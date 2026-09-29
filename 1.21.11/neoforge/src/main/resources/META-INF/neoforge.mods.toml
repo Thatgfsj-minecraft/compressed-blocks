@@ -1,0 +1,25 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="MIT"
+
+[[mods]]
+modId="compressedblocks"
+version="${version}"
+displayName="Compressed Blocks"
+description='''Compress common blocks 1x-9x for easy carrying. Tools made from compressed blocks scale durability 9^n (unbreakable at 6x+) and mine faster.'''
+authors="Thatgfsj"
+logoFile="assets/compressedblocks/icon.png"
+
+[[dependencies.compressedblocks]]
+modId="neoforge"
+type="required"
+versionRange="[21.11.0,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.compressedblocks]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.11,1.21.12)"
+ordering="NONE"
+side="BOTH"

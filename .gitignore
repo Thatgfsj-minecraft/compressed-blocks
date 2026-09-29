@@ -1,0 +1,16 @@
+# gradle
+.gradle/
+build/
+out/
+
+# ide
+.idea/
+.vscode/
+*.iml
+
+# 素材本地缓存（原版 sprite 提取物与预览图，不属于仓库内容）
+_asset-src/
+
+# 运行产物
+*.log
+.mimosa/
