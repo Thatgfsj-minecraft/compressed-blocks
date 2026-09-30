@@ -253,20 +253,28 @@ def cane_names():
 
 def gen_assets(res):
     # 储存方块/树叶：cube_all + blockstate + 物品模型定义
+    leaf_set = set(leaves_names())
     for name in storage_names() + leaves_names():
         dump(f"{res}/blockstates/{name}.json",
              {"variants": {"": {"model": f"{NS}:block/{name}"}}})
-        dump(f"{res}/models/block/{name}.json",
-             {"parent": "minecraft:block/cube_all", "textures": {"all": f"{NS}:block/{name}"}})
+        if name in leaf_set:
+            # 树叶带透明像素：必须声明 cutout_mipped（1.21.4+ 无 render_type 默认 SOLID 不透明）
+            dump(f"{res}/models/block/{name}.json",
+                 {"parent": "minecraft:block/cube_all", "render_type": "minecraft:cutout_mipped",
+                  "textures": {"all": f"{NS}:block/{name}"}})
+        else:
+            dump(f"{res}/models/block/{name}.json",
+                 {"parent": "minecraft:block/cube_all", "textures": {"all": f"{NS}:block/{name}"}})
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
-    # 树苗：cross，stage 0/1 同模型
+    # 树苗：cross，stage 0/1 同模型；透明模型必须声明 render_type（1.21.4+ 默认 SOLID 不透明）
     for name in sapling_names():
         dump(f"{res}/blockstates/{name}.json",
              {"variants": {"stage=0": {"model": f"{NS}:block/{name}"},
                            "stage=1": {"model": f"{NS}:block/{name}"}}})
         dump(f"{res}/models/block/{name}.json",
-             {"parent": "minecraft:block/cross", "textures": {"cross": f"{NS}:block/{name}"}})
+             {"parent": "minecraft:block/cross", "render_type": "minecraft:cutout",
+              "textures": {"cross": f"{NS}:block/{name}"}})
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
     # 压缩甘蔗：cross 单模型（age 属性不换图）
@@ -274,7 +282,8 @@ def gen_assets(res):
         dump(f"{res}/blockstates/{name}.json",
              {"variants": {"": {"model": f"{NS}:block/{name}"}}})
         dump(f"{res}/models/block/{name}.json",
-             {"parent": "minecraft:block/cross", "textures": {"cross": f"{NS}:block/{name}"}})
+             {"parent": "minecraft:block/cross", "render_type": "minecraft:cutout",
+              "textures": {"cross": f"{NS}:block/{name}"}})
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
     # 耕地：15/16 模板，无物品
@@ -296,7 +305,7 @@ def gen_assets(res):
             dump(f"{res}/blockstates/{block}.json", {"variants": variants})
             for n in range(stages):
                 dump(f"{res}/models/block/{p}_{crop}_stage{n}.json",
-                     {"parent": "minecraft:block/crop",
+                     {"parent": "minecraft:block/crop", "render_type": "minecraft:cutout",
                       "textures": {"crop": f"{NS}:block/{p}_{crop}_stage{n}"}})
             # 作物 BlockItem：物品模型
             dump(f"{res}/items/{crop_item_id(crop, p)}.json",

@@ -1,1 +1,1 @@
-{"parent":"minecraft:block/cube_all","textures":{"all":"compressedblocks:block/2x_mangrove_leaves"}}
+{"parent":"minecraft:block/cube_all","render_type":"minecraft:cutout_mipped","textures":{"all":"compressedblocks:block/2x_mangrove_leaves"}}

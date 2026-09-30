@@ -111,15 +111,19 @@ function check(name, ok, detail) {
     await clear(slot);
     slot++;
   }
-  // 压缩甘蔗：种在同重数压缩泥土上应存活（沙子路线由 place 门与 mayPlaceOn 覆盖，此处验证泥土路线）
-  for (const cb of CANE_BLOCKS) {
+  // 压缩甘蔗：专用条带（泥土 + 相邻水源，模拟真实农田），种在同重数压缩泥土上应存活
+  for (let i = 0; i < CANE_BLOCKS.length; i++) {
+    const cb = CANE_BLOCKS[i];
     const lvl = cb.split('_')[0];
-    await cmd(`setblock ${pos(slot)} ${NS}:${lvl}_dirt`);
-    await cmd(`setblock ${pos(slot, 1)} ${NS}:${cb}`);
-    const res = await cmd(`execute if block ${pos(slot, 1)} ${NS}:${cb}`);
+    const x = 2 + (i % 12), z = -40 - Math.floor(i / 12) * 3;
+    await cmd(`setblock ${x} -60 ${z + 1} minecraft:water`);
+    await cmd(`setblock ${x} -60 ${z} ${NS}:${lvl}_dirt`);
+    await cmd(`setblock ${x} -59 ${z} ${NS}:${cb}`);
+    const res = await cmd(`execute if block ${x} -59 ${z} ${NS}:${cb}`);
     check(`block ${cb}`, /Test passed/.test(res), res.trim());
-    await clear(slot);
-    slot++;
+    await cmd(`setblock ${x} -59 ${z} minecraft:air`);
+    await cmd(`setblock ${x} -60 ${z} minecraft:air`);
+    await cmd(`setblock ${x} -60 ${z + 1} minecraft:air`);
   }
 
   // 2) 作物/树苗等级门：放错等级支撑上，邻居更新后应弹掉
