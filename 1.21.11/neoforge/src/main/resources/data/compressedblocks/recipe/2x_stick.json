@@ -1,1 +1,1 @@
-{"type":"minecraft:crafting_shaped","category":"ingredients","pattern":["PPP","PPP","PPP"],"key":{"P":"compressedblocks:1x_stick"},"result":{"count":1,"id":"compressedblocks:2x_stick"}}
+{"type":"minecraft:crafting_shaped","category":"building","pattern":["PPP","PPP","PPP"],"key":{"P":"compressedblocks:1x_stick"},"result":{"count":1,"id":"compressedblocks:2x_stick"}}

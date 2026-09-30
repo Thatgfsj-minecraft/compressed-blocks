@@ -14,3 +14,5 @@ _asset-src/
 # 运行产物
 *.log
 .mimosa/
+1.21.11/neoforge/runs/
+1.21.11/neoforge/run/

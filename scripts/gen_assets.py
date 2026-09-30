@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """压缩方块 mod 贴图生成器。
 
-全部贴图从原版方块/工具 sprite 程序化重绘生成，不复制任何第三方 mod 的像素：
-- 方块：原版贴图做底，按重数加深 + 嵌套方框环（"层层压缩"的视觉语言）
-- 工具：原版石/木工具 sprite，把"头部"像素重新着色为对应材料色（随重数加深），把手不动
-
+全部贴图从原版方块/物品 sprite 程序化重绘生成，不复制任何第三方 mod 的像素。
+压缩层视觉语言（0.3.0 起）：
+- 方块：底图加灰色滤镜，外围压缩环封顶 5 圈（每圈≈5%）：
+  1~5 重=黑/浅黑圈逐级累积；6~8 重新增圈改深紫/浅紫（紫黑黑黑黑→紫紫紫黑黑）；
+  9 重最外圈改白色细圈（白紫紫黑黑）
+- 非整面物品（树苗/作物/食物/种子/盔甲图标）：按同一配色做逐级染色
+  （1~5 重渐深、6~8 重偏紫、9 重泛白+白边）
+- 树叶：保留生物染色，只叠压缩环不加灰滤镜
 用法：python scripts/gen_assets.py [--out-root <repo根，默认仓库根>]
-输出：各子项目 src/main/resources/assets/compressedblocks/textures/{block,item}/*.png
-     以及 _asset-src/preview_blocks.png / preview_tools.png 预览拼图。
 """
 import argparse
 import colorsys
@@ -34,45 +36,108 @@ LEVELS = [
     (9, "9x", "Nonuple Compressed", "九重压缩"),
 ]
 
-# key: (vanilla 贴图名, en 名, zh 名, 是否可做工具, 工具基材 stone|wood)
+# 储存方块材料（0.2.0 起就有）。工具不挂材料：只有圆石线+木线两条（见 TOOL_KINDS）
 MATERIALS = [
-    ("cobblestone", "Cobblestone", "圆石", True, "stone"),
-    ("stone", "Stone", "石头", True, "stone"),
-    ("cobbled_deepslate", "Cobbled Deepslate", "深板岩圆石", True, "stone"),
-    ("deepslate", "Deepslate", "深板岩", True, "stone"),
-    ("oak_log", "Oak Log", "橡木原木", True, "wood"),
-    ("spruce_log", "Spruce Log", "云杉原木", True, "wood"),
-    ("birch_log", "Birch Log", "白桦原木", True, "wood"),
-    ("jungle_log", "Jungle Log", "丛林原木", True, "wood"),
-    ("acacia_log", "Acacia Log", "金合欢原木", True, "wood"),
-    ("dark_oak_log", "Dark Oak Log", "深色橡木原木", True, "wood"),
-    ("mangrove_log", "Mangrove Log", "红树原木", True, "wood"),
-    ("cherry_log", "Cherry Log", "樱花原木", True, "wood"),
-    ("pale_oak_log", "Pale Oak Log", "苍白橡木原木", True, "wood"),
-    ("dirt", "Dirt", "泥土", False, None),
-    ("sand", "Sand", "沙子", False, None),
-    ("gravel", "Gravel", "沙砾", False, None),
-    ("netherrack", "Netherrack", "下界岩", False, None),
-    ("end_stone", "End Stone", "末地石", False, None),
-    ("obsidian", "Obsidian", "黑曜石", False, None),
+    ("cobblestone", "Cobblestone", "圆石", False),
+    ("stone", "Stone", "石头", False),
+    ("cobbled_deepslate", "Cobbled Deepslate", "深板岩圆石", False),
+    ("deepslate", "Deepslate", "深板岩", False),
+    ("oak_log", "Oak Log", "橡木原木", False),
+    ("spruce_log", "Spruce Log", "云杉原木", False),
+    ("birch_log", "Birch Log", "白桦原木", False),
+    ("jungle_log", "Jungle Log", "丛林原木", False),
+    ("acacia_log", "Acacia Log", "金合欢原木", False),
+    ("dark_oak_log", "Dark Oak Log", "深色橡木原木", False),
+    ("mangrove_log", "Mangrove Log", "红树原木", False),
+    ("cherry_log", "Cherry Log", "樱花原木", False),
+    ("pale_oak_log", "Pale Oak Log", "苍白橡木原木", False),
+    ("dirt", "Dirt", "泥土", False),
+    ("sand", "Sand", "沙子", False),
+    ("gravel", "Gravel", "沙砾", False),
+    ("netherrack", "Netherrack", "下界岩", False),
+    ("end_stone", "End Stone", "末地石", False),
+    ("obsidian", "Obsidian", "黑曜石", False),
 ]
 
+# 0.3.0 新建材 24 种：(key, en, zh, sprite 名, light 等级)
+BUILD_MATERIALS = [
+    ("granite", "Granite", "花岗岩", "granite", 0),
+    ("diorite", "Diorite", "闪长岩", "diorite", 0),
+    ("andesite", "Andesite", "安山岩", "andesite", 0),
+    ("calcite", "Calcite", "方解石", "calcite", 0),
+    ("tuff", "Tuff", "凝灰岩", "tuff", 0),
+    ("sandstone", "Sandstone", "砂岩", "sandstone", 0),
+    ("red_sandstone", "Red Sandstone", "红砂岩", "red_sandstone", 0),
+    ("basalt", "Basalt", "玄武岩", "basalt_side", 0),
+    ("blackstone", "Blackstone", "黑石", "blackstone", 0),
+    ("dripstone_block", "Dripstone Block", "钟乳石", "dripstone_block", 0),
+    ("terracotta", "Terracotta", "陶瓦", "terracotta", 0),
+    ("quartz_block", "Quartz Block", "石英块", "quartz_block_side", 0),
+    ("purpur_block", "Purpur Block", "紫珀块", "purpur_block", 0),
+    ("prismarine", "Prismarine", "海晶石", "prismarine", 0),
+    ("amethyst_block", "Amethyst Block", "紫水晶块", "amethyst_block", 0),
+    ("glowstone", "Glowstone", "荧石", "glowstone", 15),
+    ("clay", "Clay", "黏土块", "clay", 0),
+    ("hay_block", "Hay Bale", "干草块", "hay_block_side", 0),
+    ("bone_block", "Bone Block", "骨块", "bone_block_side", 0),
+    ("moss_block", "Moss Block", "苔藓块", "moss_block", 0),
+    ("snow", "Snow Block", "雪块", "snow", 0),
+    ("ice", "Ice", "冰", "ice", 0),
+    ("packed_ice", "Packed Ice", "浮冰", "packed_ice", 0),
+    ("mud", "Mud", "泥巴", "mud", 0),
+]
+
+# 树：key / en / zh / 树叶 sprite / 树苗 sprite / 生物染色（None=贴图自带色）
+WOODS = [
+    ("oak", "Oak", "橡木", "oak_leaves", "oak_sapling", (119, 171, 47)),
+    ("spruce", "Spruce", "云杉", "spruce_leaves", "spruce_sapling", (97, 153, 97)),
+    ("birch", "Birch", "白桦", "birch_leaves", "birch_sapling", (128, 167, 85)),
+    ("jungle", "Jungle", "丛林", "jungle_leaves", "jungle_sapling", (119, 171, 47)),
+    ("acacia", "Acacia", "金合欢", "acacia_leaves", "acacia_sapling", (119, 171, 47)),
+    ("dark_oak", "Dark Oak", "深色橡木", "dark_oak_leaves", "dark_oak_sapling", (119, 171, 47)),
+    ("mangrove", "Mangrove", "红树", "mangrove_leaves", "mangrove_propagule", (119, 171, 47)),
+    ("cherry", "Cherry", "樱花", "cherry_leaves", "cherry_sapling", None),
+    ("pale_oak", "Pale Oak", "苍白橡木", "pale_oak_leaves", "pale_oak_sapling", None),
+]
+
+# 作物：key / en / zh / 阶段数 / 产物 sprite / 种子 sprite（None=产物直种）
+CROPS = [
+    ("wheat", "Wheat", "小麦", 8, "item/wheat", "item/wheat_seeds"),
+    ("carrot", "Carrot", "胡萝卜", 4, "item/carrot", None),
+    ("potato", "Potato", "马铃薯", 4, "item/potato", None),
+    ("beetroot", "Beetroot", "甜菜根", 4, "item/beetroot", "item/beetroot_seeds"),
+]
+# 阶段贴图命名：小麦 wheat_stageN，其余复数 carrots_/potatoes_/beetroots_stageN
+CROP_STAGE_SPRITE = {"wheat": "wheat_stage", "carrot": "carrots_stage",
+                     "potato": "potatoes_stage", "beetroot": "beetroots_stage"}
+
+FOODS = [
+    ("bread", "Bread", "面包", "item/bread"),
+    ("beef", "Beef", "牛肉", "item/beef"),
+    ("melon", "Watermelon", "西瓜", "item/melon_slice"),
+]
+
+ARMOR_PIECES = ["helmet", "chestplate", "leggings", "boots"]
+
 TOOL_TYPES = ["pickaxe", "axe", "shovel", "hoe", "sword"]
-TOOL_ZH = {"pickaxe": "镐", "axe": "斧", "shovel": "锹", "hoe": "锄", "sword": "剑"}
 
 SIZE = 16
+PURPLE_DARK = (85, 32, 140)
+PURPLE_LIGHT = (178, 102, 255)
+WHITE_RING = (245, 245, 250)
 
 
 def load_base(name):
     kind, _, file = name.partition("/")
-    return Image.open(os.path.join(VANILLA, f"{kind}_{file}")).convert("RGBA")
+    return Image.open(os.path.join(VANILLA, f"{kind}_{file}.png")).convert("RGBA")
 
 
 def avg_color(img):
     px = list(img.getdata())
-    r = sum(p[0] for p in px) / len(px)
-    g = sum(p[1] for p in px) / len(px)
-    b = sum(p[2] for p in px) / len(px)
+    n = len(px)
+    r = sum(p[0] for p in px) / n
+    g = sum(p[1] for p in px) / n
+    b = sum(p[2] for p in px) / n
     return (r, g, b)
 
 
@@ -96,119 +161,161 @@ def darken(img, f):
 
 def draw_frame(img, inset, color):
     d = ImageDraw.Draw(img)
-    d.rectangle([inset, inset, SIZE - 1 - inset, SIZE - 1 - inset], outline=color)
+    d.rectangle([inset, inset, img.width - 1 - inset, img.height - 1 - inset], outline=color)
     return img
 
 
-def gen_block_tex(base, level):
-    """方块贴图：field 随重数加深 + 深色嵌套环逐级累积（第 n 重比第 n-1 重多一环）。
-
-    九重额外：field 更深 + 中心 2×2 亮点（"压缩到核心"标记），保证与八重可辨。
-    """
-    avg = avg_color(base)
-    f = max(0.42, 0.84 ** (level - 1))
-    if level >= 9:
-        f = 0.34
-    img = darken(base, f)
-    ring_a = scale_color(avg, 0.10)
-    ring_b = scale_color(avg, 0.28)
-    for i in range(level):
-        inset = i  # 0,1,2,... 最外圈从边缘开始
-        if inset > 7:
-            break
-        draw_frame(img, inset, ring_a if i % 2 == 0 else ring_b)
-    if level >= 9:
-        d = ImageDraw.Draw(img)
-        light = mix(avg, (255, 255, 255), 0.6)
-        d.rectangle([7, 7, 8, 8], fill=light)
-    return img
+def ring_plan(level):
+    """从外到内的压缩环配色计划。黑黑黑黑黑封顶 5 圈；6~8 重外围换紫；9 重最外圈白。"""
+    if level <= 5:
+        return ["B"] * level
+    if level == 6:
+        return ["P", "B", "B", "B", "B"]
+    if level == 7:
+        return ["P", "P", "B", "B", "B"]
+    if level == 8:
+        return ["P", "P", "P", "B", "B"]
+    return ["W", "P", "P", "B", "B"]
 
 
-def head_mask(sprite_stone):
-    """头部像素 = 石工具 sprite 上的低饱和度灰像素。
-
-    原版同类型工具（木/石/铁…）几何完全一致，只有配色不同，
-    所以石 sprite 的灰像素坐标可以直接作为所有材质变体的头部遮罩。
-    """
-    mask = []
-    for y in range(SIZE):
-        for x in range(SIZE):
-            r, g, b, a = sprite_stone.getpixel((x, y))
-            if a == 0:
-                continue
-            h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
-            if s < 0.25 and v > 0.15:
-                mask.append((x, y))
-    return mask
-
-
-def gen_tool_tex(tool, level, base_kind, mat_color):
-    """工具贴图：原版石/木 sprite 的头部按遮罩重新着色为材料色（随重数加深）。"""
-    kind = "stone" if base_kind == "stone" else "wooden"
-    sprite = load_base(f"item/{kind}_{tool}.png")
-    out = sprite.copy()
-    mask = head_mask(load_base(f"item/stone_{tool}.png"))
-    if not mask:
-        print(f"WARN: empty head mask for {tool}", file=sys.stderr)
-        return out
-    mr, mg, mb, _ = mat_color
-    for x, y in mask:
-        r, g, b, a = sprite.getpixel((x, y))
-        # 用原像素明度（0.35~1.1 拉伸）乘材料色，保留雕刻细节又带足材料色
-        lum = (0.299 * r + 0.587 * g + 0.114 * b) / 160.0
-        k = max(0.35, min(1.1, lum))
-        out.putpixel((x, y), (min(255, int(mr * k)), min(255, int(mg * k)), min(255, int(mb * k)), a))
-    # 六重及以上（不可破坏）：沿头部左上轮廓加一道浅色高光作为"无限"标记
-    if level >= 6 and mask:
-        s_min = min(x + y for x, y in mask)
-        for x, y in mask:
-            if x + y - s_min <= 1:
-                out.putpixel((x, y), (235, 240, 255, 255))
-    return out
-
-
-def gen_stick_tex(level):
-    """压缩木棍：木棍 sprite 逐级加深 + 剪影描边加深；九重加白色顶点标记。"""
-    sprite = load_base("item/stick.png")
-    img = darken(sprite, max(0.42, 0.84 ** (level - 1)))
-    # 剪影边缘再压暗一档（描边感）
-    px = img.load()
-    edges = []
-    for y in range(SIZE):
-        for x in range(SIZE):
+def gray_filter(img):
+    """灰色滤镜：向亮度灰偏移 45% 再压暗 15%，突出压缩环配色。"""
+    out = img.copy()
+    px = out.load()
+    for y in range(out.height):
+        for x in range(out.width):
             r, g, b, a = px[x, y]
             if a == 0:
                 continue
-            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                nx, ny = x + dx, y + dy
-                if not (0 <= nx < SIZE and 0 <= ny < SIZE) or px[nx, ny][3] == 0:
-                    edges.append((x, y))
-                    break
-    for x, y in edges:
-        r, g, b, a = px[x, y]
-        px[x, y] = (int(r * 0.55), int(g * 0.55), int(b * 0.55), a)
-    if level >= 9:
-        for x, y in mask_top_pixels(sprite, 2):
-            px[x, y] = (240, 240, 255, 255)
+            lum = 0.299 * r + 0.587 * g + 0.114 * b
+            px[x, y] = (int((r * 0.55 + lum * 0.45) * 0.85),
+                        int((g * 0.55 + lum * 0.45) * 0.85),
+                        int((b * 0.55 + lum * 0.45) * 0.85), a)
+    return out
+
+
+def gen_block_tex(base, level, gray=True):
+    """方块/树叶贴图：灰色滤镜底图 + 封顶 5 圈压缩环（黑圈颜色取自底图均色，紫圈固定配色）。"""
+    avg = avg_color(base)
+    img = gray_filter(base) if gray else base.copy()
+    for i, kind in enumerate(ring_plan(level)):
+        if kind == "B":
+            color = scale_color(avg, 0.10) if i % 2 == 0 else scale_color(avg, 0.30)
+        elif kind == "P":
+            color = PURPLE_DARK if i % 2 == 0 else PURPLE_LIGHT
+        else:
+            color = WHITE_RING
+        draw_frame(img, i, color)
     return img
 
 
-def mask_top_pixels(img, count):
-    """sprite 剪影最上方的若干像素（用于九重标记）。"""
-    pts = [(x, y) for y in range(SIZE) for x in range(SIZE) if img.getpixel((x, y))[3] != 0]
-    min_y = min(y for _, y in pts)
-    return [(x, y) for x, y in pts if y <= min_y + 1][:count]
+def level_tint(img, level, rim=True):
+    """物品级逐级染色：1~5 重渐深，6~8 重偏紫，9 重泛白+白色剪影描边。"""
+    out = img.copy()
+    px = out.load()
+    dark = 1.0 - 0.06 * (min(level, 5) - 1)
+    purple = 0.0 if level < 6 else 0.18 * (level - 5)
+    white = 0.30 if level >= 9 else 0.0
+    for y in range(out.height):
+        for x in range(out.width):
+            r, g, b, a = px[x, y]
+            if a == 0:
+                continue
+            c = (r * dark, g * dark, b * dark)
+            if purple:
+                c = mix(c, PURPLE_LIGHT, purple)
+            if white:
+                c = mix(c, (255, 255, 255), white)
+            px[x, y] = (int(c[0]), int(c[1]), int(c[2]), a)
+    if rim and level >= 9:
+        for y in range(out.height):
+            for x in range(out.width):
+                if px[x, y][3] == 0:
+                    continue
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = x + dx, y + dy
+                    if not (0 <= nx < out.width and 0 <= ny < out.height) or px[nx, ny][3] == 0:
+                        px[x, y] = (240, 240, 255, px[x, y][3])
+                        break
+    return out
 
 
-def contact_sheet(images, cols, cell=20, scale=4):
-    rows = (len(images) + cols - 1) // cols
-    sheet = Image.new("RGBA", (cols * cell * scale, rows * cell * scale), (40, 40, 40, 255))
-    for i, img in enumerate(images):
-        big = img.resize((img.width * scale, img.height * scale), Image.NEAREST)
-        x = (i % cols) * cell * scale + 2 * scale
-        y = (i // cols) * cell * scale + 2 * scale
-        sheet.paste(big, (x, y))
-    return sheet
+def recolor_by_lum(sprite, mask_sprite, mat_color):
+    """按遮罩 sprite 的灰度像素位置，用原像素明度×材料色重着色（工具头部/盔甲通用）。"""
+    out = sprite.copy()
+    for y in range(SIZE):
+        for x in range(SIZE):
+            r, g, b, a = mask_sprite.getpixel((x, y))
+            if a == 0:
+                continue
+            h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            if s >= 0.25 or v <= 0.15:  # 非头部像素（把手等）跳过
+                continue
+            sr, sg, sb, sa = sprite.getpixel((x, y))
+            lum = (0.299 * sr + 0.587 * sg + 0.114 * sb) / 160.0
+            k = max(0.35, min(1.1, lum))
+            out.putpixel((x, y), (min(255, int(mat_color[0] * k)),
+                                  min(255, int(mat_color[1] * k)),
+                                  min(255, int(mat_color[2] * k)), sa))
+    return out
+
+
+def gen_tool_tex(tool, level, base_kind, mat_color):
+    """工具贴图：原版石/木 sprite 头部按遮罩重着色（随重数加深），六重起加浅色高光。"""
+    kind = "stone" if base_kind == "stone" else "wooden"
+    sprite = load_base(f"item/{kind}_{tool}")
+    out = recolor_by_lum(sprite, load_base("item/stone_" + tool), mat_color)
+    if level >= 6:
+        mask = [(x, y) for y in range(SIZE) for x in range(SIZE)
+                if sprite.getpixel((x, y))[3] != 0
+                and _is_head_pixel(sprite.getpixel((x, y)))]
+        if mask:
+            s_min = min(x + y for x, y in mask)
+            for x, y in mask:
+                if x + y - s_min <= 1:
+                    out.putpixel((x, y), (235, 240, 255, 255))
+    return out
+
+
+def _is_head_pixel(rgba):
+    r, g, b, a = rgba
+    h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+    return s < 0.25 and v > 0.15
+
+
+def gen_stick_tex(level):
+    """压缩木棍：木棍 sprite 逐级染色。"""
+    return level_tint(load_base("item/stick"), level)
+
+
+def gen_leaves_tex(sprite, tint, level):
+    """树叶：先按生物染色，再叠压缩环（不加灰滤镜，保绿色）。"""
+    img = sprite.copy()
+    if tint:
+        px = img.load()
+        for y in range(SIZE):
+            for x in range(SIZE):
+                r, g, b, a = px[x, y]
+                if a == 0:
+                    continue
+                px[x, y] = (int(r * tint[0] / 255), int(g * tint[1] / 255), int(b * tint[2] / 255), a)
+    return gen_block_tex(img, level, gray=False)
+
+
+def gen_farmland_tex(dirt, moist_top, level):
+    """压缩耕地：泥土底 + 湿耕地沟壑叠加 + 压缩环。"""
+    base = dirt.copy()
+    px = base.load()
+    for y in range(SIZE):
+        for x in range(SIZE):
+            tr, tg, tb, ta = moist_top.getpixel((x, y))
+            if ta == 0:
+                continue
+            dr, dg, db, _ = px[x, y]
+            t = ta / 255.0
+            px[x, y] = (int(dr * (1 - t) + tr * t), int(dg * (1 - t) + tg * t),
+                        int(db * (1 - t) + tb * t), 255)
+    return gen_block_tex(base, level)
 
 
 def main():
@@ -216,60 +323,146 @@ def main():
     ap.add_argument("--out-root", default=ROOT)
     args = ap.parse_args()
 
-    block_tex, item_tex = {}, {}
-    for key, en, zh, can_tool, kind in MATERIALS:
-        base = load_base(f"block/{key}.png")
-        for level, prefix, en_p, zh_p in LEVELS:
-            name = f"{prefix}_{key}"
-            block_tex[name] = gen_block_tex(base, level)
-            if can_tool:
-                mat_color = avg_color(block_tex[name]) + (255,)
-                for tool in TOOL_TYPES:
-                    item_tex[f"{prefix}_{key}_{tool}"] = gen_tool_tex(tool, level, kind, mat_color)
-    for level, prefix, en_p, zh_p in LEVELS:
-        item_tex[f"{prefix}_stick"] = gen_stick_tex(level)
+    block_tex, item_tex, armor_layer_tex = {}, {}, {}
+    for mat in [(k, e, z, t) for k, e, z, t in MATERIALS] + \
+               [(k, e, z, False) for k, e, z, _, _ in BUILD_MATERIALS]:
+        key, sprite = mat[0], mat[0]
+        for k, e, z, sp, _ in BUILD_MATERIALS:
+            if k == mat[0]:
+                sprite = sp
+        base = load_base("block/" + sprite)
+        for _, prefix, _, _ in LEVELS:
+            block_tex[f"{prefix}_{key}"] = gen_block_tex(base, int(prefix[:-1]))
 
-    print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}")
+    # 树叶（带生物染色 + 压缩环）与耕地
+    for wood, _, _, leaves_sprite, _, tint in WOODS:
+        sprite = load_base("block/" + leaves_sprite)
+        for _, prefix, _, _ in LEVELS:
+            block_tex[f"{prefix}_{wood}_leaves"] = gen_leaves_tex(sprite, tint, int(prefix[:-1]))
+    dirt_img = load_base("block/dirt")
+    moist_top = load_base("block/farmland_moist")
+    for _, prefix, _, _ in LEVELS:
+        block_tex[f"{prefix}_farmland"] = gen_farmland_tex(dirt_img, moist_top, int(prefix[:-1]))
+
+    # 作物阶段（方块 cross 贴图）
+    for crop, _, _, stages, _, _ in CROPS:
+        for n in range(stages):
+            sprite = load_base("block/" + CROP_STAGE_SPRITE[crop] + str(n))
+            for _, prefix, _, _ in LEVELS[:3]:
+                block_tex[f"{prefix}_{crop}_stage{n}"] = level_tint(sprite, int(prefix[:-1]), rim=False)
+
+    # 工具两条线：压缩圆石工具（石 sprite）+ 压缩木质工具（木 sprite，9 原木混用）
+    for key, base_kind, color_src in (("cobblestone", "stone", "cobblestone"), ("wood", "wood", "oak_log")):
+        for _, prefix, _, _ in LEVELS:
+            level = int(prefix[:-1])
+            mat_color = avg_color(block_tex[f"{prefix}_{color_src}"]) + (255,)
+            for tool in TOOL_TYPES:
+                item_tex[f"{prefix}_{key}_{tool}"] = gen_tool_tex(tool, level, base_kind, mat_color)
+    for _, prefix, _, _ in LEVELS:
+        item_tex[f"{prefix}_stick"] = gen_stick_tex(int(prefix[:-1]))
+
+    # 树苗 / 作物产物与种子 / 食物：物品级染色
+    for wood, _, _, _, sapling_sprite, _ in WOODS:
+        sprite = load_base("block/" + sapling_sprite)
+        for _, prefix, _, _ in LEVELS:
+            item_tex[f"{prefix}_{wood}_sapling"] = level_tint(sprite, int(prefix[:-1]))
+    for crop, _, _, _, produce_sprite, seed_sprite in CROPS:
+        produce = load_base(produce_sprite)
+        for _, prefix, _, _ in LEVELS[:3]:
+            item_tex[f"{prefix}_{crop}"] = level_tint(produce, int(prefix[:-1]))
+        if seed_sprite:
+            seeds = load_base(seed_sprite)
+            for _, prefix, _, _ in LEVELS[:3]:
+                item_tex[f"{prefix}_{crop}_seeds"] = level_tint(seeds, int(prefix[:-1]))
+    for food, _, _, sprite in FOODS:
+        base = load_base(sprite)
+        for _, prefix, _, _ in LEVELS[:3]:
+            item_tex[f"{prefix}_{food}"] = level_tint(base, int(prefix[:-1]))
+
+    # 盔甲：图标=铁甲图标重着色为石灰色再逐级染色；实体层=铁甲层重着色
+    stone_avg = avg_color(load_base("block/stone"))
+    stone_color = (int(stone_avg[0]), int(stone_avg[1]), int(stone_avg[2]))
+    for piece in ARMOR_PIECES:
+        icon = load_base("item/iron_" + piece)
+        for _, prefix, _, _ in LEVELS:
+            level = int(prefix[:-1])
+            item_tex[f"{prefix}_stone_{piece}"] = level_tint(
+                recolor_by_lum(icon, icon, stone_color + (255,)), level)
+    for layer, src in (("humanoid", "humanoid/iron"), ("humanoid_leggings", "humanoid_leggings/iron")):
+        layer_img = load_base(src)
+        for _, prefix, _, _ in LEVELS:
+            level = int(prefix[:-1])
+            armor_layer_tex[f"{layer}/stone_{prefix}"] = level_tint(
+                recolor_full(layer_img, stone_color), level, rim=False)
+
+    print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}, armor layers: {len(armor_layer_tex)}")
     for sub in SUBPROJECTS:
-        bdir = os.path.join(args.out_root, os.path.relpath(sub, ROOT), "src", "main", "resources",
+        rel = os.path.relpath(sub, ROOT)
+        if not os.path.exists(os.path.join(args.out_root, rel, "build.gradle")):
+            continue
+        tdir = os.path.join(args.out_root, rel, "src", "main", "resources",
                             "assets", "compressedblocks", "textures")
-        if os.path.exists(os.path.join(args.out_root, os.path.relpath(sub, ROOT), "build.gradle")):
-            for name, img in block_tex.items():
-                p = os.path.join(bdir, "block", name + ".png")
-                os.makedirs(os.path.dirname(p), exist_ok=True)
-                img.save(p)
-            for name, img in item_tex.items():
-                p = os.path.join(bdir, "item", name + ".png")
-                os.makedirs(os.path.dirname(p), exist_ok=True)
-                img.save(p)
-            print(f"wrote textures into {sub}")
+        for name, img in block_tex.items():
+            p = os.path.join(tdir, "block", name + ".png")
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            img.save(p)
+        for name, img in item_tex.items():
+            p = os.path.join(tdir, "item", name + ".png")
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            img.save(p)
+        for name, img in armor_layer_tex.items():
+            p = os.path.join(tdir, "entity", "equipment", name + ".png")
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            img.save(p)
+        print(f"wrote textures into {sub}")
 
-    # mod 图标：九重压缩圆石 8x 放大
     icon = block_tex["9x_cobblestone"].resize((128, 128), Image.NEAREST)
     icon.save(os.path.join(ROOT, "_asset-src", "icon.png"))
 
-    # 预览拼图：方块按材料分行 × 9 重
-    sheet = Image.new("RGBA", (10 * 22 * 4, len(MATERIALS) * 22 * 4), (40, 40, 40, 255))
-    for r, (key, en, zh, _, _) in enumerate(MATERIALS):
-        for c, (level, prefix, _, _) in enumerate(LEVELS):
-            img = block_tex[f"{prefix}_{key}"].resize((64, 64), Image.NEAREST)
-            sheet.paste(img, (c * 88 + 4, r * 88 + 4))
-    sheet.save(os.path.join(ROOT, "_asset-src", "preview_blocks.png"))
+    # 预览：储存方块 + 树叶/耕地
+    lv = [l[1] for l in LEVELS]
+    sheet_keys = [f"{p}_{m[0]}" for m in MATERIALS + [(k, e, z, False) for k, e, z, _, _ in BUILD_MATERIALS]
+                  for p in lv]
+    extra_keys = [f"{p}_{w[0]}_leaves" for w in WOODS for p in lv] + \
+                 [f"{p}_farmland" for p in lv]
+    contact_sheet([(k, block_tex[k]) for k in sheet_keys + extra_keys], 18,
+                  os.path.join(ROOT, "_asset-src", "preview_blocks.png"))
+    imgs = [f"{p}_{k}_{t}" for k in ("cobblestone", "wood") for t in TOOL_TYPES for p in lv]
+    contact_sheet([(k, item_tex[k]) for k in imgs], 45,
+                  os.path.join(ROOT, "_asset-src", "preview_tools.png"))
+    misc = [k for k in item_tex if k.endswith(("_sapling", "_seeds")) or
+            any(k == f"{p}_{f[0]}" for p in lv for f in FOODS) or
+            any(k == f"{p}_stone_{piece}" for p in lv for piece in ARMOR_PIECES)]
+    contact_sheet([(k, item_tex[k]) for k in sorted(misc)], 27,
+                  os.path.join(ROOT, "_asset-src", "preview_items.png"))
+    print("previews written to _asset-src/preview_{blocks,tools,items}.png")
 
-    # 工具预览：每种材料 5 行（5 工具）× 9 重
-    tool_rows = [(k, e, z) for k, e, z, t, _ in MATERIALS if t]
-    icon = 88
-    cols = len(LEVELS) * len(TOOL_TYPES)
-    sheet = Image.new("RGBA", (cols * icon, len(tool_rows) * len(TOOL_TYPES) * icon), (40, 40, 40, 255))
-    for r, (key, en, zh) in enumerate(tool_rows):
-        for t_i, tool in enumerate(TOOL_TYPES):
-            for c, (level, prefix, _, _) in enumerate(LEVELS):
-                img = item_tex[f"{prefix}_{key}_{tool}"].resize((64, 64), Image.NEAREST)
-                x = ((t_i * len(LEVELS)) + c) * icon + 4
-                y = (r * len(TOOL_TYPES) + t_i) * icon + 4
-                sheet.paste(img, (x, y))
-    sheet.save(os.path.join(ROOT, "_asset-src", "preview_tools.png"))
-    print("previews written to _asset-src/preview_blocks.png, preview_tools.png")
+
+def recolor_full(img, color):
+    """整图按明度×材料色重着色（盔甲实体层）。"""
+    out = img.copy()
+    px = out.load()
+    for y in range(out.height):
+        for x in range(out.width):
+            r, g, b, a = px[x, y]
+            if a == 0:
+                continue
+            lum = (0.299 * r + 0.587 * g + 0.114 * b) / 160.0
+            k = max(0.3, min(1.15, lum))
+            px[x, y] = (min(255, int(color[0] * k)), min(255, int(color[1] * k)),
+                        min(255, int(color[2] * k)), a)
+    return out
+
+
+def contact_sheet(pairs, cols, out_path, cell=20, scale=4):
+    rows = (len(pairs) + cols - 1) // cols
+    sheet = Image.new("RGBA", (cols * cell * scale, rows * cell * scale), (40, 40, 40, 255))
+    for i, (name, img) in enumerate(pairs):
+        big = img.resize((img.width * scale, img.height * scale), Image.NEAREST)
+        x = (i % cols) * cell * scale + 2 * scale
+        y = (i // cols) * cell * scale + 2 * scale
+        sheet.paste(big, (x, y))
+    sheet.save(out_path)
 
 
 if __name__ == "__main__":
