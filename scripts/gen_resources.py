@@ -99,8 +99,7 @@ BUILD_MATERIALS = [
     ("bone_block", "Bone Block", "骨块", "pickaxe", None),
     ("moss_block", "Moss Block", "苔藓块", "hoe", None),
     ("snow", "Snow Block", "雪块", "shovel", None),
-    ("ice", "Ice", "冰", "pickaxe", None),
-    ("packed_ice", "Packed Ice", "浮冰", "pickaxe", None),
+    ("blue_ice", "Blue Ice", "蓝冰", "pickaxe", None),
     ("mud", "Mud", "泥巴", "shovel", None),
 ]
 
@@ -203,7 +202,7 @@ def tool_names():
 
 
 def armor_names():
-    return [f"{p}_stone_{piece}" for p in LV for piece in ARMOR_PIECES]
+    return [f"{p}_{line}_{piece}" for line in ("stone", "wood") for p in LV for piece in ARMOR_PIECES]
 
 
 def food_names():
@@ -326,6 +325,9 @@ def gen_assets(res):
         dump(f"{res}/equipment/stone_{p}.json",
              {"layers": {"humanoid": [{"texture": f"{NS}:stone_{p}"}],
                          "humanoid_leggings": [{"texture": f"{NS}:stone_{p}"}]}})
+        dump(f"{res}/equipment/wood_{p}.json",
+             {"layers": {"humanoid": [{"texture": f"{NS}:wood_{p}"}],
+                         "humanoid_leggings": [{"texture": f"{NS}:wood_{p}"}]}})
     icon_src = os.path.join(ROOT, "_asset-src", "icon.png")
     shutil.copyfile(icon_src, f"{res}/icon.png")
 
@@ -404,6 +406,13 @@ def gen_lang(res):
         lv = next(l for l in LEVELS if l[0] == p)
         en[f"item.{NS}.{name}"] = f"{lv[1]} Stone {ARMOR_EN[piece]}"
         zh[f"item.{NS}.{name}"] = f"{lv[2]}石头{ARMOR_ZH[piece]}"
+    for name in armor_names():
+        if "_wood_" in name:
+            p = name.split("_", 1)[0]
+            piece = name.split("_wood_")[1]
+            lv = next(l for l in LEVELS if l[0] == p)
+            en[f"item.{NS}.{name}"] = f"{lv[1]} Wooden {ARMOR_EN[piece]}"
+            zh[f"item.{NS}.{name}"] = f"{lv[2]}木质{ARMOR_ZH[piece]}"
     for name in stick_names():
         lv = next(l for l in LEVELS if name.startswith(l[0] + "_"))
         en[f"item.{NS}.{name}"] = f"{lv[1]} Stick"
@@ -492,7 +501,8 @@ def gen_data(data):
     for i, p in enumerate(LV[:FOOD_MAX_LEVEL]):
         cur = f"{NS}:{p}_melon"
         if i == 0:
-            compress(cur, "minecraft:melon_slice")   # 9 西瓜片 → 1x
+            # 不可从西瓜片合成：否则与原版“9 西瓜片→西瓜块”同形抢占，导致西瓜块无法合成。
+            # 链条：西瓜片→(原版)西瓜块→二重西瓜→分解→一重西瓜→分解→西瓜片
             unpack(cur, "minecraft:melon_slice")
         elif i == 1:
             compress(cur, "minecraft:melon")          # 9 西瓜块 → 2x（原版 9 片=西瓜块）
@@ -516,19 +526,24 @@ def gen_data(data):
             compress(cur, prev)
             unpack(cur, prev)
     # ---- 压缩甘蔗：8 甘蔗 + 核心方块居中 → 1x；9× 升级；1x 可拆回核心方块（矿物甘蔗拆出压缩钻石块）
+    # 纯压缩甘蔗：9 甘蔗 ↔ 1x，逐级 9↔1（唯一可用甘蔗合成且可逆分解的甘蔗）
+    for i, p in enumerate(LV):
+        cur = f"{NS}:{p}_cane"
+        if i == 0:
+            compress(cur, "minecraft:sugar_cane")
+            unpack(cur, "minecraft:sugar_cane")
+        else:
+            compress(cur, f"{NS}:{LV[i - 1]}_cane")
+            unpack(cur, f"{NS}:{LV[i - 1]}_cane")
+    # 风味甘蔗：每级独立 = 8× 同级压缩甘蔗 + 1× 同级核心方块；分解只返还同级核心方块
     for flavor in CANE_FLAVORS:
+        if flavor == "cane":
+            continue
         for i, p in enumerate(LV):
             cur = f"{NS}:{p}_{flavor}"
-            if i == 0 and flavor == "cane":
-                compress(cur, "minecraft:sugar_cane")   # 纯压缩甘蔗：9 甘蔗 → 1x
-                unpack(cur, "minecraft:sugar_cane")
-            elif i == 0:
-                shaped(f"{p}_{flavor}", ["CCC", "CBC", "CCC"],
-                       {"C": "minecraft:sugar_cane", "B": cane_center_id(flavor, "1x")}, cur)
-                unpack(cur, f"{NS}:1x_{CANE_UNPACK[flavor]}", count=1)
-            else:
-                compress(cur, f"{NS}:{LV[i - 1]}_{flavor}")
-                unpack(cur, f"{NS}:{LV[i - 1]}_{flavor}")
+            shaped(f"{p}_{flavor}", ["CCC", "CBC", "CCC"],
+                   {"C": f"{NS}:{p}_cane", "B": cane_center_id(flavor, p)}, cur)
+            unpack(cur, f"{NS}:{p}_{CANE_UNPACK[flavor]}", count=1)
     # ---- 食物：面包=3 压缩小麦（原版 3 麦→面包），牛肉=9 肉，西瓜见上
     shaped("1x_bread", ["WWW"], {"W": f"{NS}:1x_wheat"}, f"{NS}:1x_bread", category="misc")
     for i, p in enumerate(LV[:FOOD_MAX_LEVEL]):
@@ -562,6 +577,8 @@ def gen_data(data):
         for piece, pattern in ARMOR_PATTERNS.items():
             shaped(f"{p}_stone_{piece}", pattern, {"X": f"#{NS}:stone_armor_{p}"},
                    f"{NS}:{p}_stone_{piece}", category="equipment")
+            shaped(f"{p}_wood_{piece}", pattern, {"X": f"#{NS}:wood_tool_{p}"},
+                   f"{NS}:{p}_wood_{piece}", category="equipment")
     # ---- 战利品表
     for name in storage_names():
         dump(f"{data}/{NS}/loot_table/blocks/{name}.json", self_drop(name))
@@ -581,20 +598,13 @@ def gen_data(data):
                        "entries": [{"type": "minecraft:item", "name": f"{NS}:{name}"}],
                        "conditions": [{"condition": "minecraft:survives_explosion"}]}]})
     # ---- 方块标签（并入原版命名空间）
-    pickaxe = [f"{NS}:{n}" for n in storage_names() if _mat_of(n) in PICKAXE_MATS]
-    shovel = [f"{NS}:{n}" for n in storage_names() if _mat_of(n) in SHOVEL_MATS]
-    axe = [f"{NS}:{n}" for n in storage_names() if _mat_of(n).endswith("_log")]
-    hoe = [f"{NS}:{n}" for n in leaves_names()] + \
-          [f"{NS}:{n}" for n in storage_names() if _mat_of(n) in ("hay_block", "moss_block")]
-    stone_tool = [f"{NS}:{n}" for n in storage_names() if _mat_of(n) in
-                  ("deepslate", "cobbled_deepslate", "granite", "diorite", "andesite", "calcite", "tuff", "basalt",
-                   "copper_block", "iron_block", "lapis_block")]
-    iron_tool = [f"{NS}:{n}" for n in storage_names() if _mat_of(n) in
-                 ("amethyst_block", "gold_block", "redstone_block", "emerald_block", "diamond_block")]
-    diamond_tool = [f"{NS}:{n}" for n in storage_names() if _mat_of(n) == "obsidian"]
+    # 所有压缩方块统一镐子采掘；挖掘等级：L1-2 石镐、L3-4 铁镐、L5+ 钻镐封顶
+    pickaxe = [f"{NS}:{n}" for n in storage_names()]
+    stone_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) <= 2]
+    iron_tool = [f"{NS}:{n}" for n in storage_names() if 3 <= int(n.split("_", 1)[0][:-1]) <= 4]
+    diamond_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) >= 5]
     logs = [f"{NS}:{p}_{w[0]}_log" for w in WOODS for p in LV]
-    for tag, values in [("mineable/pickaxe", pickaxe), ("mineable/shovel", shovel),
-                        ("mineable/axe", axe), ("mineable/hoe", hoe),
+    for tag, values in [("mineable/pickaxe", pickaxe),
                         ("needs_stone_tool", stone_tool), ("needs_iron_tool", iron_tool),
                         ("needs_diamond_tool", diamond_tool),
                         ("logs", logs), ("logs_that_burn", logs),
@@ -627,6 +637,8 @@ def gen_data(data):
     for p in LV:
         dump(f"{data}/{NS}/tags/item/repair_stone_armor_{p}.json",
              {"replace": False, "values": [f"{NS}:{p}_stone"]})
+        dump(f"{data}/{NS}/tags/item/repair_wood_armor_{p}.json",
+             {"replace": False, "values": sorted(f"{NS}:{p}_{w[0]}_log" for w in WOODS)})
     # 工具材料混用标签（对应原版 #stone_tool_materials 的做法）；名字必须与配方引用的 {mat}_tool_{p} 一致
     for p in LV:
         dump(f"{data}/{NS}/tags/item/cobblestone_tool_{p}.json",
@@ -745,10 +757,10 @@ def main():
               + crop_block_names() + cane_names())
     items = (storage_names() + leaves_names() + sapling_names() + crop_block_names() + cane_names()
              + tool_names() + armor_names() + food_names() + crop_produce_names() + stick_names())
-    assert len(storage_names()) == 459, len(storage_names())
+    assert len(storage_names()) == 450, len(storage_names())
     assert len(tool_names()) == 90, len(tool_names())
-    assert len(blocks) == 696, len(blocks)
-    assert len(items) == 840, len(items)
+    assert len(blocks) == 687, len(blocks)
+    assert len(items) == 867, len(items)
     print(f"blocks={len(blocks)} items={len(items)} (tools={len(tool_names())} armor={len(armor_names())} "
           f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())})")
     for sub in subs:

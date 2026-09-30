@@ -1,1 +1,1 @@
-{"type":"minecraft:crafting_shaped","category":"building","pattern":["PPP","PPP","PPP"],"key":{"P":"compressedblocks:6x_dirt_cane"},"result":{"count":1,"id":"compressedblocks:7x_dirt_cane"}}
+{"type":"minecraft:crafting_shaped","category":"building","pattern":["CCC","CBC","CCC"],"key":{"C":"compressedblocks:7x_cane","B":"compressedblocks:7x_dirt"},"result":{"count":1,"id":"compressedblocks:7x_dirt_cane"}}

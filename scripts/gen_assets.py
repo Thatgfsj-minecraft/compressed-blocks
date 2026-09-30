@@ -91,8 +91,7 @@ BUILD_MATERIALS = [
     ("bone_block", "Bone Block", "骨块", "bone_block_side", 0),
     ("moss_block", "Moss Block", "苔藓块", "moss_block", 0),
     ("snow", "Snow Block", "雪块", "snow", 0),
-    ("ice", "Ice", "冰", "ice", 0),
-    ("packed_ice", "Packed Ice", "浮冰", "packed_ice", 0),
+    ("blue_ice", "Blue Ice", "蓝冰", "blue_ice", 0),
     ("mud", "Mud", "泥巴", "mud", 0),
 ]
 
@@ -487,6 +486,26 @@ def main():
             else:
                 item_tex[f"{prefix}_stone_{piece}"] = level_tint(
                     recolor_by_lum(icon, icon, stone_color + (255,)), level)
+    # 木质盔甲：木棕底色，花纹档位整体右移一档（7/8/9 重 = 蓝/橙/红花纹），无隐形档
+    wood_color = (150, 115, 68)
+    wood_stripes = {7: (56, 92, 214), 8: (232, 122, 20), 9: (208, 32, 32)}
+    for piece in ARMOR_PIECES:
+        icon = load_base("item/iron_" + piece)
+        for _, prefix, _, _ in LEVELS:
+            level = int(prefix[:-1])
+            if level in wood_stripes:
+                item_tex[f"{prefix}_wood_{piece}"] = recolor_ornate(icon, wood_stripes[level])
+            else:
+                item_tex[f"{prefix}_wood_{piece}"] = level_tint(
+                    recolor_by_lum(icon, icon, wood_color + (255,)), level)
+    for layer, src in (("humanoid", "humanoid/iron"), ("humanoid_leggings", "humanoid_leggings/iron")):
+        layer_img = load_base(src)
+        for _, prefix, _, _ in LEVELS:
+            level = int(prefix[:-1])
+            if level in wood_stripes:
+                armor_layer_tex[f"{layer}/wood_{prefix}"] = recolor_ornate(layer_img, wood_stripes[level])
+            else:
+                armor_layer_tex[f"{layer}/wood_{prefix}"] = recolor_full(layer_img, wood_color)
     for layer, src in (("humanoid", "humanoid/iron"), ("humanoid_leggings", "humanoid_leggings/iron")):
         layer_img = load_base(src)
         for _, prefix, _, _ in LEVELS:
@@ -508,7 +527,7 @@ def main():
             block_tex[f"{prefix}_{flavor}"] = gen_cane_tex(center_sprite, level)
 
     # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 12 作物 + 27 甘蔗中计入贴图的部分 = 717
-    assert len(block_tex) == 744, len(block_tex)
+    assert len(block_tex) == 735, len(block_tex)
     print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}, armor layers: {len(armor_layer_tex)}")
     for sub in SUBPROJECTS:
         rel = os.path.relpath(sub, ROOT)

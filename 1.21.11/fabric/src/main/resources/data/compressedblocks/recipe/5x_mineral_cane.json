@@ -1,1 +1,1 @@
-{"type":"minecraft:crafting_shaped","category":"building","pattern":["PPP","PPP","PPP"],"key":{"P":"compressedblocks:4x_mineral_cane"},"result":{"count":1,"id":"compressedblocks:5x_mineral_cane"}}
+{"type":"minecraft:crafting_shaped","category":"building","pattern":["CCC","CBC","CCC"],"key":{"C":"compressedblocks:5x_cane","B":"#compressedblocks:mineral_cane_5x"},"result":{"count":1,"id":"compressedblocks:5x_mineral_cane"}}

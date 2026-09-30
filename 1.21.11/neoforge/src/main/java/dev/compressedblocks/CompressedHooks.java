@@ -10,9 +10,17 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -62,25 +70,88 @@ public final class CompressedHooks {
      * 溢出防御 → 抗性提升（等级=溢出总和）；四件全九重 → 饱食度与饱和度常满。
      */
     public static void armorTick(ServerPlayer player) {
+        // 效果阶梯（任意穿戴件取最高重数；短时长刷新，摘下即过期，无粒子）：
+        // 6 重=抗性1+夜视；7 重=抗性2+夜视；8 重=抗性3+夜视+水下呼吸+海底行者+飞行；
+        // 9 重=抗性5+夜视+水下呼吸+海底行者+飞行+速度1+急迫2（不死=九重满套伤害事件，饱食常满）
+        int max = CompressedBlocks.wornMaxLevel(player);
+        if (max >= 6) {
+            addEffect(player, MobEffects.RESISTANCE, CompressedBlocks.resistanceAmplifier(max));
+            addEffect(player, MobEffects.NIGHT_VISION, 0);
+        }
+        if (max >= 8) {
+            addEffect(player, MobEffects.WATER_BREATHING, 0);
+            ensureDepthStrider(player);
+        }
+        if (max >= 9) {
+            addEffect(player, MobEffects.SPEED, 0);
+            addEffect(player, MobEffects.HASTE, 1);
+        }
+        // 飞行：满套（4 件）且每件 ≥8 重；疾跑时飞行速度提到鞘翅级
+        boolean mayFly = CompressedBlocks.fullSetAtLeast(player, 8);
+        var abilities = player.getAbilities();
+        if (mayFly) {
+            if (!abilities.mayfly) {
+                abilities.mayfly = true;
+                player.onUpdateAbilities();
+            }
+            float target = player.isSprinting() ? 0.15F : 0.05F;
+            if (Math.abs(abilities.getFlyingSpeed() - target) > 0.001F) {
+                abilities.setFlyingSpeed(target);
+                player.onUpdateAbilities();
+            }
+        } else if (abilities.mayfly && !abilities.instabuild) {
+            // 脱下满套立刻收回飞行（含正在飞：强制落地）
+            abilities.mayfly = false;
+            abilities.flying = false;
+            abilities.setFlyingSpeed(0.05F);
+            player.onUpdateAbilities();
+        }
         if (CompressedBlocks.hasFullLevel9Armor(player)) {
             player.getFoodData().setFoodLevel(20);
             player.getFoodData().setSaturation(20.0F);
-            // 九重满套：生存飞行（不影响创造模式自身的 mayfly）
-            if (!player.getAbilities().mayfly) {
-                player.getAbilities().mayfly = true;
-                player.onUpdateAbilities();
-            }
-        } else if (player.getAbilities().mayfly && !player.getAbilities().instabuild) {
-            // 脱下满套立刻收回飞行（含正在飞：强制落地）
-            player.getAbilities().mayfly = false;
-            player.getAbilities().flying = false;
-            player.onUpdateAbilities();
         }
-        int overflow = CompressedBlocks.wornOverflow(player);
-        if (overflow > 0) {
-            // 短时长持续刷新：摘下即自然过期；无粒子、环境生效
-            player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 80, overflow - 1, true, false));
+    }
+
+    private static void addEffect(ServerPlayer player, Holder<MobEffect> effect, int amplifier) {
+        player.addEffect(new MobEffectInstance(effect, 100, amplifier, true, false));
+    }
+
+    /** 海底行者 3：注入到穿戴中的本模组靴子（不满 3 级才写）。 */
+    private static void ensureDepthStrider(ServerPlayer player) {
+        ItemStack boots = player.getItemBySlot(EquipmentSlot.FEET);
+        if (boots.isEmpty() || !CompressedBlocks.isCompressedBoots(boots)) {
+            return;
         }
+        ItemEnchantments cur = boots.getOrDefault(DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY);
+        Holder<Enchantment> depthStrider = player.level().registryAccess()
+            .lookupOrThrow(Registries.ENCHANTMENT).getOrThrow(Enchantments.DEPTH_STRIDER);
+        if (cur.getLevel(depthStrider) < 3) {
+            ItemEnchantments.Mutable mutable = new ItemEnchantments.Mutable(cur);
+            mutable.set(depthStrider, 3);
+            boots.set(DataComponents.ENCHANTMENTS, mutable.toImmutable());
+        }
+    }
+
+    /** 铁砧材料修理：本模组物品 1 个材料修 50%（原版 25%）。返回是否改写了结果。 */
+    public static boolean halfMaterialRepair(ItemStack input, ItemStack material, ItemStack result) {
+        if (input.isEmpty() || material.isEmpty() || result.isEmpty() || result.getItem() != input.getItem()) {
+            return false;
+        }
+        var repairable = input.get(DataComponents.REPAIRABLE);
+        if (repairable == null || !repairable.isValidRepairItem(material)) {
+            return false;
+        }
+        int max = input.getMaxDamage();
+        if (max <= 0 || input.getDamageValue() <= 0) {
+            return false;
+        }
+        int count = Math.min(material.getCount(), 2);
+        int newDamage = Math.max(0, input.getDamageValue() - max / 2 * count);
+        if (result.getDamageValue() == newDamage) {
+            return false;
+        }
+        result.setDamageValue(newDamage);
+        return true;
     }
 
     /** 四件全九重：取消一切伤害（含 /kill、虚空）。 */

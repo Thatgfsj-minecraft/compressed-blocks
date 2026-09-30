@@ -83,8 +83,21 @@ public final class CompressedBlocks {
     /** 全部压缩方块炸不毁（黑曜石级爆炸抗性）。 */
     public static final float STORAGE_BLAST = 1200.0F;
 
-    public static float hardnessFor(int level) {
-        return (float) (STORAGE_HARDNESS_BASE * Math.pow(STORAGE_HARDNESS_STEP, level - 1));
+    /** 压缩硬度：L1 = 原版该方块硬度，线性升到 L9 目标（黑曜石类 200、硬类 150、软类 100）。 */
+    public static float hardnessFor(StorageMat m, int level) {
+        float vh = m.vh();
+        float target = m.key().equals("obsidian") ? 200.0F : (vh >= 1.5F ? 150.0F : 100.0F);
+        return vh + (target - vh) * (level - 1) / 8.0F;
+    }
+
+    private static StorageMat storageMatOf(String blockName) {
+        String mat = blockName.substring(blockName.indexOf('_') + 1);
+        for (StorageMat m : STORAGE) {
+            if (m.key().equals(mat)) {
+                return m;
+            }
+        }
+        throw new IllegalStateException("no StorageMat for " + blockName);
     }
 
     public enum ToolKind { STONE, WOOD }
@@ -96,62 +109,60 @@ public final class CompressedBlocks {
      * 储存方块材料（key/声音/地图色/是否需要正确工具/发光）。19 旧材料 + 24 新建材。
      * 硬度与爆炸抗性统一走公式，不再复制原版数值。
      */
-    private record StorageMat(String key, SoundType sound, MapColor color, boolean requiresTool, int light) {
+    private record StorageMat(String key, SoundType sound, MapColor color, boolean requiresTool, int light, float vh) {
     }
 
     private static final List<StorageMat> STORAGE = List.of(
-        new StorageMat("cobblestone", SoundType.STONE, MapColor.STONE, true, 0),
-        new StorageMat("stone", SoundType.STONE, MapColor.STONE, true, 0),
-        new StorageMat("cobbled_deepslate", SoundType.DEEPSLATE, MapColor.DEEPSLATE, true, 0),
-        new StorageMat("deepslate", SoundType.DEEPSLATE, MapColor.DEEPSLATE, true, 0),
-        new StorageMat("oak_log", SoundType.WOOD, MapColor.WOOD, false, 0),
-        new StorageMat("spruce_log", SoundType.WOOD, MapColor.WOOD, false, 0),
-        new StorageMat("birch_log", SoundType.WOOD, MapColor.WOOD, false, 0),
-        new StorageMat("jungle_log", SoundType.WOOD, MapColor.WOOD, false, 0),
-        new StorageMat("acacia_log", SoundType.WOOD, MapColor.WOOD, false, 0),
-        new StorageMat("dark_oak_log", SoundType.WOOD, MapColor.WOOD, false, 0),
-        new StorageMat("mangrove_log", SoundType.WOOD, MapColor.WOOD, false, 0),
-        new StorageMat("cherry_log", SoundType.WOOD, MapColor.WOOD, false, 0),
-        new StorageMat("pale_oak_log", SoundType.WOOD, MapColor.WOOD, false, 0),
-        new StorageMat("dirt", SoundType.GRAVEL, MapColor.DIRT, false, 0),
-        new StorageMat("sand", SoundType.SAND, MapColor.SAND, false, 0),
-        new StorageMat("gravel", SoundType.GRAVEL, MapColor.STONE, false, 0),
-        new StorageMat("netherrack", SoundType.NETHERRACK, MapColor.NETHER, true, 0),
-        new StorageMat("end_stone", SoundType.STONE, MapColor.SAND, true, 0),
-        new StorageMat("obsidian", SoundType.STONE, MapColor.COLOR_BLACK, true, 0),
-        // 原版矿物块（储存用）：压缩矿物甘蔗的核心方块族
-        new StorageMat("coal_block", SoundType.STONE, MapColor.COLOR_BLACK, true, 0),
-        new StorageMat("copper_block", SoundType.COPPER, MapColor.COLOR_ORANGE, true, 0),
-        new StorageMat("iron_block", SoundType.METAL, MapColor.METAL, true, 0),
-        new StorageMat("lapis_block", SoundType.STONE, MapColor.LAPIS, true, 0),
-        new StorageMat("gold_block", SoundType.METAL, MapColor.GOLD, true, 0),
-        new StorageMat("redstone_block", SoundType.STONE, MapColor.COLOR_RED, true, 0),
-        new StorageMat("emerald_block", SoundType.METAL, MapColor.EMERALD, true, 0),
-        new StorageMat("diamond_block", SoundType.METAL, MapColor.DIAMOND, true, 0),
-        new StorageMat("granite", SoundType.STONE, MapColor.COLOR_ORANGE, true, 0),
-        new StorageMat("diorite", SoundType.STONE, MapColor.QUARTZ, true, 0),
-        new StorageMat("andesite", SoundType.STONE, MapColor.STONE, true, 0),
-        new StorageMat("calcite", SoundType.CALCITE, MapColor.QUARTZ, true, 0),
-        new StorageMat("tuff", SoundType.TUFF, MapColor.COLOR_GRAY, true, 0),
-        new StorageMat("sandstone", SoundType.STONE, MapColor.SAND, true, 0),
-        new StorageMat("red_sandstone", SoundType.STONE, MapColor.COLOR_ORANGE, true, 0),
-        new StorageMat("basalt", SoundType.BASALT, MapColor.COLOR_GRAY, true, 0),
-        new StorageMat("blackstone", SoundType.STONE, MapColor.COLOR_BLACK, true, 0),
-        new StorageMat("dripstone_block", SoundType.DRIPSTONE_BLOCK, MapColor.COLOR_BROWN, true, 0),
-        new StorageMat("terracotta", SoundType.STONE, MapColor.COLOR_ORANGE, true, 0),
-        new StorageMat("quartz_block", SoundType.STONE, MapColor.QUARTZ, true, 0),
-        new StorageMat("purpur_block", SoundType.STONE, MapColor.COLOR_MAGENTA, true, 0),
-        new StorageMat("prismarine", SoundType.STONE, MapColor.COLOR_CYAN, true, 0),
-        new StorageMat("amethyst_block", SoundType.AMETHYST, MapColor.COLOR_PURPLE, true, 0),
-        new StorageMat("glowstone", SoundType.GLASS, MapColor.SAND, false, 15),
-        new StorageMat("clay", SoundType.GRAVEL, MapColor.COLOR_LIGHT_GRAY, false, 0),
-        new StorageMat("hay_block", SoundType.GRASS, MapColor.COLOR_YELLOW, false, 0),
-        new StorageMat("bone_block", SoundType.STONE, MapColor.SAND, true, 0),
-        new StorageMat("moss_block", SoundType.MOSS, MapColor.COLOR_GREEN, false, 0),
-        new StorageMat("snow", SoundType.SNOW, MapColor.SNOW, false, 0),
-        new StorageMat("ice", SoundType.GLASS, MapColor.COLOR_LIGHT_BLUE, false, 0),
-        new StorageMat("packed_ice", SoundType.STONE, MapColor.COLOR_LIGHT_BLUE, false, 0),
-        new StorageMat("mud", SoundType.MUD, MapColor.COLOR_GRAY, false, 0)
+        new StorageMat("cobblestone", SoundType.STONE, MapColor.STONE, true, 0, 2F),
+        new StorageMat("stone", SoundType.STONE, MapColor.STONE, true, 0, 1.5F),
+        new StorageMat("cobbled_deepslate", SoundType.DEEPSLATE, MapColor.DEEPSLATE, true, 0, 3.5F),
+        new StorageMat("deepslate", SoundType.DEEPSLATE, MapColor.DEEPSLATE, true, 0, 3F),
+        new StorageMat("oak_log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("spruce_log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("birch_log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("jungle_log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("acacia_log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("dark_oak_log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("mangrove_log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("cherry_log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("pale_oak_log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("dirt", SoundType.GRAVEL, MapColor.DIRT, false, 0, 0.5F),
+        new StorageMat("sand", SoundType.SAND, MapColor.SAND, false, 0, 0.5F),
+        new StorageMat("gravel", SoundType.GRAVEL, MapColor.STONE, false, 0, 0.6F),
+        new StorageMat("netherrack", SoundType.NETHERRACK, MapColor.NETHER, true, 0, 0.4F),
+        new StorageMat("end_stone", SoundType.STONE, MapColor.SAND, true, 0, 3F),
+        new StorageMat("obsidian", SoundType.STONE, MapColor.COLOR_BLACK, true, 0, 50F),
+        new StorageMat("coal_block", SoundType.STONE, MapColor.COLOR_BLACK, true, 0, 5F),
+        new StorageMat("copper_block", SoundType.COPPER, MapColor.COLOR_ORANGE, true, 0, 3F),
+        new StorageMat("iron_block", SoundType.METAL, MapColor.METAL, true, 0, 5F),
+        new StorageMat("lapis_block", SoundType.STONE, MapColor.LAPIS, true, 0, 3F),
+        new StorageMat("gold_block", SoundType.METAL, MapColor.GOLD, true, 0, 3F),
+        new StorageMat("redstone_block", SoundType.STONE, MapColor.COLOR_RED, true, 0, 5F),
+        new StorageMat("emerald_block", SoundType.METAL, MapColor.EMERALD, true, 0, 5F),
+        new StorageMat("diamond_block", SoundType.METAL, MapColor.DIAMOND, true, 0, 5F),
+        new StorageMat("granite", SoundType.STONE, MapColor.COLOR_ORANGE, true, 0, 1.5F),
+        new StorageMat("diorite", SoundType.STONE, MapColor.QUARTZ, true, 0, 1.5F),
+        new StorageMat("andesite", SoundType.STONE, MapColor.STONE, true, 0, 1.5F),
+        new StorageMat("calcite", SoundType.CALCITE, MapColor.QUARTZ, true, 0, 0.75F),
+        new StorageMat("tuff", SoundType.TUFF, MapColor.COLOR_GRAY, true, 0, 1.5F),
+        new StorageMat("sandstone", SoundType.STONE, MapColor.SAND, true, 0, 0.8F),
+        new StorageMat("red_sandstone", SoundType.STONE, MapColor.COLOR_ORANGE, true, 0, 0.8F),
+        new StorageMat("basalt", SoundType.BASALT, MapColor.COLOR_GRAY, true, 0, 1.25F),
+        new StorageMat("blackstone", SoundType.STONE, MapColor.COLOR_BLACK, true, 0, 1.5F),
+        new StorageMat("dripstone_block", SoundType.DRIPSTONE_BLOCK, MapColor.COLOR_BROWN, true, 0, 1.5F),
+        new StorageMat("terracotta", SoundType.STONE, MapColor.COLOR_ORANGE, true, 0, 1.25F),
+        new StorageMat("quartz_block", SoundType.STONE, MapColor.QUARTZ, true, 0, 0.8F),
+        new StorageMat("purpur_block", SoundType.STONE, MapColor.COLOR_MAGENTA, true, 0, 1.5F),
+        new StorageMat("prismarine", SoundType.STONE, MapColor.COLOR_CYAN, true, 0, 1.5F),
+        new StorageMat("amethyst_block", SoundType.AMETHYST, MapColor.COLOR_PURPLE, true, 0, 1.5F),
+        new StorageMat("glowstone", SoundType.GLASS, MapColor.SAND, false, 15, 0.3F),
+        new StorageMat("clay", SoundType.GRAVEL, MapColor.COLOR_LIGHT_GRAY, false, 0, 0.6F),
+        new StorageMat("hay_block", SoundType.GRASS, MapColor.COLOR_YELLOW, false, 0, 0.5F),
+        new StorageMat("bone_block", SoundType.STONE, MapColor.SAND, true, 0, 2F),
+        new StorageMat("moss_block", SoundType.MOSS, MapColor.COLOR_GREEN, false, 0, 0.1F),
+        new StorageMat("snow", SoundType.SNOW, MapColor.SNOW, false, 0, 0.2F),
+        new StorageMat("blue_ice", SoundType.GLASS, MapColor.COLOR_LIGHT_BLUE, false, 0, 2.8F),
+        new StorageMat("mud", SoundType.MUD, MapColor.COLOR_GRAY, false, 0, 0.5F)
     );
 
     // ------------------------------------------------------------------ 树 / 作物 / 食物
@@ -429,7 +440,7 @@ public final class CompressedBlocks {
                     .setId(ResourceKey.create(Registries.BLOCK, id(name)))
                     .mapColor(m.color())
                     .sound(m.sound())
-                    .strength(hardnessFor(level), STORAGE_BLAST);
+                    .strength(hardnessFor(m, level), STORAGE_BLAST);
                 if (m.requiresTool()) {
                     props = props.requiresCorrectToolForDrops();
                 }
@@ -625,6 +636,46 @@ public final class CompressedBlocks {
                 ARMOR_INDEX.put(item, new int[]{piece, level});
             }
         }
+        // 7b. 压缩木质盔甲（4 件 × 9 重）：防御/耐久与石甲相同；效果整体降一档（索引记有效重数 = 重数-1）；
+        //     不毁仍从 6 重开始；9 重木甲有效 8 重（抗性3+夜视+水下呼吸+海底行者+飞行），无 9 重石甲的不死/速度/急迫档
+        for (int level = 1; level <= LEVELS; level++) {
+            String p = LEVEL_PREFIX[level - 1];
+            long mult = level >= UNBREAKABLE_FROM ? Integer.MAX_VALUE / 16L : pow9(level);
+            Map<ArmorType, Integer> defense = Map.of(
+                ArmorType.HELMET, armorDefense(level, 0),
+                ArmorType.CHESTPLATE, armorDefense(level, 1),
+                ArmorType.LEGGINGS, armorDefense(level, 2),
+                ArmorType.BOOTS, armorDefense(level, 3));
+            ArmorMaterial woodMaterial = new ArmorMaterial(
+                (int) mult,
+                defense,
+                ARMOR_ENCHANTABILITY,
+                SoundEvents.ARMOR_EQUIP_LEATHER,
+                0.0F,
+                0.0F,
+                TagKey.create(Registries.ITEM, id("repair_wood_armor_" + p)),
+                ResourceKey.create(EquipmentAssets.ROOT_ID, id("wood_" + p))
+            );
+            for (int piece = 0; piece < 4; piece++) {
+                String name = p + "_wood_" + switch (piece) {
+                    case 0 -> "helmet";
+                    case 1 -> "chestplate";
+                    case 2 -> "leggings";
+                    default -> "boots";
+                };
+                Item.Properties props = new Item.Properties()
+                    .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                    .humanoidArmor(woodMaterial, ARMOR_TYPES[piece]);
+                if (level >= UNBREAKABLE_FROM) {
+                    props = props.component(DataComponents.UNBREAKABLE, Unit.INSTANCE);
+                }
+                Item item = new Item(props);
+                ITEMS.add(new ItemReg(name, item, Tab.TOOLS, false));
+                ArmorReg reg = new ArmorReg(name, item, piece, level);
+                ARMOR_REGS.add(reg);
+                ARMOR_INDEX.put(item, new int[]{piece, Math.max(1, level - 1)});
+            }
+        }
         // 8. 工具（2 线 × 5 类 × 9 重）
         for (ToolLine line : TOOL_LINES) {
             for (int t = 0; t < TOOLS.length; t++) {
@@ -664,14 +715,50 @@ public final class CompressedBlocks {
     }
 
     /** 四件全九重 = 免疫一切伤害（含 /kill）+ 饱食度常满。 */
-    public static boolean hasFullLevel9Armor(Player player) {
+    /** 当前穿戴件的最高重数（无穿戴 = 0）。 */
+    public static int wornMaxLevel(Player player) {
+        int max = 0;
         for (EquipmentSlot slot : ARMOR_SLOTS) {
             int[] info = ARMOR_INDEX.get(player.getItemBySlot(slot).getItem());
-            if (info == null || info[1] < LEVELS) {
+            if (info != null) {
+                max = Math.max(max, info[1]);
+            }
+        }
+        return max;
+    }
+
+    /** 四件全穿且每件重数 ≥ minLevel。 */
+    public static boolean fullSetAtLeast(Player player, int minLevel) {
+        for (EquipmentSlot slot : ARMOR_SLOTS) {
+            int[] info = ARMOR_INDEX.get(player.getItemBySlot(slot).getItem());
+            if (info == null || info[1] < minLevel) {
                 return false;
             }
         }
         return true;
+    }
+
+    public static boolean hasFullLevel9Armor(Player player) {
+        return fullSetAtLeast(player, LEVELS);
+    }
+
+    /** 穿戴重数对应的抗性提升等级（0 基）：6 重=1、7 重=2、8 重=3、9 重=5；不足 6 重 = -1（无）。 */
+    public static int resistanceAmplifier(int level) {
+        if (level >= LEVELS) {
+            return 4;
+        }
+        return level >= 6 ? level - 6 : -1;
+    }
+
+    /** 是否本模组的压缩靴子（用于海底行者附魔注入）。 */
+    public static boolean isCompressedBoots(ItemStack stack) {
+        for (ItemReg e : ITEMS) {
+            if ((e.name().endsWith("_stone_boots") || e.name().endsWith("_wood_boots"))
+                && e.item() == stack.getItem()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ------------------------------------------------------------------ 创造栏
@@ -755,11 +842,11 @@ public final class CompressedBlocks {
         if (itemCount != expectItems) {
             errors.add("item count " + itemCount + " != " + expectItems);
         }
-        if (BLOCKS.size() != 696) {
-            errors.add("block registry size " + BLOCKS.size() + " != 696");
+        if (BLOCKS.size() != 687) {
+            errors.add("block registry size " + BLOCKS.size() + " != 687");
         }
-        if (expectItems != 840) {
-            errors.add("item registry size " + expectItems + " != 840");
+        if (expectItems != 867) {
+            errors.add("item registry size " + expectItems + " != 867");
         }
         // 方块：注册、翻译键、物品映射
         for (BlockReg b : BLOCKS) {
@@ -790,7 +877,7 @@ public final class CompressedBlocks {
         // 储存方块：硬度公式 + 爆炸抗性 + 荧石发光
         for (BlockReg b : STORAGE_BLOCKS) {
             float hardness = b.block().defaultBlockState().getDestroySpeed(level, CHECK_POS);
-            float want = hardnessFor(levelOfName(b.name()));
+            float want = hardnessFor(storageMatOf(b.name()), levelOfName(b.name()));
             if (Math.abs(hardness - want) > 0.01F) {
                 errors.add(b.name() + " hardness " + hardness + " != " + want);
             }
@@ -912,9 +999,11 @@ public final class CompressedBlocks {
         assertTier(errors, "7x_cobblestone_pickaxe", Blocks.OBSIDIAN, false);
         assertTier(errors, "8x_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
         assertTier(errors, "9x_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
-        // 溢出表抽查（护甲防御封顶 10，超出转抗性）
-        if (armorOverflow(9, 1) != 4 || armorOverflow(9, 2) != 3 || armorOverflow(6, 1) != 1 || armorOverflow(5, 1) != 0) {
-            errors.add("armor overflow table wrong");
+        // 效果阶梯抽查：6/7/8/9 重 → 抗性 1/2/3/5 级
+        if (resistanceAmplifier(6) != 0 || resistanceAmplifier(7) != 1
+            || resistanceAmplifier(8) != 2 || resistanceAmplifier(9) != 4
+            || resistanceAmplifier(5) != -1) {
+            errors.add("armor effect ladder wrong");
         }
         if (errors.isEmpty()) {
             LOGGER.info("SELF-TEST PASS: blocks={} items={} ({} tools, {} armor, {} food)",

@@ -18,7 +18,7 @@ const STORAGE_MATS = ['cobblestone', 'stone', 'cobbled_deepslate', 'deepslate',
   'granite', 'diorite', 'andesite', 'calcite', 'tuff', 'sandstone', 'red_sandstone',
   'basalt', 'blackstone', 'dripstone_block', 'terracotta', 'quartz_block', 'purpur_block',
   'prismarine', 'amethyst_block', 'glowstone', 'clay', 'hay_block', 'bone_block',
-  'moss_block', 'snow', 'ice', 'packed_ice', 'mud'];
+  'moss_block', 'snow', 'blue_ice', 'mud'];
 const CANES = ['cane', 'dirt_cane', 'sand_cane', 'clay_cane', 'cobblestone_cane', 'mineral_cane'];
 const WOODS = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'mangrove', 'cherry', 'pale_oak'];
 const CROPS = ['wheat', 'carrot', 'potato', 'beetroot'];
@@ -50,7 +50,7 @@ const CROP_BLOCKS = CROPS.flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}_plant
 const CANE_BLOCKS = CANES.flatMap((c) => LEVELS.map((p) => `${p}_${c}`));
 const TOOL_IDS = TOOL_LINES.flatMap((l) => LEVELS.flatMap((p) => TOOLS.map((t) => `${p}_${l}_${t}`)));
 const STICKS = LEVELS.map((p) => `${p}_stick`);
-const ARMOR_IDS = LEVELS.flatMap((p) => ARMOR.map((a) => `${p}_stone_${a}`));
+const ARMOR_IDS = LEVELS.flatMap((p) => ARMOR.flatMap((a) => [`${p}_stone_${a}`, `${p}_wood_${a}`]));
 const FOOD_IDS = FOODS.flatMap((f) => CROP_LEVELS.map((p) => `${p}_${f}`));
 const PRODUCE = [...CROP_LEVELS.map((p) => `${p}_wheat`), ...CROP_LEVELS.map((p) => `${p}_beetroot`)];
 const CROP_ITEMS = ['wheat', 'beetroot'].flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}_seeds`))
@@ -67,7 +67,7 @@ function check(name, ok, detail) {
 }
 
 (async () => {
-  if (ALL_ITEMS.length !== 840) throw new Error(`item list ${ALL_ITEMS.length} != 840`);
+  if (ALL_ITEMS.length !== 867) throw new Error(`item list ${ALL_ITEMS.length} != 867`);
   const rcon = await new Rcon().connect(PORT, '127.0.0.1', 'testpass');
   const cmd = (c) => rcon.command(c);
 

@@ -4,6 +4,7 @@
   "package": "dev.compressedblocks.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "AnvilMenuMixin",
     "BlockBehaviourMixin",
     "ServerPlayerGameModeMixin"
   ],
