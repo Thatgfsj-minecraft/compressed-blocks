@@ -26,15 +26,15 @@ Thatgfsj-minecraft 组织出品，开发约定见 [mc-mod-dev-skill](https://git
 ## 构建 / 测试
 
 ```bash
-cd 1.21.11/fabric   && GRADLE_USER_HOME=<干净目录> ./gradlew build
+cd 1.21.11/fabric   && GRADLE_USER_HOME=<干净目录> ./gradlew build   # 1.21.1 同理
 cd 1.21.11/neoforge && GRADLE_USER_HOME=<干净目录> ./gradlew build
-# 产物：build/libs/compressedblocks-<loader>-1.21.11-<version>.jar
+# 产物：build/libs/compressedblocks-<loader>-<mc版本>-<version>.jar
 ```
 
-- 环境与版本坐标（Loom 1.17.21 / ModDevGradle 2.0.147 / Gradle 9.5.1 / JDK 21）见 `../mc-mod-dev-skill/SKILL.md`
+- 环境：Loom 1.17.21 / ModDevGradle 2.0.147 / Gradle 9.5.1 / JDK 21（版本坐标在各子项目 gradle.properties）
 - **GRADLE_USER_HOME 必须指向无 init.gradle 的干净目录**（全局阿里云镜像会破坏 NeoForge 解析）
-- 贴图与全部 JSON 由脚本生成：`python scripts/gen_assets.py && python scripts/gen_resources.py`
-- E2E：`ci/` 下的专用服 + RCON 断言（`node ci/e2e.js`，环境变量 `RCON_PORT` 指定端口），服务器启动日志搜 `SELF-TEST PASS`（服务端权威比对注册数/耐久公式/不可破坏/速度阶梯）
+- 贴图与全部 JSON 由脚本生成：`python scripts/gen_assets.py && python scripts/gen_resources.py`（1.21.1 加 `--target 1.21.1`，用旧配方格式且无物品模型定义）
+- E2E：`ci/` 下的专用服 + RCON 断言（`node ci/e2e.js`，环境变量 `RCON_PORT` 指定端口），服务器启动日志搜 `SELF-TEST PASS`（服务端权威比对注册数/耐久公式/不可破坏/速度/伤害）
 
 ## 素材说明
 
