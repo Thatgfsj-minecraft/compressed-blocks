@@ -23,15 +23,15 @@ SUBPROJECTS = [os.path.join(ROOT, "1.21.11", "fabric"), os.path.join(ROOT, "1.21
 
 # 1~9 重：id 前缀 / en 前缀 / zh 前缀
 LEVELS = [
-    (1, "compressed", "Compressed", "压缩"),
-    (2, "double_compressed", "Double Compressed", "二重压缩"),
-    (3, "triple_compressed", "Triple Compressed", "三重压缩"),
-    (4, "quadruple_compressed", "Quadruple Compressed", "四重压缩"),
-    (5, "quintuple_compressed", "Quintuple Compressed", "五重压缩"),
-    (6, "sextuple_compressed", "Sextuple Compressed", "六重压缩"),
-    (7, "septuple_compressed", "Septuple Compressed", "七重压缩"),
-    (8, "octuple_compressed", "Octuple Compressed", "八重压缩"),
-    (9, "nonuple_compressed", "Nonuple Compressed", "九重压缩"),
+    (1, "1x", "Compressed", "压缩"),
+    (2, "2x", "Double Compressed", "二重压缩"),
+    (3, "3x", "Triple Compressed", "三重压缩"),
+    (4, "4x", "Quadruple Compressed", "四重压缩"),
+    (5, "5x", "Quintuple Compressed", "五重压缩"),
+    (6, "6x", "Sextuple Compressed", "六重压缩"),
+    (7, "7x", "Septuple Compressed", "七重压缩"),
+    (8, "8x", "Octuple Compressed", "八重压缩"),
+    (9, "9x", "Nonuple Compressed", "九重压缩"),
 ]
 
 # key: (vanilla 贴图名, en 名, zh 名, 是否可做工具, 工具基材 stone|wood)
@@ -245,7 +245,7 @@ def main():
             print(f"wrote textures into {sub}")
 
     # mod 图标：九重压缩圆石 8x 放大
-    icon = block_tex["nonuple_compressed_cobblestone"].resize((128, 128), Image.NEAREST)
+    icon = block_tex["9x_cobblestone"].resize((128, 128), Image.NEAREST)
     icon.save(os.path.join(ROOT, "_asset-src", "icon.png"))
 
     # 预览拼图：方块按材料分行 × 9 重

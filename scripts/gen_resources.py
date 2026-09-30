@@ -25,15 +25,15 @@ NS = "compressedblocks"
 LEGACY = False
 
 LEVELS = [
-    ("compressed", "Compressed", "压缩"),
-    ("double_compressed", "Double Compressed", "二重压缩"),
-    ("triple_compressed", "Triple Compressed", "三重压缩"),
-    ("quadruple_compressed", "Quadruple Compressed", "四重压缩"),
-    ("quintuple_compressed", "Quintuple Compressed", "五重压缩"),
-    ("sextuple_compressed", "Sextuple Compressed", "六重压缩"),
-    ("septuple_compressed", "Septuple Compressed", "七重压缩"),
-    ("octuple_compressed", "Octuple Compressed", "八重压缩"),
-    ("nonuple_compressed", "Nonuple Compressed", "九重压缩"),
+    ("1x", "Compressed", "压缩"),
+    ("2x", "Double Compressed", "二重压缩"),
+    ("3x", "Triple Compressed", "三重压缩"),
+    ("4x", "Quadruple Compressed", "四重压缩"),
+    ("5x", "Quintuple Compressed", "五重压缩"),
+    ("6x", "Sextuple Compressed", "六重压缩"),
+    ("7x", "Septuple Compressed", "七重压缩"),
+    ("8x", "Octuple Compressed", "八重压缩"),
+    ("9x", "Nonuple Compressed", "九重压缩"),
 ]
 
 # key: (en, zh, 可做工具)

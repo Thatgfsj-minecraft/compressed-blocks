@@ -39,13 +39,13 @@
 
 ### 命名
 
-- 方块 id：`compressed_<mat>`、`double_compressed_<mat>`、`triple_…`、`quadruple_…`、`quintuple_…`、`sextuple_…`、`septuple_…`、`octuple_…`、`nonuple_…`
+- 方块 id：`1x_<mat>`、`2x_<mat>`、…、`9x_<mat>`（显示名仍为 压缩/二重压缩/…/九重压缩）
 - zh：`压缩圆石 / 二重压缩圆石 / 三重 / 四重 / 五重 / 六重 / 七重 / 八重 / 九重压缩圆石`
 - en：`Compressed / Double / Triple / Quadruple / Quintuple / Sextuple / Septuple / Octuple / Nonuple Compressed …`
 
 ## 3. 压缩木棍（9 个物品）
 
-- `compressed_stick`、`double_compressed_stick`、… `nonuple_compressed_stick`
+- `1x_stick`、`2x_stick`、… `9x_stick`
 - 合成：9 木棍 → 压缩木棍；9 第 n-1 重 → 第 n 重；可无序解压
 - **第 n 重工具的配方里，木棍位必须用第 n 重压缩木棍**
 - 创造栏：独立页签「压缩」的末位

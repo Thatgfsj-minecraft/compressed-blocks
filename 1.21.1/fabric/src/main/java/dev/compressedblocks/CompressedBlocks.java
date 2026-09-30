@@ -49,8 +49,7 @@ public final class CompressedBlocks {
     public static final int UNBREAKABLE_FROM = 6;
 
     private static final String[] LEVEL_PREFIX = {
-        "compressed", "double_compressed", "triple_compressed", "quadruple_compressed", "quintuple_compressed",
-        "sextuple_compressed", "septuple_compressed", "octuple_compressed", "nonuple_compressed"
+        "1x", "2x", "3x", "4x", "5x", "6x", "7x", "8x", "9x"
     };
 
     /** 挖掘速度阶梯：一重=铁 6.0、二重=钻 8.0、三重=金 12.0，四重=三重×1.5、五重=四重×1.5……逐级连乘。 */
@@ -265,7 +264,7 @@ public final class CompressedBlocks {
     /** 图标：九重压缩圆石（与 mod 图标一致）。 */
     public static Item iconItem() {
         for (BlockEntry b : BLOCKS) {
-            if (b.name().equals("nonuple_compressed_cobblestone")) {
+            if (b.name().equals("9x_cobblestone")) {
                 return b.item();
             }
         }
@@ -416,13 +415,13 @@ public final class CompressedBlocks {
                 errors.add(e.name() + " not in #enchantable/sharp_weapon");
             }
         }
-        // 挖掘等级阶梯：6 重仍为石级，7 重=铁，8 重/9 重=钻石级及以上
-        assertTier(errors, "compressed_cobblestone_pickaxe", Blocks.DIAMOND_ORE, false);
-        assertTier(errors, "sextuple_compressed_cobblestone_pickaxe", Blocks.DIAMOND_ORE, false);
-        assertTier(errors, "septuple_compressed_cobblestone_pickaxe", Blocks.DIAMOND_ORE, true);
-        assertTier(errors, "septuple_compressed_cobblestone_pickaxe", Blocks.OBSIDIAN, false);
-        assertTier(errors, "octuple_compressed_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
-        assertTier(errors, "nonuple_compressed_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
+        // 挖掘等级阶梯：6x 仍为石级，7x=铁，8x/9x=钻石级及以上
+        assertTier(errors, "1x_cobblestone_pickaxe", Blocks.DIAMOND_ORE, false);
+        assertTier(errors, "6x_cobblestone_pickaxe", Blocks.DIAMOND_ORE, false);
+        assertTier(errors, "7x_cobblestone_pickaxe", Blocks.DIAMOND_ORE, true);
+        assertTier(errors, "7x_cobblestone_pickaxe", Blocks.OBSIDIAN, false);
+        assertTier(errors, "8x_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
+        assertTier(errors, "9x_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
         if (!errors.isEmpty()) {
             throw new IllegalStateException("SELF-TEST FAILED: " + String.join("; ", errors));
         }

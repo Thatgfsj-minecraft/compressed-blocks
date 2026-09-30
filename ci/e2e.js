@@ -7,8 +7,7 @@ const { Rcon } = require('./rcon');
 const PORT = parseInt(process.env.RCON_PORT || '25576', 10);
 const NS = 'compressedblocks';
 
-const LEVELS = ['compressed', 'double_compressed', 'triple_compressed', 'quadruple_compressed',
-  'quintuple_compressed', 'sextuple_compressed', 'septuple_compressed', 'octuple_compressed', 'nonuple_compressed'];
+const LEVELS = ['1x', '2x', '3x', '4x', '5x', '6x', '7x', '8x', '9x'];
 const MATS = ['cobblestone', 'stone', 'cobbled_deepslate', 'deepslate',
   'oak_log', 'spruce_log', 'birch_log', 'jungle_log', 'acacia_log', 'dark_oak_log',
   'mangrove_log', 'cherry_log', 'pale_oak_log',
@@ -70,10 +69,10 @@ function check(name, ok, detail) {
   await cmd('kill @e[type=minecraft:item]');
   await cmd('setblock 2 -60 20 minecraft:air');
   await cmd('setblock 2 -60 20 minecraft:air');
-  await cmd(`setblock 2 -60 20 ${NS}:double_compressed_stone`);
-  await cmd(`setblock 2 -60 20 ${NS}:double_compressed_stone destroy`);
+  await cmd(`setblock 2 -60 20 ${NS}:2x_stone`);
+  await cmd(`setblock 2 -60 20 ${NS}:2x_stone destroy`);
   const drop = await cmd('execute if entity @e[type=minecraft:item,x=2,y=-60,z=20,distance=..5]');
-  check('loot drop double_compressed_stone', /Test passed/.test(drop), drop.trim());
+  check('loot drop 2x_stone', /Test passed/.test(drop), drop.trim());
   await cmd('kill @e[type=minecraft:item]');
   await cmd('setblock 2 -60 20 minecraft:air');
 
@@ -102,7 +101,7 @@ function check(name, ok, detail) {
   }
 
   // 组件补丁管线抽样：damage 补丁应落进 NBT（证明默认带耐久组件的真物品）
-  for (const sample of ['compressed_cobblestone_pickaxe', 'nonuple_compressed_oak_log_sword', 'double_compressed_stick']) {
+  for (const sample of ['1x_cobblestone_pickaxe', '9x_oak_log_sword', '2x_stick']) {
     const rep = await cmd(`item replace entity ${stand} weapon.mainhand with ${NS}:${sample}[minecraft:damage=1]`);
     const dmg = await cmd(`data get entity ${stand} ${handPath}.components."minecraft:damage"`);
     check(`component patch ${sample}`, /: 1$/.test(dmg.trim()) || /"minecraft:damage": 1/.test(dmg), `${rep.trim()} | ${dmg.trim()}`);

@@ -1,1 +1,0 @@
-{"type":"minecraft:crafting_shaped","category":"equipment","pattern":["XX"," S"," S"],"key":{"X":{"item":"compressedblocks:compressed_cobblestone"},"S":{"item":"compressedblocks:compressed_stick"}},"result":{"count":1,"item":"compressedblocks:compressed_cobblestone_hoe"}}

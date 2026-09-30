@@ -1,1 +1,0 @@
-{"type":"minecraft:block","random_sequence":"compressedblocks:blocks/quadruple_compressed_dirt","pools":[{"rolls":1.0,"bonus_rolls":0.0,"conditions":[{"condition":"minecraft:survives_explosion"}],"entries":[{"type":"minecraft:item","name":"compressedblocks:quadruple_compressed_dirt"}]}]}

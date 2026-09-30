@@ -7,7 +7,7 @@
   "authors": [
     "Thatgfsj"
   ],
-  "license": "MIT",
+  "license": "GPL-3.0",
   "environment": "*",
   "icon": "assets/compressedblocks/icon.png",
   "mixins": [

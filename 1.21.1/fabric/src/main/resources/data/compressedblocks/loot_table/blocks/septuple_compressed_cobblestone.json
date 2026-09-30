@@ -1,1 +1,0 @@
-{"type":"minecraft:block","random_sequence":"compressedblocks:blocks/septuple_compressed_cobblestone","pools":[{"rolls":1.0,"bonus_rolls":0.0,"conditions":[{"condition":"minecraft:survives_explosion"}],"entries":[{"type":"minecraft:item","name":"compressedblocks:septuple_compressed_cobblestone"}]}]}
