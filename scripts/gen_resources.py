@@ -346,8 +346,6 @@ def gen_lang(res):
         lv = next(l for l in LEVELS if name.startswith(l[0] + "_"))
         en[f"item.{NS}.{name}"] = f"{lv[1]} Stick"
         zh[f"item.{NS}.{name}"] = f"{lv[2]}木棍"
-    en["itemGroup.compressedblocks"] = "Compressed Blocks"
-    zh["itemGroup.compressedblocks"] = "压缩"
     en["itemGroup.compressedblocks.blocks"] = "Compressed Blocks"
     zh["itemGroup.compressedblocks.blocks"] = "压缩方块"
     en["itemGroup.compressedblocks.tools"] = "Compressed Tools"
@@ -448,7 +446,8 @@ def gen_data(data):
     # ---- 工具两条线：材料位=同重数混用标签（圆石线=圆石+深板岩圆石，木线=9 原木），棍位=同重数压缩木棍
     for mat, _, _ in TOOL_LINES:
         for p in LV:
-            key_x = {"tag": f"{NS}:{mat}_tool_{p}"}
+            # 1.21.2+ 配方材料只有字符串形式：物品=id，标签=#id（{"tag":...} 已废除，解析会失败）
+            key_x = f"#{NS}:{mat}_tool_{p}"
             stick_id = f"{NS}:{p}_stick"
             for tool, (pattern, _) in TOOLS.items():
                 name = f"{p}_{mat}_{tool}"
@@ -523,9 +522,9 @@ def gen_data(data):
     for p in LV:
         dump(f"{data}/{NS}/tags/item/repair_stone_armor_{p}.json",
              {"replace": False, "values": [f"{NS}:{p}_stone"]})
-    # 工具材料混用标签（对应原版 #stone_tool_materials 的做法）
+    # 工具材料混用标签（对应原版 #stone_tool_materials 的做法）；名字必须与配方引用的 {mat}_tool_{p} 一致
     for p in LV:
-        dump(f"{data}/{NS}/tags/item/cobble_tool_{p}.json",
+        dump(f"{data}/{NS}/tags/item/cobblestone_tool_{p}.json",
              {"replace": False, "values": [f"{NS}:{p}_cobblestone", f"{NS}:{p}_cobbled_deepslate"]})
         dump(f"{data}/{NS}/tags/item/wood_tool_{p}.json",
              {"replace": False, "values": sorted(f"{NS}:{p}_{w[0]}_log" for w in WOODS)})
@@ -642,12 +641,20 @@ def main():
             continue
         res = f"{sub}/src/main/resources/assets/{NS}"
         data = f"{sub}/src/main/resources/data"
-        # 生成目录整体归本脚本所有：先清空再生成，避免 0.2.0 遗留文件
-        shutil.rmtree(res, ignore_errors=True)
+        # 生成目录整体归本脚本所有：先清空再生成，避免 0.2.0 遗留文件。
+        # textures/ 例外——归 gen_assets.py 所有，只清本脚本拥有的条目。
+        if os.path.isdir(res):
+            for entry in os.listdir(res):
+                if entry == "textures":
+                    continue
+                full = os.path.join(res, entry)
+                shutil.rmtree(full, ignore_errors=True) if os.path.isdir(full) else os.remove(full)
         shutil.rmtree(data, ignore_errors=True)
         gen_assets(res)
         gen_lang(res)
         gen_data(data)
+        if not os.path.isdir(f"{res}/textures"):
+            raise SystemExit(f"ERROR: {res}/textures 不存在——先跑 gen_assets.py 再跑本脚本")
         print(f"generated resources into {sub}")
 
 

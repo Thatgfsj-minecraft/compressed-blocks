@@ -187,6 +187,8 @@ function check(name, ok, detail) {
   const equip = await cmd(`item replace entity @e[tag=cbz,limit=1] armor.chest with ${NS}:9x_stone_chestplate`);
   check('zombie equip 9x chestplate', !/Unknown|Failed|No item/i.test(equip), equip.trim());
   await new Promise((r) => setTimeout(r, 600));
+  // 无人暂停（pause-when-empty）会让装备属性永不结算，强推 30 tick 保证结算
+  await cmd('tick sprint 30t');
   const armorVal = await cmd('attribute @e[tag=cbz,limit=1] minecraft:armor get');
   check('9x chestplate armor = 2+10', /is 12(\.0)?($|\s|,)/.test(armorVal.trim()), armorVal.trim());
   await cmd('kill @e[tag=cbz]');

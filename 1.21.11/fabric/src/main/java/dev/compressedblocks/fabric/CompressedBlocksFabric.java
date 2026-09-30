@@ -30,8 +30,7 @@ public class CompressedBlocksFabric implements ModInitializer {
             }
             Registry.register(BuiltInRegistries.ITEM, CompressedBlocks.id(e.name()), e.item());
         }
-        // 创造物品栏：总栏 + 方块/工具/食物三个分类栏
-        Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, CompressedBlocks.id("main"), CompressedBlocks.TAB);
+        // 创造物品栏：方块/工具/食物三个分类栏
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, CompressedBlocks.id("blocks"), CompressedBlocks.TAB_BLOCKS);
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, CompressedBlocks.id("tools"), CompressedBlocks.TAB_TOOLS);
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, CompressedBlocks.id("food"), CompressedBlocks.TAB_FOOD);

@@ -53,7 +53,6 @@ public class CompressedBlocksNeoForge {
             });
         } else if (event.getRegistryKey() == Registries.CREATIVE_MODE_TAB) {
             event.register(Registries.CREATIVE_MODE_TAB, helper -> {
-                helper.register(CompressedBlocks.id("main"), CompressedBlocks.TAB);
                 helper.register(CompressedBlocks.id("blocks"), CompressedBlocks.TAB_BLOCKS);
                 helper.register(CompressedBlocks.id("tools"), CompressedBlocks.TAB_TOOLS);
                 helper.register(CompressedBlocks.id("food"), CompressedBlocks.TAB_FOOD);

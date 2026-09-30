@@ -1,1 +1,1 @@
-{"type":"minecraft:crafting_shaped","category":"equipment","pattern":["X","X","S"],"key":{"X":{"tag":"compressedblocks:cobblestone_tool_9x"},"S":"compressedblocks:9x_stick"},"result":{"count":1,"id":"compressedblocks:9x_cobblestone_sword"}}
+{"type":"minecraft:crafting_shaped","category":"equipment","pattern":["X","X","S"],"key":{"X":"#compressedblocks:cobblestone_tool_9x","S":"compressedblocks:9x_stick"},"result":{"count":1,"id":"compressedblocks:9x_cobblestone_sword"}}

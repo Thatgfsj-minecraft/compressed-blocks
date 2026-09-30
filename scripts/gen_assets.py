@@ -365,7 +365,10 @@ def main():
     for wood, _, _, _, sapling_sprite, _ in WOODS:
         sprite = load_base("block/" + sapling_sprite)
         for _, prefix, _, _ in LEVELS:
-            item_tex[f"{prefix}_{wood}_sapling"] = level_tint(sprite, int(prefix[:-1]))
+            tex = level_tint(sprite, int(prefix[:-1]))
+            # 树苗是十字方块模型 + 物品定义共用一张图：block/ 与 item/ 都要给
+            block_tex[f"{prefix}_{wood}_sapling"] = tex
+            item_tex[f"{prefix}_{wood}_sapling"] = tex
     for crop, _, _, _, produce_sprite, seed_sprite in CROPS:
         produce = load_base(produce_sprite)
         for _, prefix, _, _ in LEVELS[:3]:
@@ -395,6 +398,9 @@ def main():
             armor_layer_tex[f"{layer}/stone_{prefix}"] = level_tint(
                 recolor_full(layer_img, stone_color), level, rim=False)
 
+    # 387 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 12 作物 = 570 块级贴图键中的 550 张
+    # （farmland 有 9 张但 crop 侧模型走 cross，本计数以 block_tex 实际键数为准）
+    assert len(block_tex) == 618, len(block_tex)
     print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}, armor layers: {len(armor_layer_tex)}")
     for sub in SUBPROJECTS:
         rel = os.path.relpath(sub, ROOT)

@@ -635,27 +635,13 @@ public final class CompressedBlocks {
         }
     }
 
-    /** 总栏"压缩"：方块 → 食物/农业 → 工具。 */
-    public static void acceptMainTab(CreativeModeTab.Output output) {
-        acceptItems(output, Tab.BLOCKS);
-        acceptItems(output, Tab.FOOD);
-        acceptItems(output, Tab.TOOLS);
-        acceptItems(output, Tab.INGREDIENTS);
-    }
-
-    public static final CreativeModeTab TAB = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
-        .title(Component.translatable("itemGroup.compressedblocks"))
-        .icon(() -> icon("9x_cobblestone"))
-        .displayItems((parameters, output) -> acceptMainTab(output))
-        .build();
-
-    public static final CreativeModeTab TAB_BLOCKS = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 1)
+    public static final CreativeModeTab TAB_BLOCKS = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
         .title(Component.translatable("itemGroup.compressedblocks.blocks"))
         .icon(() -> icon("1x_cobblestone"))
         .displayItems((parameters, output) -> acceptItems(output, Tab.BLOCKS))
         .build();
 
-    public static final CreativeModeTab TAB_TOOLS = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 2)
+    public static final CreativeModeTab TAB_TOOLS = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 1)
         .title(Component.translatable("itemGroup.compressedblocks.tools"))
         .icon(() -> icon("9x_wood_pickaxe"))
         .displayItems((parameters, output) -> {
@@ -664,7 +650,7 @@ public final class CompressedBlocks {
         })
         .build();
 
-    public static final CreativeModeTab TAB_FOOD = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 3)
+    public static final CreativeModeTab TAB_FOOD = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 2)
         .title(Component.translatable("itemGroup.compressedblocks.food"))
         .icon(() -> icon("3x_beef"))
         .displayItems((parameters, output) -> acceptItems(output, Tab.FOOD))
