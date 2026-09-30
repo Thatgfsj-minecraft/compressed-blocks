@@ -43,6 +43,10 @@ cd 1.21.11/neoforge && GRADLE_USER_HOME=<干净目录> ./gradlew build
 原版基础 sprite 不入库：首次生成前把它们放到 `_asset-src/vanilla/`（命名如 `block_stone.png`、`item_stick.png`，共 22 张 = 19 张方块底图 + 石/木工具各 5 张 + 木棍，从 Gradle Loom 缓存的 `minecraft-client.jar` 内 `assets/minecraft/textures/` 解出，文件名 = jar 内路径把 `/` 换成 `_`；本地已有时跳过）。
 
 
-## License
+## 开源协议 / License
 
-MIT，见根目录 LICENSE。
+本项目基于 [GPL-3.0](./LICENSE)（GNU 通用公共许可证第 3 版）开源发布。
+
+- 你可以自由地使用、学习、修改和分发本项目的代码；
+- 基于本项目修改或二次开发的作品，必须同样以 GPL-3.0 协议开源，并保留相应的版权与许可声明；
+- 本项目不提供任何担保，完整条款请参见 [LICENSE](./LICENSE) 文件。
