@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "compressedblocks",
+  "version": "${version}",
+  "name": "Compressed Blocks",
+  "description": "Compress common blocks 1x-9x for easy carrying. Tools made from compressed blocks scale durability 9^n (unbreakable at 6x+), mine faster and hit harder.",
+  "authors": [
+    "Thatgfsj"
+  ],
+  "license": "MIT",
+  "environment": "*",
+  "icon": "assets/compressedblocks/icon.png",
+  "entrypoints": {
+    "main": [
+      "dev.compressedblocks.fabric.CompressedBlocksFabric"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "fabric-api": "*",
+    "minecraft": ">=1.21.1 <1.21.2",
+    "java": ">=21"
+  }
+}

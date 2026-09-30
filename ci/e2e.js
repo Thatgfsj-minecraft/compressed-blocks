@@ -86,18 +86,25 @@ function check(name, ok, detail) {
   check('summon probe stand', !/Unknown|Failed/i.test(summon), summon.trim());
   const stand = '@e[tag=cbprobe,limit=1]';
 
+  // 装备 NBT 路径自适应：1.21.5+ 是 equipment.mainhand，1.21.1 是 HandItems[0]
+  await cmd(`item replace entity ${stand} weapon.mainhand with minecraft:stone`);
+  let handPath = 'equipment.mainhand';
+  if (/Found no elements/.test(await cmd(`data get entity ${stand} ${handPath}.id`))) {
+    handPath = 'HandItems[0]';
+  }
+
   for (const item of [...TOOLS_ALL, ...STICKS]) {
     const full = `${NS}:${item}`;
     const rep = await cmd(`item replace entity ${stand} weapon.mainhand with ${full}`);
     check(`item ${item} replace`, !/Unknown|Failed|No item|mismatch/i.test(rep), rep.trim());
-    const id = await cmd(`data get entity ${stand} equipment.mainhand.id`);
+    const id = await cmd(`data get entity ${stand} ${handPath}.id`);
     check(`item ${item} in hand`, id.includes(`"${full}"`), id.trim().slice(0, 100));
   }
 
   // 组件补丁管线抽样：damage 补丁应落进 NBT（证明默认带耐久组件的真物品）
   for (const sample of ['compressed_cobblestone_pickaxe', 'nonuple_compressed_oak_log_sword', 'double_compressed_stick']) {
     const rep = await cmd(`item replace entity ${stand} weapon.mainhand with ${NS}:${sample}[minecraft:damage=1]`);
-    const dmg = await cmd(`data get entity ${stand} equipment.mainhand.components."minecraft:damage"`);
+    const dmg = await cmd(`data get entity ${stand} ${handPath}.components."minecraft:damage"`);
     check(`component patch ${sample}`, /: 1$/.test(dmg.trim()) || /"minecraft:damage": 1/.test(dmg), `${rep.trim()} | ${dmg.trim()}`);
   }
   await cmd('kill @e[tag=cbprobe]');

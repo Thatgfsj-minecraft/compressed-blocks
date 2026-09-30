@@ -8,6 +8,7 @@
   木棍   <prefix>_stick
 用法：python scripts/gen_resources.py   （写 1.21.11 下 fabric/neoforge 两个子项目）
 """
+import argparse
 import json
 import os
 import shutil
@@ -15,11 +16,12 @@ from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-SUBS = [
-    os.path.join(ROOT, "1.21.11", "fabric"),
-    os.path.join(ROOT, "1.21.11", "neoforge"),
-]
 NS = "compressedblocks"
+
+# 1.21.11 与 1.21.1 的资源格式差异：
+#   - 1.21.4+ 才有 assets/<ns>/items/*.json（物品模型定义），1.21.1 方块物品直接用方块模型
+#   - 1.21.2+ 配方配料才是裸字符串，1.21.1 用 {"item": ...} 对象
+LEGACY = False
 
 LEVELS = [
     ("compressed", "Compressed", "压缩"),
@@ -90,18 +92,21 @@ def gen_assets(res, blocks, tools, sticks):
              {"variants": {"": {"model": f"{NS}:block/{name}"}}})
         dump(f"{res}/models/block/{name}.json",
              {"parent": "minecraft:block/cube_all", "textures": {"all": f"{NS}:block/{name}"}})
-        dump(f"{res}/items/{name}.json",
-             {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
+        if not LEGACY:  # 1.21.4+ 物品模型定义；1.21.1 方块物品自动用方块模型
+            dump(f"{res}/items/{name}.json",
+                 {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
     for name in tools:
         dump(f"{res}/models/item/{name}.json",
              {"parent": "minecraft:item/handheld", "textures": {"layer0": f"{NS}:item/{name}"}})
-        dump(f"{res}/items/{name}.json",
-             {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
+        if not LEGACY:
+            dump(f"{res}/items/{name}.json",
+                 {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
     for name in sticks:
         dump(f"{res}/models/item/{name}.json",
              {"parent": "minecraft:item/generated", "textures": {"layer0": f"{NS}:item/{name}"}})
-        dump(f"{res}/items/{name}.json",
-             {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
+        if not LEGACY:
+            dump(f"{res}/items/{name}.json",
+                 {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
     icon_src = os.path.join(ROOT, "_asset-src", "icon.png")
     icon_dst = f"{res}/icon.png"
     os.makedirs(os.path.dirname(icon_dst), exist_ok=True)
@@ -153,15 +158,16 @@ def gen_data(data, blocks, tools):
             cur = f"{NS}:{LEVELS[lv - 1][0]}_{mat}"
             prev = prev_item(mat, lv)
         cur_file = cur.split(":", 1)[1]  # 不能用 os.path.basename：Windows 会把 id 里的冒号当盘符
+        key_prev = prev if not LEGACY else {"item": prev}
         dump(f"{data}/{NS}/recipe/{cur_file}.json", {
             "type": "minecraft:crafting_shaped", "category": "building" if mat != "stick" else "ingredients",
-            "pattern": ["PPP", "PPP", "PPP"], "key": {"P": prev},
-            "result": {"count": 1, "id": cur},
+            "pattern": ["PPP", "PPP", "PPP"], "key": {"P": key_prev},
+            "result": ({"count": 1, "id": cur} if not LEGACY else {"count": 1, "item": cur}),
         })
         dump(f"{data}/{NS}/recipe/unpack_{cur_file}.json", {
             "type": "minecraft:crafting_shapeless", "category": "building" if mat != "stick" else "ingredients",
-            "ingredients": [cur],
-            "result": {"count": 9, "id": prev},
+            "ingredients": [cur if not LEGACY else {"item": cur}],
+            "result": ({"count": 9, "id": prev} if not LEGACY else {"count": 9, "item": prev}),
         })
     # 工具：材料位=同重数压缩方块，棍位=同重数压缩木棍
     for mat, _, _, can in MATERIALS:
@@ -174,8 +180,11 @@ def gen_data(data, blocks, tools):
                 name = f"{LEVELS[lv - 1][0]}_{mat}_{tool}"
                 dump(f"{data}/{NS}/recipe/{name}.json", {
                     "type": "minecraft:crafting_shaped", "category": "equipment",
-                    "pattern": pattern, "key": {"X": block_id, "S": stick_id},
-                    "result": {"count": 1, "id": f"{NS}:{name}"},
+                    "pattern": pattern,
+                    "key": ({"X": block_id, "S": stick_id} if not LEGACY else
+                            {"X": {"item": block_id}, "S": {"item": stick_id}}),
+                    "result": ({"count": 1, "id": f"{NS}:{name}"} if not LEGACY
+                               else {"count": 1, "item": f"{NS}:{name}"}),
                 })
     # 战利品表：掉自身
     for name in blocks:
@@ -204,10 +213,18 @@ def gen_data(data, blocks, tools):
 
 
 def main():
+    global LEGACY
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--target", default="1.21.11", choices=["1.21.11", "1.21.1"],
+                    help="1.21.11 = 新格式（items/*.json、字符串配料）；1.21.1 = 旧格式")
+    args = ap.parse_args()
+    LEGACY = args.target == "1.21.1"
+    subs = [os.path.join(ROOT, args.target, loader) for loader in ("fabric", "neoforge")]
+
     blocks, tools, sticks = block_names(), tool_names(), stick_names()
-    print(f"blocks={len(blocks)} tools={len(tools)} sticks={len(sticks)}")
+    print(f"target={args.target} blocks={len(blocks)} tools={len(tools)} sticks={len(sticks)}")
     assert len(blocks) == 171 and len(tools) == 585 and len(sticks) == 9
-    for sub in SUBS:
+    for sub in subs:
         if not os.path.exists(os.path.join(sub, "build.gradle")):
             print(f"skip {sub} (no build.gradle)")
             continue
