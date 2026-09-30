@@ -129,6 +129,7 @@ FOODS = [
     ("bread", "Bread", "面包"),
     ("beef", "Beef", "牛肉"),
     ("melon", "Watermelon", "西瓜"),
+    ("rotten_flesh", "Rotten Flesh", "腐肉"),
 ]
 FOOD_MAX_LEVEL = 3
 
@@ -218,16 +219,21 @@ def stick_names():
     return [f"{p}_stick" for p in LV]
 
 
-# 压缩甘蔗三风味：核心方块分别是 压缩泥土 / 压缩圆石 / 压缩矿物块(标签)
+# 压缩甘蔗六风味：cane=纯甘蔗皮（无核心）；其余核心方块分别为对应压缩方块，矿物甘蔗用矿物块标签
 CANE_FLAVORS = {
     "cane": ("Sugar Cane", "甘蔗"),
+    "dirt_cane": ("Dirt Cane", "泥土甘蔗"),
+    "sand_cane": ("Sand Cane", "沙子甘蔗"),
+    "clay_cane": ("Clay Cane", "黏土甘蔗"),
     "cobblestone_cane": ("Cobblestone Cane", "原石甘蔗"),
     "mineral_cane": ("Mineral Cane", "矿物甘蔗"),
 }
 
-CANE_CENTERS = {"cane": "dirt", "cobblestone_cane": "cobblestone", "mineral_cane": None}
+CANE_CENTERS = {"cane": None, "dirt_cane": "dirt", "sand_cane": "sand", "clay_cane": "clay",
+                "cobblestone_cane": "cobblestone", "mineral_cane": None}
 
-CANE_UNPACK = {"cane": "dirt", "cobblestone_cane": "cobblestone", "mineral_cane": "diamond_block"}
+CANE_UNPACK = {"dirt_cane": "dirt", "sand_cane": "sand", "clay_cane": "clay",
+               "cobblestone_cane": "cobblestone", "mineral_cane": "diamond_block"}
 
 MINERAL_MATS = ("coal_block", "copper_block", "iron_block", "lapis_block",
                 "gold_block", "redstone_block", "emerald_block", "diamond_block")
@@ -502,12 +508,14 @@ def gen_data(data):
             unpack(cur, prev)
     # ---- 压缩甘蔗：8 甘蔗 + 核心方块居中 → 1x；9× 升级；1x 可拆回核心方块（矿物甘蔗拆出压缩钻石块）
     for flavor in CANE_FLAVORS:
-        center = cane_center_id(flavor, "1x")
         for i, p in enumerate(LV):
             cur = f"{NS}:{p}_{flavor}"
-            if i == 0:
+            if i == 0 and flavor == "cane":
+                compress(cur, "minecraft:sugar_cane")   # 纯压缩甘蔗：9 甘蔗 → 1x
+                unpack(cur, "minecraft:sugar_cane")
+            elif i == 0:
                 shaped(f"{p}_{flavor}", ["CCC", "CBC", "CCC"],
-                       {"C": "minecraft:sugar_cane", "B": center}, cur)
+                       {"C": "minecraft:sugar_cane", "B": cane_center_id(flavor, "1x")}, cur)
                 unpack(cur, f"{NS}:1x_{CANE_UNPACK[flavor]}", count=1)
             else:
                 compress(cur, f"{NS}:{LV[i - 1]}_{flavor}")
@@ -522,6 +530,12 @@ def gen_data(data):
     for i, p in enumerate(LV[:FOOD_MAX_LEVEL]):
         cur = f"{NS}:{p}_beef"
         prev = "minecraft:beef" if i == 0 else f"{NS}:{LV[i - 1]}_beef"
+        compress(cur, prev)
+        unpack(cur, prev)
+    # 压缩腐肉：无饥饿副作用（Java 侧 FoodProperties 不带任何效果），数值 ×9^层
+    for i, p in enumerate(LV[:FOOD_MAX_LEVEL]):
+        cur = f"{NS}:{p}_rotten_flesh"
+        prev = "minecraft:rotten_flesh" if i == 0 else f"{NS}:{LV[i - 1]}_rotten_flesh"
         compress(cur, prev)
         unpack(cur, prev)
     # ---- 工具两条线：材料位=同重数混用标签（圆石线=圆石+深板岩圆石，木线=9 原木），棍位=同重数压缩木棍
@@ -724,8 +738,8 @@ def main():
              + tool_names() + armor_names() + food_names() + crop_produce_names() + stick_names())
     assert len(storage_names()) == 459, len(storage_names())
     assert len(tool_names()) == 90, len(tool_names())
-    assert len(blocks) == 669, len(blocks)
-    assert len(items) == 810, len(items)
+    assert len(blocks) == 696, len(blocks)
+    assert len(items) == 840, len(items)
     print(f"blocks={len(blocks)} items={len(items)} (tools={len(tool_names())} armor={len(armor_names())} "
           f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())})")
     for sub in subs:

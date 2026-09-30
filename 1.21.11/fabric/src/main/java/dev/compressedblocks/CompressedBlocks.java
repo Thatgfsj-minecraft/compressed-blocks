@@ -184,11 +184,12 @@ public final class CompressedBlocks {
     private record FoodDef(String key, String en, float nutrition, float saturation) {
     }
 
-    /** 原版数值：面包 5/6.0、牛肉 8/12.8、西瓜片 2/1.2；N 级压缩 = ×9^N。 */
+    /** 原版数值：面包 5/6.0、牛肉 8/12.8、西瓜片 2/1.2、腐肉 4/0.8（无饥饿副作用）；N 级压缩 = ×9^N。 */
     private static final List<FoodDef> FOODS = List.of(
         new FoodDef("bread", "Bread", 5.0F, 6.0F),
         new FoodDef("beef", "Beef", 8.0F, 12.8F),
-        new FoodDef("melon", "Watermelon", 2.0F, 1.2F)
+        new FoodDef("melon", "Watermelon", 2.0F, 1.2F),
+        new FoodDef("rotten_flesh", "Rotten Flesh", 4.0F, 0.8F)
     );
 
     // ------------------------------------------------------------------ 护甲
@@ -545,6 +546,9 @@ public final class CompressedBlocks {
         // 5b. 压缩甘蔗（3 风味 × 9 重）：只能种在 N 重以上压缩泥土/沙子，生长同原版
         String[][] canes = {
             {"cane", "Sugar Cane"},
+            {"dirt_cane", "Dirt Cane"},
+            {"sand_cane", "Sand Cane"},
+            {"clay_cane", "Clay Cane"},
             {"cobblestone_cane", "Cobblestone Cane"},
             {"mineral_cane", "Mineral Cane"}
         };
@@ -751,11 +755,11 @@ public final class CompressedBlocks {
         if (itemCount != expectItems) {
             errors.add("item count " + itemCount + " != " + expectItems);
         }
-        if (BLOCKS.size() != 669) {
-            errors.add("block registry size " + BLOCKS.size() + " != 669");
+        if (BLOCKS.size() != 696) {
+            errors.add("block registry size " + BLOCKS.size() + " != 696");
         }
-        if (expectItems != 810) {
-            errors.add("item registry size " + expectItems + " != 810");
+        if (expectItems != 840) {
+            errors.add("item registry size " + expectItems + " != 840");
         }
         // 方块：注册、翻译键、物品映射
         for (BlockReg b : BLOCKS) {

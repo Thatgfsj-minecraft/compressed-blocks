@@ -1,0 +1,14 @@
+[
+  {"version":1},
+  {"ingredient":{"id":"compressedblocks:8x_cobblestone_cane"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"compressedblocks:7x_cobblestone_cane"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"compressedblocks:6x_cobblestone_cane"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"compressedblocks:5x_cobblestone_cane"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"compressedblocks:4x_cobblestone_cane"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"compressedblocks:3x_cobblestone_cane"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"compressedblocks:2x_cobblestone_cane"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"compressedblocks:1x_cobblestone_cane"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"travelersbackpack:crafting_upgrade"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"compressedblocks:3x_bread"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"compressedblocks:1x_bread"},"type":"item_stack","bookmarkType":"INGREDIENT"}
+]

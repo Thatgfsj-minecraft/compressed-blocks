@@ -19,11 +19,11 @@ const STORAGE_MATS = ['cobblestone', 'stone', 'cobbled_deepslate', 'deepslate',
   'basalt', 'blackstone', 'dripstone_block', 'terracotta', 'quartz_block', 'purpur_block',
   'prismarine', 'amethyst_block', 'glowstone', 'clay', 'hay_block', 'bone_block',
   'moss_block', 'snow', 'ice', 'packed_ice', 'mud'];
-const CANES = ['cane', 'cobblestone_cane', 'mineral_cane'];
+const CANES = ['cane', 'dirt_cane', 'sand_cane', 'clay_cane', 'cobblestone_cane', 'mineral_cane'];
 const WOODS = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'mangrove', 'cherry', 'pale_oak'];
 const CROPS = ['wheat', 'carrot', 'potato', 'beetroot'];
 const CROP_LEVELS = LEVELS.slice(0, 3);
-const FOODS = ['bread', 'beef', 'melon'];
+const FOODS = ['bread', 'beef', 'melon', 'rotten_flesh'];
 const ARMOR = ['helmet', 'chestplate', 'leggings', 'boots'];
 const TOOLS = ['pickaxe', 'axe', 'shovel', 'hoe', 'sword'];
 const TOOL_LINES = ['cobblestone', 'wood'];
@@ -67,7 +67,7 @@ function check(name, ok, detail) {
 }
 
 (async () => {
-  if (ALL_ITEMS.length !== 810) throw new Error(`item list ${ALL_ITEMS.length} != 810`);
+  if (ALL_ITEMS.length !== 840) throw new Error(`item list ${ALL_ITEMS.length} != 840`);
   const rcon = await new Rcon().connect(PORT, '127.0.0.1', 'testpass');
   const cmd = (c) => rcon.command(c);
 

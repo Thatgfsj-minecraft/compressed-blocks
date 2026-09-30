@@ -1,0 +1,19 @@
+[
+  {"version":1},
+  {"ingredient":{"id":"minecraft:dark_oak_log"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"travelersbackpack:blank_upgrade"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"travelersbackpack:iron_tier_upgrade"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"travelersbackpack:iron"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"travelersbackpack:iron","components":"{\"travelersbackpack:render_info\":{RenderInfo:{LeftTank:{},RightTank:{}}},\"travelersbackpack:sleeping_bag_color\":0,\"travelersbackpack:starter_upgrades\":[{item:{count:1,id:\"travelersbackpack:tanks_upgrade\"},slot:0}],\"travelersbackpack:storage_slots\":27}"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"travelersbackpack:iron","components":"{\"travelersbackpack:render_info\":{RenderInfo:{Capacity:243000L,LeftTank:{amount:0L,fluidVariant:{fluid:\"minecraft:empty\"}},RightTank:{amount:0L,fluidVariant:{fluid:\"minecraft:empty\"}}}},\"travelersbackpack:sleeping_bag_color\":0,\"travelersbackpack:storage_slots\":27,\"travelersbackpack:tool_slots\":2,\"travelersbackpack:upgrade_slots\":2,\"travelersbackpack:upgrades\":[{item:{count:1,id:\"travelersbackpack:tanks_upgrade\"},slot:0},{item:{},slot:1}]}"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"travelersbackpack:standard"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"travelersbackpack:standard","components":"{\"travelersbackpack:render_info\":{RenderInfo:{LeftTank:{},RightTank:{}}},\"travelersbackpack:sleeping_bag_color\":0,\"travelersbackpack:starter_upgrades\":[{item:{count:1,id:\"travelersbackpack:tanks_upgrade\"},slot:0}],\"travelersbackpack:storage_slots\":27}"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"recipe":"travelersbackpack:standard","recipeType":"minecraft:crafting","bookmarkType":"RECIPE"},
+  {"ingredient":{"id":"minecraft:raw_iron"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"minecraft:leather"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"travelersbackpack:backpack_tank"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"minecraft:apple"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"minecraft:stick"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"minecraft:coal"},"type":"item_stack","bookmarkType":"INGREDIENT"},
+  {"ingredient":{"id":"minecraft:crafting_table"},"type":"item_stack","bookmarkType":"INGREDIENT"}
+]

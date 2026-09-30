@@ -124,6 +124,7 @@ FOODS = [
     ("bread", "Bread", "面包", "item/bread"),
     ("beef", "Beef", "牛肉", "item/beef"),
     ("melon", "Watermelon", "西瓜", "item/melon_slice"),
+    ("rotten_flesh", "Rotten Flesh", "腐肉", "item/rotten_flesh"),
 ]
 
 ARMOR_PIECES = ["helmet", "chestplate", "leggings", "boots"]
@@ -328,9 +329,18 @@ def gen_farmland_tex(dirt, moist_top, level):
 
 
 def gen_cane_tex(center_sprite, level):
-    """压缩甘蔗：甘蔗图案里，核心方块的颜色与甘蔗本来的绿按连续小像素段混排
-    （几个像素连着一段），保留甘蔗明暗；每深一层整体变黑 5%（9 层=黑 40%）。"""
+    """压缩甘蔗：有核心方块时，核心颜色与甘蔗本来的绿按连续小像素段混排（几个像素连着一段），
+    保留甘蔗明暗；无核心 = 纯甘蔗皮。变黑：纯甘蔗每层 5%（9 层=45%），方块甘蔗每层 5%（L1 不变，9 层=40%）。"""
     cane = load_base("block/sugar_cane").convert("RGBA")
+    if center_sprite is None:
+        f = 1.0 - 0.05 * level
+        ip = cane.load()
+        for y in range(cane.height):
+            for x in range(cane.width):
+                r, g, b, a = ip[x, y]
+                if a:
+                    ip[x, y] = (int(r * f), int(g * f), int(b * f), a)
+        return cane
     ref = load_base(center_sprite).convert("RGBA")
     base = avg_color(ref)
     base_lum = 0.299 * base[0] + 0.587 * base[1] + 0.114 * base[2]
@@ -440,27 +450,57 @@ def main():
             item_tex[f"{prefix}_{food}"] = level_tint(base, int(prefix[:-1]))
 
     # 盔甲：图标=铁甲图标重着色；实体层=铁甲层重着色。
+    # 1-5 石头色逐级加深；6 黑+蓝条纹；7 黑+橙条纹；8 黑+红条纹；9 穿戴层全透明（显示皮肤）
     stone_avg = avg_color(load_base("block/stone"))
     stone_color = (int(stone_avg[0]), int(stone_avg[1]), int(stone_avg[2]))
-    armor_colors = {1: stone_color, 2: stone_color, 3: stone_color, 4: stone_color, 5: stone_color,
-                    6: (34, 46, 94), 7: (198, 98, 18), 8: (156, 26, 26), 9: stone_color}
+    accent_stripes = {6: (56, 92, 214), 7: (232, 122, 20), 8: (208, 32, 32)}
+
+    def recolor_ornate(gray, accent):
+        """下界合金风格花纹：暗部近黑（微透accent）、中间调深accent、棱边高光亮accent——
+        铁甲自带的棱线/雕纹在暗底上以accent色浮现。"""
+        out = gray.copy()
+        px = out.load()
+        for y in range(out.height):
+            for x in range(out.width):
+                r, g, b, a = px[x, y]
+                if a == 0:
+                    continue
+                l = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+                if l > 0.85:
+                    c = (accent[0] * 1.05, accent[1] * 1.05, accent[2] * 1.05)  # 顶部棱边：亮 accent
+                elif l > 0.72:
+                    c = (accent[0] * 0.48, accent[1] * 0.48, accent[2] * 0.48)  # 上斜面：中 accent
+                elif l > 0.45:
+                    c = (r * 0.10 + accent[0] * 0.14 + 5, g * 0.10 + accent[1] * 0.14 + 5,
+                         b * 0.10 + accent[2] * 0.14 + 7)                        # 主体：黑炭带accent色相
+                else:
+                    c = (r * 0.16 + 3, g * 0.16 + 3, b * 0.16 + 5)               # 轮廓/深影：近黑
+                px[x, y] = (min(255, int(c[0])), min(255, int(c[1])), min(255, int(c[2])), a)
+        return out
+
     for piece in ARMOR_PIECES:
         icon = load_base("item/iron_" + piece)
         for _, prefix, _, _ in LEVELS:
             level = int(prefix[:-1])
-            item_tex[f"{prefix}_stone_{piece}"] = level_tint(
-                recolor_by_lum(icon, icon, armor_colors[level] + (255,)), level)
+            if level in accent_stripes:
+                item_tex[f"{prefix}_stone_{piece}"] = recolor_ornate(icon, accent_stripes[level])
+            else:
+                item_tex[f"{prefix}_stone_{piece}"] = level_tint(
+                    recolor_by_lum(icon, icon, stone_color + (255,)), level)
     for layer, src in (("humanoid", "humanoid/iron"), ("humanoid_leggings", "humanoid_leggings/iron")):
         layer_img = load_base(src)
         for _, prefix, _, _ in LEVELS:
             level = int(prefix[:-1])
             if level >= 9:
                 armor_layer_tex[f"{layer}/stone_{prefix}"] = Image.new("RGBA", layer_img.size, (0, 0, 0, 0))
+            elif level in accent_stripes:
+                armor_layer_tex[f"{layer}/stone_{prefix}"] = recolor_ornate(layer_img, accent_stripes[level])
             else:
-                armor_layer_tex[f"{layer}/stone_{prefix}"] = recolor_full(layer_img, armor_colors[level])
+                armor_layer_tex[f"{layer}/stone_{prefix}"] = recolor_full(layer_img, stone_color)
 
     # 压缩甘蔗（3 风味 × 9 级）：甘蔗图案 + 核心方块颜色按连续像素段混排，每层变黑 5%
-    cane_flavors = [("cane", "block/dirt"), ("cobblestone_cane", "block/cobblestone"),
+    cane_flavors = [("cane", None), ("dirt_cane", "block/dirt"), ("sand_cane", "block/sand"),
+                    ("clay_cane", "block/clay"), ("cobblestone_cane", "block/cobblestone"),
                     ("mineral_cane", "block/diamond_block")]
     for flavor, center_sprite in cane_flavors:
         for _, prefix, _, _ in LEVELS:
@@ -468,7 +508,7 @@ def main():
             block_tex[f"{prefix}_{flavor}"] = gen_cane_tex(center_sprite, level)
 
     # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 12 作物 + 27 甘蔗中计入贴图的部分 = 717
-    assert len(block_tex) == 717, len(block_tex)
+    assert len(block_tex) == 744, len(block_tex)
     print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}, armor layers: {len(armor_layer_tex)}")
     for sub in SUBPROJECTS:
         rel = os.path.relpath(sub, ROOT)
