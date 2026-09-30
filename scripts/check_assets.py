@@ -116,6 +116,10 @@ def check():
         data = os.path.join(ROOT, TARGET, loader, "src", "main", "resources", "data")
         tags = rel_set(data)
         rdir = os.path.join(data, NS, "recipe")
+        adv_dir = os.path.join(data, NS, "advancement", "recipes")
+        for f in os.listdir(rdir):
+            if not os.path.exists(os.path.join(adv_dir, f)):
+                MISSING.append(f"recipe {f[:-5]} has no unlock advancement")
         stack_all = [jload(os.path.join(rdir, f)) for f in os.listdir(rdir)]
         while stack_all:
             o = stack_all.pop()

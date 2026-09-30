@@ -13,10 +13,13 @@ const STORAGE_MATS = ['cobblestone', 'stone', 'cobbled_deepslate', 'deepslate',
   'oak_log', 'spruce_log', 'birch_log', 'jungle_log', 'acacia_log', 'dark_oak_log',
   'mangrove_log', 'cherry_log', 'pale_oak_log',
   'dirt', 'sand', 'gravel', 'netherrack', 'end_stone', 'obsidian',
+  'coal_block', 'copper_block', 'iron_block', 'lapis_block', 'gold_block',
+  'redstone_block', 'emerald_block', 'diamond_block',
   'granite', 'diorite', 'andesite', 'calcite', 'tuff', 'sandstone', 'red_sandstone',
   'basalt', 'blackstone', 'dripstone_block', 'terracotta', 'quartz_block', 'purpur_block',
   'prismarine', 'amethyst_block', 'glowstone', 'clay', 'hay_block', 'bone_block',
   'moss_block', 'snow', 'ice', 'packed_ice', 'mud'];
+const CANES = ['cane', 'cobblestone_cane', 'mineral_cane'];
 const WOODS = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'mangrove', 'cherry', 'pale_oak'];
 const CROPS = ['wheat', 'carrot', 'potato', 'beetroot'];
 const CROP_LEVELS = LEVELS.slice(0, 3);
@@ -44,6 +47,7 @@ const LEAVES = WOODS.flatMap((w) => LEVELS.map((p) => `${p}_${w}_leaves`));
 const SAPLINGS = WOODS.flatMap((w) => LEVELS.map((p) => `${p}_${w}_sapling`));
 const FARMLAND = LEVELS.map((p) => `${p}_farmland`);
 const CROP_BLOCKS = CROPS.flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}_plant`));
+const CANE_BLOCKS = CANES.flatMap((c) => LEVELS.map((p) => `${p}_${c}`));
 const TOOL_IDS = TOOL_LINES.flatMap((l) => LEVELS.flatMap((p) => TOOLS.map((t) => `${p}_${l}_${t}`)));
 const STICKS = LEVELS.map((p) => `${p}_stick`);
 const ARMOR_IDS = LEVELS.flatMap((p) => ARMOR.map((a) => `${p}_stone_${a}`));
@@ -51,7 +55,7 @@ const FOOD_IDS = FOODS.flatMap((f) => CROP_LEVELS.map((p) => `${p}_${f}`));
 const PRODUCE = [...CROP_LEVELS.map((p) => `${p}_wheat`), ...CROP_LEVELS.map((p) => `${p}_beetroot`)];
 const CROP_ITEMS = ['wheat', 'beetroot'].flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}_seeds`))
   .concat(['carrot', 'potato'].flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}`)));
-const ALL_ITEMS = [...STORAGE_BLOCKS, ...LEAVES, ...SAPLINGS, ...CROP_ITEMS,
+const ALL_ITEMS = [...STORAGE_BLOCKS, ...LEAVES, ...SAPLINGS, ...CANE_BLOCKS, ...CROP_ITEMS,
   ...TOOL_IDS, ...ARMOR_IDS, ...FOOD_IDS, ...PRODUCE, ...STICKS];
 
 let failures = 0;
@@ -63,7 +67,7 @@ function check(name, ok, detail) {
 }
 
 (async () => {
-  if (ALL_ITEMS.length !== 711) throw new Error(`item list ${ALL_ITEMS.length} != 711`);
+  if (ALL_ITEMS.length !== 810) throw new Error(`item list ${ALL_ITEMS.length} != 810`);
   const rcon = await new Rcon().connect(PORT, '127.0.0.1', 'testpass');
   const cmd = (c) => rcon.command(c);
 
@@ -104,6 +108,16 @@ function check(name, ok, detail) {
     await cmd(`setblock ${pos(slot, 1)} ${NS}:${c}`);
     const res = await cmd(`execute if block ${pos(slot, 1)} ${NS}:${c}`);
     check(`block ${c}`, /Test passed/.test(res), res.trim());
+    await clear(slot);
+    slot++;
+  }
+  // 压缩甘蔗：种在同重数压缩泥土上应存活（沙子路线由 place 门与 mayPlaceOn 覆盖，此处验证泥土路线）
+  for (const cb of CANE_BLOCKS) {
+    const lvl = cb.split('_')[0];
+    await cmd(`setblock ${pos(slot)} ${NS}:${lvl}_dirt`);
+    await cmd(`setblock ${pos(slot, 1)} ${NS}:${cb}`);
+    const res = await cmd(`execute if block ${pos(slot, 1)} ${NS}:${cb}`);
+    check(`block ${cb}`, /Test passed/.test(res), res.trim());
     await clear(slot);
     slot++;
   }

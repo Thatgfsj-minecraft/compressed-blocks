@@ -59,6 +59,15 @@ MATERIALS = [
     ("netherrack", "Netherrack", "下界岩"),
     ("end_stone", "End Stone", "末地石"),
     ("obsidian", "Obsidian", "黑曜石"),
+    # 原版矿物块（储存用，无工具线）：压缩矿物甘蔗的核心方块
+    ("coal_block", "Block of Coal", "煤炭块"),
+    ("copper_block", "Block of Copper", "铜块"),
+    ("iron_block", "Block of Iron", "铁块"),
+    ("lapis_block", "Lapis Lazuli Block", "青金石块"),
+    ("gold_block", "Block of Gold", "金块"),
+    ("redstone_block", "Block of Redstone", "红石块"),
+    ("emerald_block", "Block of Emerald", "绿宝石块"),
+    ("diamond_block", "Block of Diamond", "钻石块"),
 ]
 
 # 工具只有两条线：压缩圆石工具（圆石+深板岩圆石混用）、压缩木质工具（9 原木混用）
@@ -209,6 +218,31 @@ def stick_names():
     return [f"{p}_stick" for p in LV]
 
 
+# 压缩甘蔗三风味：核心方块分别是 压缩泥土 / 压缩圆石 / 压缩矿物块(标签)
+CANE_FLAVORS = {
+    "cane": ("Sugar Cane", "甘蔗"),
+    "cobblestone_cane": ("Cobblestone Cane", "原石甘蔗"),
+    "mineral_cane": ("Mineral Cane", "矿物甘蔗"),
+}
+
+CANE_CENTERS = {"cane": "dirt", "cobblestone_cane": "cobblestone", "mineral_cane": None}
+
+CANE_UNPACK = {"cane": "dirt", "cobblestone_cane": "cobblestone", "mineral_cane": "diamond_block"}
+
+MINERAL_MATS = ("coal_block", "copper_block", "iron_block", "lapis_block",
+                "gold_block", "redstone_block", "emerald_block", "diamond_block")
+
+
+def cane_center_id(flavor, p):
+    """甘蔗配方的居中方块：泥土/圆石用固定方块，矿物甘蔗用矿物块标签。"""
+    mat = CANE_CENTERS[flavor]
+    return f"#{NS}:mineral_cane_{p}" if mat is None else f"{NS}:{p}_{mat}"
+
+
+def cane_names():
+    return [f"{p}_{f}" for f in CANE_FLAVORS for p in LV]
+
+
 # ---------------------------------------------------------------- assets
 
 def gen_assets(res):
@@ -225,6 +259,14 @@ def gen_assets(res):
         dump(f"{res}/blockstates/{name}.json",
              {"variants": {"stage=0": {"model": f"{NS}:block/{name}"},
                            "stage=1": {"model": f"{NS}:block/{name}"}}})
+        dump(f"{res}/models/block/{name}.json",
+             {"parent": "minecraft:block/cross", "textures": {"cross": f"{NS}:block/{name}"}})
+        dump(f"{res}/items/{name}.json",
+             {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
+    # 压缩甘蔗：cross 单模型（age 属性不换图）
+    for name in cane_names():
+        dump(f"{res}/blockstates/{name}.json",
+             {"variants": {"": {"model": f"{NS}:block/{name}"}}})
         dump(f"{res}/models/block/{name}.json",
              {"parent": "minecraft:block/cross", "textures": {"cross": f"{NS}:block/{name}"}})
         dump(f"{res}/items/{name}.json",
@@ -297,51 +339,56 @@ def gen_lang(res):
         lv = next(l for l in LEVELS if name.startswith(l[0] + "_"))
         wood = next(w for w in WOODS if name[len(lv[0]) + 1:].startswith(w[0] + "_"))
         en[f"block.{NS}.{name}"] = f"{lv[1]} {wood[1]} Leaves"
-        zh[f"block.{NS}.{name}"] = f"{lv[2]}压缩{wood[2]}树叶"
+        zh[f"block.{NS}.{name}"] = f"{lv[2]}{wood[2]}树叶"
     for name in sapling_names():
         lv = next(l for l in LEVELS if name.startswith(l[0] + "_"))
         wood = next(w for w in WOODS if name[len(lv[0]) + 1:].startswith(w[0] + "_"))
         en[f"block.{NS}.{name}"] = f"{lv[1]} {wood[1]} Sapling"
-        zh[f"block.{NS}.{name}"] = f"{lv[2]}压缩{wood[2]}树苗"
+        zh[f"block.{NS}.{name}"] = f"{lv[2]}{wood[2]}树苗"
     for name in farmland_names():
         lv = next(l for l in LEVELS if name.startswith(l[0] + "_"))
-        en[f"block.{NS}.{name}"] = f"{lv[1]} Compressed Farmland"
-        zh[f"block.{NS}.{name}"] = f"{lv[2]}压缩耕地"
+        en[f"block.{NS}.{name}"] = f"{lv[1]} Farmland"
+        zh[f"block.{NS}.{name}"] = f"{lv[2]}耕地"
+    for name in cane_names():
+        lv = next(l for l in LEVELS if name.startswith(l[0] + "_"))
+        flavor = name[len(lv[0]) + 1:]
+        en[f"block.{NS}.{name}"] = f"{lv[1]} {CANE_FLAVORS[flavor][0]}"
+        zh[f"block.{NS}.{name}"] = f"{lv[2]}{CANE_FLAVORS[flavor][1]}"
     crop_en = {c[0]: c[1] for c in CROPS}
     crop_zh = {c[0]: c[2] for c in CROPS}
     for name in crop_block_names():
         p, crop, _ = name.split("_", 2)
         lv = next(l for l in LEVELS if l[0] == p)
-        en[f"block.{NS}.{name}"] = f"{lv[1]} Compressed {crop_en[crop]} Plant"
-        zh[f"block.{NS}.{name}"] = f"{lv[2]}压缩{crop_zh[crop]}植株"
+        en[f"block.{NS}.{name}"] = f"{lv[1]} {crop_en[crop]} Plant"
+        zh[f"block.{NS}.{name}"] = f"{lv[2]}{crop_zh[crop]}植株"
     for crop, en_name, zh_name, _, has_seed in CROPS:
         for p in LV[:CROP_MAX_LEVEL]:
             lv = next(l for l in LEVELS if l[0] == p)
             item = crop_item_id(crop, p)
             if has_seed:
                 en[f"item.{NS}.{item}"] = f"{lv[1]} Compressed {en_name} Seeds"
-                zh[f"item.{NS}.{item}"] = f"{lv[2]}压缩{zh_name}种子"
+                zh[f"item.{NS}.{item}"] = f"{lv[2]}{zh_name}种子"
             else:
                 en[f"item.{NS}.{item}"] = f"{lv[1]} Compressed {en_name}"
-                zh[f"item.{NS}.{item}"] = f"{lv[2]}压缩{zh_name}"
+                zh[f"item.{NS}.{item}"] = f"{lv[2]}{zh_name}"
     for p in LV[:CROP_MAX_LEVEL]:
         lv = next(l for l in LEVELS if l[0] == p)
-        en[f"item.{NS}.{p}_wheat"] = f"{lv[1]} Compressed Wheat"
-        zh[f"item.{NS}.{p}_wheat"] = f"{lv[2]}压缩小麦"
-        en[f"item.{NS}.{p}_beetroot"] = f"{lv[1]} Compressed Beetroot"
-        zh[f"item.{NS}.{p}_beetroot"] = f"{lv[2]}压缩甜菜根"
+        en[f"item.{NS}.{p}_wheat"] = f"{lv[1]} Wheat"
+        zh[f"item.{NS}.{p}_wheat"] = f"{lv[2]}小麦"
+        en[f"item.{NS}.{p}_beetroot"] = f"{lv[1]} Beetroot"
+        zh[f"item.{NS}.{p}_beetroot"] = f"{lv[2]}甜菜根"
     food_en = {f[0]: f[1] for f in FOODS}
     food_zh = {f[0]: f[2] for f in FOODS}
     for name in food_names():
         p, food = name.split("_", 1)
         lv = next(l for l in LEVELS if l[0] == p)
-        en[f"item.{NS}.{name}"] = f"{lv[1]} Compressed {food_en[food]}"
-        zh[f"item.{NS}.{name}"] = f"{lv[2]}压缩{food_zh[food]}"
+        en[f"item.{NS}.{name}"] = f"{lv[1]} {food_en[food]}"
+        zh[f"item.{NS}.{name}"] = f"{lv[2]}{food_zh[food]}"
     for name in armor_names():
         p, _, piece = name.split("_", 2)
         lv = next(l for l in LEVELS if l[0] == p)
-        en[f"item.{NS}.{name}"] = f"{lv[1]} Compressed Stone {ARMOR_EN[piece]}"
-        zh[f"item.{NS}.{name}"] = f"{lv[2]}压缩石头{ARMOR_ZH[piece]}"
+        en[f"item.{NS}.{name}"] = f"{lv[1]} Stone {ARMOR_EN[piece]}"
+        zh[f"item.{NS}.{name}"] = f"{lv[2]}石头{ARMOR_ZH[piece]}"
     for name in stick_names():
         lv = next(l for l in LEVELS if name.startswith(l[0] + "_"))
         en[f"item.{NS}.{name}"] = f"{lv[1]} Stick"
@@ -359,12 +406,29 @@ def gen_lang(res):
 # ---------------------------------------------------------------- data
 
 def gen_data(data):
+    def unlock_advancement(path, result, ingredients):
+        """配方解锁进度：没有它配方书永不显示（1.21 配方需 advancement rewards）。"""
+        first = ingredients[0]
+        dump(f"{data}/{NS}/advancement/recipes/{path}.json", {
+            "parent": "minecraft:recipes/root",
+            "criteria": {
+                "has_the_recipe": {"trigger": "minecraft:recipe_unlocked",
+                                   "conditions": {"recipe": f"{NS}:{path}"}},
+                "has_ingredient": {"trigger": "minecraft:inventory_changed",
+                                   "conditions": {"items": [{"items": first}]}},
+            },
+            "requirements": [["has_ingredient", "has_the_recipe"]],
+            "rewards": {"recipes": [f"{NS}:{path}"]},
+        })
+
     def shaped(path, pattern, key, result, count=1, category="building"):
         dump(f"{data}/{NS}/recipe/{path}.json", {
             "type": "minecraft:crafting_shaped", "category": category,
             "pattern": pattern, "key": key,
             "result": {"count": count, "id": result},
         })
+        unlock_advancement(path, result, list(dict.fromkeys(
+            ing for ing in key.values() if isinstance(ing, str))))
 
     def shapeless(path, ingredients, result, count=1, category="building"):
         dump(f"{data}/{NS}/recipe/{path}.json", {
@@ -372,6 +436,8 @@ def gen_data(data):
             "ingredients": ingredients,
             "result": {"count": count, "id": result},
         })
+        unlock_advancement(path, result, list(dict.fromkeys(
+            ing for ing in ingredients if isinstance(ing, str))))
 
     def compress(cur, prev, count=9):
         """3×3 压缩（prev 可为物品或配料列表）。"""
@@ -411,9 +477,12 @@ def gen_data(data):
     for i, p in enumerate(LV[:FOOD_MAX_LEVEL]):
         cur = f"{NS}:{p}_melon"
         if i == 0:
+            compress(cur, "minecraft:melon_slice")   # 9 西瓜片 → 1x
             unpack(cur, "minecraft:melon_slice")
         elif i == 1:
-            compress(cur, "minecraft:melon")
+            compress(cur, "minecraft:melon")          # 9 西瓜块 → 2x（原版 9 片=西瓜块）
+            shaped(f"{p}_melon_from_compressed", ["PPP", "PPP", "PPP"],
+                   {"P": f"{NS}:1x_melon"}, cur)      # 9×1x → 2x
             unpack(cur, f"{NS}:{LV[i - 1]}_melon")
         else:
             compress(cur, f"{NS}:{LV[i - 1]}_melon")
@@ -431,6 +500,18 @@ def gen_data(data):
             prev = f"minecraft:{crop}_seeds" if i == 0 else f"{NS}:{LV[i - 1]}_{crop}_seeds"
             compress(cur, prev)
             unpack(cur, prev)
+    # ---- 压缩甘蔗：8 甘蔗 + 核心方块居中 → 1x；9× 升级；1x 可拆回核心方块（矿物甘蔗拆出压缩钻石块）
+    for flavor in CANE_FLAVORS:
+        center = cane_center_id(flavor, "1x")
+        for i, p in enumerate(LV):
+            cur = f"{NS}:{p}_{flavor}"
+            if i == 0:
+                shaped(f"{p}_{flavor}", ["CCC", "CBC", "CCC"],
+                       {"C": "minecraft:sugar_cane", "B": center}, cur)
+                unpack(cur, f"{NS}:1x_{CANE_UNPACK[flavor]}", count=1)
+            else:
+                compress(cur, f"{NS}:{LV[i - 1]}_{flavor}")
+                unpack(cur, f"{NS}:{LV[i - 1]}_{flavor}")
     # ---- 食物：面包=3 压缩小麦（原版 3 麦→面包），牛肉=9 肉，西瓜见上
     shaped("1x_bread", ["WWW"], {"W": f"{NS}:1x_wheat"}, f"{NS}:1x_bread", category="misc")
     for i, p in enumerate(LV[:FOOD_MAX_LEVEL]):
@@ -451,21 +532,13 @@ def gen_data(data):
             stick_id = f"{NS}:{p}_stick"
             for tool, (pattern, _) in TOOLS.items():
                 name = f"{p}_{mat}_{tool}"
-                dump(f"{data}/{NS}/recipe/{name}.json", {
-                    "type": "minecraft:crafting_shaped", "category": "equipment",
-                    "pattern": pattern,
-                    "key": {"X": key_x, "S": stick_id},
-                    "result": {"count": 1, "id": f"{NS}:{name}"},
-                })
+                shaped(name, pattern, {"X": key_x, "S": stick_id}, f"{NS}:{name}", category="equipment")
     # ---- 盔甲：原版盔甲配方 × 同重数压缩石头
     for p in LV:
         stone = f"{NS}:{p}_stone"
         for piece, pattern in ARMOR_PATTERNS.items():
-            dump(f"{data}/{NS}/recipe/{p}_stone_{piece}.json", {
-                "type": "minecraft:crafting_shaped", "category": "equipment",
-                "pattern": pattern, "key": {"X": stone},
-                "result": {"count": 1, "id": f"{NS}:{p}_stone_{piece}"},
-            })
+            shaped(f"{p}_stone_{piece}", pattern, {"X": f"#{NS}:stone_armor_{p}"},
+                   f"{NS}:{p}_stone_{piece}", category="equipment")
     # ---- 战利品表
     for name in storage_names():
         dump(f"{data}/{NS}/loot_table/blocks/{name}.json", self_drop(name))
@@ -477,6 +550,13 @@ def gen_data(data):
     for crop, _, _, _, has_seed in CROPS:
         for p in LV[:CROP_MAX_LEVEL]:
             gen_crop_loot(data, crop, p, has_seed)
+    # 压缩甘蔗：掉落自身
+    for name in cane_names():
+        dump(f"{data}/{NS}/loot_table/blocks/{name}.json", {
+            "type": "minecraft:block",
+            "pools": [{"rolls": 1.0, "bonus_rolls": 0.0,
+                       "entries": [{"type": "minecraft:item", "name": f"{NS}:{name}"}],
+                       "conditions": [{"condition": "minecraft:survives_explosion"}]}]})
     # ---- 方块标签（并入原版命名空间）
     pickaxe = [f"{NS}:{n}" for n in storage_names() if _mat_of(n) in PICKAXE_MATS]
     shovel = [f"{NS}:{n}" for n in storage_names() if _mat_of(n) in SHOVEL_MATS]
@@ -484,8 +564,10 @@ def gen_data(data):
     hoe = [f"{NS}:{n}" for n in leaves_names()] + \
           [f"{NS}:{n}" for n in storage_names() if _mat_of(n) in ("hay_block", "moss_block")]
     stone_tool = [f"{NS}:{n}" for n in storage_names() if _mat_of(n) in
-                  ("deepslate", "cobbled_deepslate", "granite", "diorite", "andesite", "calcite", "tuff", "basalt")]
-    iron_tool = [f"{NS}:{n}" for n in storage_names() if _mat_of(n) == "amethyst_block"]
+                  ("deepslate", "cobbled_deepslate", "granite", "diorite", "andesite", "calcite", "tuff", "basalt",
+                   "copper_block", "iron_block", "lapis_block")]
+    iron_tool = [f"{NS}:{n}" for n in storage_names() if _mat_of(n) in
+                 ("amethyst_block", "gold_block", "redstone_block", "emerald_block", "diamond_block")]
     diamond_tool = [f"{NS}:{n}" for n in storage_names() if _mat_of(n) == "obsidian"]
     logs = [f"{NS}:{p}_{w[0]}_log" for w in WOODS for p in LV]
     for tag, values in [("mineable/pickaxe", pickaxe), ("mineable/shovel", shovel),
@@ -528,6 +610,13 @@ def gen_data(data):
              {"replace": False, "values": [f"{NS}:{p}_cobblestone", f"{NS}:{p}_cobbled_deepslate"]})
         dump(f"{data}/{NS}/tags/item/wood_tool_{p}.json",
              {"replace": False, "values": sorted(f"{NS}:{p}_{w[0]}_log" for w in WOODS)})
+        # 盔甲合成材料：压缩石头系（石头+深板岩）或压缩原石系（圆石+深板岩圆石）
+        dump(f"{data}/{NS}/tags/item/stone_armor_{p}.json",
+             {"replace": False, "values": [f"{NS}:{p}_stone", f"{NS}:{p}_deepslate",
+                                           f"{NS}:{p}_cobblestone", f"{NS}:{p}_cobbled_deepslate"]})
+        # 矿物甘蔗核心：8 种压缩矿物块
+        dump(f"{data}/{NS}/tags/item/mineral_cane_{p}.json",
+             {"replace": False, "values": sorted(f"{NS}:{p}_{m}" for m in MINERAL_MATS)})
     # ---- 世界树特征：9 树种 × 9 级，形状与原版一致
     n = gen_tree_features(data)
     assert n == 126, n
@@ -596,6 +685,9 @@ def gen_tree_features(data):
             for p in LV:
                 out = text.replace(f'"minecraft:{wood}_log"', f'"{NS}:{p}_{wood}_log"')
                 out = out.replace(f'"minecraft:{wood}_leaves"', f'"{NS}:{p}_{wood}_leaves"')
+                # 长树会把脚下换成 dirt/podzol（dirt_provider）：必须一并换成同重数压缩泥土
+                out = out.replace('"minecraft:dirt"', f'"{NS}:{p}_dirt"')
+                out = out.replace('"minecraft:podzol"', f'"{NS}:{p}_dirt"')
                 dump_text(f"{data}/{NS}/worldgen/configured_feature/{feature}_{p}.json", out)
                 total += 1
     return total
@@ -626,13 +718,14 @@ def main():
     args = ap.parse_args()
     subs = [os.path.join(ROOT, args.target, loader) for loader in ("fabric", "neoforge")]
 
-    blocks = storage_names() + leaves_names() + sapling_names() + farmland_names() + crop_block_names()
-    items = (storage_names() + leaves_names() + sapling_names() + crop_block_names()
+    blocks = (storage_names() + leaves_names() + sapling_names() + farmland_names()
+              + crop_block_names() + cane_names())
+    items = (storage_names() + leaves_names() + sapling_names() + crop_block_names() + cane_names()
              + tool_names() + armor_names() + food_names() + crop_produce_names() + stick_names())
-    assert len(storage_names()) == 387, len(storage_names())
-    assert len(blocks) == 570, len(blocks)
+    assert len(storage_names()) == 459, len(storage_names())
     assert len(tool_names()) == 90, len(tool_names())
-    assert len(items) == 711, len(items)
+    assert len(blocks) == 669, len(blocks)
+    assert len(items) == 810, len(items)
     print(f"blocks={len(blocks)} items={len(items)} (tools={len(tool_names())} armor={len(armor_names())} "
           f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())})")
     for sub in subs:

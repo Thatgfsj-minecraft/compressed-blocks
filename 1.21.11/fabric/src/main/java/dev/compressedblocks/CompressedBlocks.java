@@ -43,6 +43,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.material.PushReaction;
 import org.slf4j.Logger;
 
 /**
@@ -118,6 +119,15 @@ public final class CompressedBlocks {
         new StorageMat("netherrack", SoundType.NETHERRACK, MapColor.NETHER, true, 0),
         new StorageMat("end_stone", SoundType.STONE, MapColor.SAND, true, 0),
         new StorageMat("obsidian", SoundType.STONE, MapColor.COLOR_BLACK, true, 0),
+        // 原版矿物块（储存用）：压缩矿物甘蔗的核心方块族
+        new StorageMat("coal_block", SoundType.STONE, MapColor.COLOR_BLACK, true, 0),
+        new StorageMat("copper_block", SoundType.COPPER, MapColor.COLOR_ORANGE, true, 0),
+        new StorageMat("iron_block", SoundType.METAL, MapColor.METAL, true, 0),
+        new StorageMat("lapis_block", SoundType.STONE, MapColor.LAPIS, true, 0),
+        new StorageMat("gold_block", SoundType.METAL, MapColor.GOLD, true, 0),
+        new StorageMat("redstone_block", SoundType.STONE, MapColor.COLOR_RED, true, 0),
+        new StorageMat("emerald_block", SoundType.METAL, MapColor.EMERALD, true, 0),
+        new StorageMat("diamond_block", SoundType.METAL, MapColor.DIAMOND, true, 0),
         new StorageMat("granite", SoundType.STONE, MapColor.COLOR_ORANGE, true, 0),
         new StorageMat("diorite", SoundType.STONE, MapColor.QUARTZ, true, 0),
         new StorageMat("andesite", SoundType.STONE, MapColor.STONE, true, 0),
@@ -240,6 +250,7 @@ public final class CompressedBlocks {
     private static final List<FoodReg> FOOD_REGS = new ArrayList<>();
     private static final Map<Item, int[]> ARMOR_INDEX = new IdentityHashMap<>();
     private static final Map<Block, Integer> DIRT_LEVELS = new IdentityHashMap<>();
+    private static final Map<Block, Integer> SAND_LEVELS = new IdentityHashMap<>();
     private static final Map<Integer, Block> FARMLAND = new IdentityHashMap<>();
 
     public static List<BlockReg> blocks() {
@@ -257,6 +268,11 @@ public final class CompressedBlocks {
     /** 泥土等级查询：压缩泥土方块 → 1-9，其他 null。 */
     public static Integer dirtLevel(BlockState state) {
         return DIRT_LEVELS.get(state.getBlock());
+    }
+
+    /** 沙子等级查询：压缩沙子方块 → 1-9，其他 null。 */
+    public static Integer sandLevel(BlockState state) {
+        return SAND_LEVELS.get(state.getBlock());
     }
 
     /** 耕地等级查询：压缩耕地 → 1-9，其他 null。 */
@@ -430,6 +446,9 @@ public final class CompressedBlocks {
                 if (m.key().equals("dirt")) {
                     DIRT_LEVELS.put(block, level);
                 }
+                if (m.key().equals("sand")) {
+                    SAND_LEVELS.put(block, level);
+                }
             }
         }
         // 2. 树叶（9 木 × 9 重）：原版凋落算法
@@ -499,11 +518,21 @@ public final class CompressedBlocks {
                     .randomTicks()
                     .sound(SoundType.CROP));
                 String enName = c.hasSeeds() ? enFood + " Seeds" : enFood;
-                Item item = new CompressedSoilItem(block,
-                    new Item.Properties().setId(ResourceKey.create(Registries.ITEM, id(seedItem))),
-                    level, true, enName);
+                // 压缩胡萝卜/土豆同时是压缩食物：随时可吃 + 溢出转回升（数值 = 原版 × 9^重）
+                int foodN = c.hasSeeds() ? 0
+                    : (int) ((c.key().equals("carrot") ? 3 : 1) * pow9(level));
+                float foodS = c.hasSeeds() ? 0.0F
+                    : (c.key().equals("carrot") ? 1.8F : 0.3F) * pow9(level);
+                Item.Properties props = new Item.Properties().setId(ResourceKey.create(Registries.ITEM, id(seedItem)));
+                if (foodN > 0) {
+                    props = props.food(new FoodProperties(foodN, foodS, true));
+                }
+                Item item = new CompressedSoilItem(block, props, level, true, enName, foodN);
                 BLOCKS.add(new BlockReg(blockName, block, seedItem));
                 ITEMS.add(new ItemReg(seedItem, item, Tab.FOOD, false));
+                if (foodN > 0) {
+                    FOOD_REGS.add(new FoodReg(seedItem, item, foodN, foodS));
+                }
                 if (c.hasSeeds()) {
                     // 产物：压缩小麦 / 压缩甜菜根（不可种植的纯物品）
                     String produce = p + "_" + c.key();
@@ -511,6 +540,31 @@ public final class CompressedBlocks {
                         .setId(ResourceKey.create(Registries.ITEM, id(produce))));
                     ITEMS.add(new ItemReg(produce, produceItem, Tab.FOOD, false));
                 }
+            }
+        }
+        // 5b. 压缩甘蔗（3 风味 × 9 重）：只能种在 N 重以上压缩泥土/沙子，生长同原版
+        String[][] canes = {
+            {"cane", "Sugar Cane"},
+            {"cobblestone_cane", "Cobblestone Cane"},
+            {"mineral_cane", "Mineral Cane"}
+        };
+        for (String[] c : canes) {
+            for (int level = 1; level <= LEVELS; level++) {
+                String name = LEVEL_PREFIX[level - 1] + "_" + c[0];
+                Block block = new CompressedCaneBlock(level, BlockBehaviour.Properties.of()
+                    .setId(ResourceKey.create(Registries.BLOCK, id(name)))
+                    .mapColor(MapColor.PLANT)
+                    .noCollision()
+                    .randomTicks()
+                    .instabreak()
+                    .sound(SoundType.GRASS)
+                    .pushReaction(PushReaction.DESTROY));
+                Item item = new CompressedCaneItem(block,
+                    new Item.Properties().setId(ResourceKey.create(Registries.ITEM, id(name)))
+                        .useBlockDescriptionPrefix(),
+                    level, LEVEL_EN_PREFIX[level - 1] + " " + c[1]);
+                BLOCKS.add(new BlockReg(name, block, name));
+                ITEMS.add(new ItemReg(name, item, Tab.FOOD, true));
             }
         }
         // 6. 压缩食物（3 种 × 3 级）：canAlwaysEat，溢出转回升
@@ -697,11 +751,11 @@ public final class CompressedBlocks {
         if (itemCount != expectItems) {
             errors.add("item count " + itemCount + " != " + expectItems);
         }
-        if (BLOCKS.size() != 570) {
-            errors.add("block registry size " + BLOCKS.size() + " != 570");
+        if (BLOCKS.size() != 669) {
+            errors.add("block registry size " + BLOCKS.size() + " != 669");
         }
-        if (expectItems != 711) {
-            errors.add("item registry size " + expectItems + " != 711");
+        if (expectItems != 810) {
+            errors.add("item registry size " + expectItems + " != 810");
         }
         // 方块：注册、翻译键、物品映射
         for (BlockReg b : BLOCKS) {

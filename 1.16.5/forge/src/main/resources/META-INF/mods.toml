@@ -1,0 +1,25 @@
+modLoader="javafml"
+loaderVersion="[36,)"
+license="MIT"
+issueTrackerURL="https://github.com/Thatgfsj-minecraft/compressed-blocks/issues"
+
+[[mods]]
+modId="compressedblocks"
+version="${file.jarVersion}"
+displayName="Compressed Blocks 压缩方块"
+description="9 级压缩方块、工具、盔甲、食物与农业系统。"
+logoFile="assets/compressedblocks/icon.png"
+
+[[dependencies.compressedblocks]]
+    modId="forge"
+    mandatory=true
+    versionRange="[36,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.compressedblocks]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.16.5,1.17)"
+    ordering="NONE"
+    side="BOTH"

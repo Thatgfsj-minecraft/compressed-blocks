@@ -65,6 +65,16 @@ public final class CompressedHooks {
         if (CompressedBlocks.hasFullLevel9Armor(player)) {
             player.getFoodData().setFoodLevel(20);
             player.getFoodData().setSaturation(20.0F);
+            // 九重满套：生存飞行（不影响创造模式自身的 mayfly）
+            if (!player.getAbilities().mayfly) {
+                player.getAbilities().mayfly = true;
+                player.onUpdateAbilities();
+            }
+        } else if (player.getAbilities().mayfly && !player.getAbilities().instabuild) {
+            // 脱下满套立刻收回飞行（含正在飞：强制落地）
+            player.getAbilities().mayfly = false;
+            player.getAbilities().flying = false;
+            player.onUpdateAbilities();
         }
         int overflow = CompressedBlocks.wornOverflow(player);
         if (overflow > 0) {
@@ -115,6 +125,21 @@ public final class CompressedHooks {
             .append(Component.literal(enName).withStyle(ChatFormatting.GOLD))
             .append(Component.literal(" needs ").withStyle(ChatFormatting.RED))
             .append(Component.literal(level + "x+ " + soil).withStyle(ChatFormatting.GOLD))
+            .append(Component.literal("! Found: ").withStyle(ChatFormatting.RED))
+            .append(Component.literal(found).withStyle(ChatFormatting.GRAY)), false);
+    }
+
+    /** 压缩甘蔗：下方需 N 重以上的压缩泥土或压缩沙子。 */
+    public static void sendCaneHint(ServerPlayer player, String enName, int level, int soilLevel) {
+        if (!hintReady(player)) {
+            return;
+        }
+        String found = soilLevel < 0 ? "not compressed soil" : soilLevel + "x";
+        player.displayClientMessage(Component.empty()
+            .append(Component.literal("[Compressed Blocks] ").withStyle(ChatFormatting.DARK_GRAY))
+            .append(Component.literal(enName).withStyle(ChatFormatting.GOLD))
+            .append(Component.literal(" needs ").withStyle(ChatFormatting.RED))
+            .append(Component.literal(level + "x+ Compressed Dirt/Sand").withStyle(ChatFormatting.GOLD))
             .append(Component.literal("! Found: ").withStyle(ChatFormatting.RED))
             .append(Component.literal(found).withStyle(ChatFormatting.GRAY)), false);
     }

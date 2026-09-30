@@ -57,6 +57,15 @@ MATERIALS = [
     ("netherrack", "Netherrack", "下界岩", False),
     ("end_stone", "End Stone", "末地石", False),
     ("obsidian", "Obsidian", "黑曜石", False),
+    # 原版矿物块（与 gen_resources.MATERIALS 同步）
+    ("coal_block", "Block of Coal", "煤炭块", False),
+    ("copper_block", "Block of Copper", "铜块", False),
+    ("iron_block", "Block of Iron", "铁块", False),
+    ("lapis_block", "Lapis Lazuli Block", "青金石块", False),
+    ("gold_block", "Block of Gold", "金块", False),
+    ("redstone_block", "Block of Redstone", "红石块", False),
+    ("emerald_block", "Block of Emerald", "绿宝石块", False),
+    ("diamond_block", "Block of Diamond", "钻石块", False),
 ]
 
 # 0.3.0 新建材 24 种：(key, en, zh, sprite 名, light 等级)
@@ -318,6 +327,54 @@ def gen_farmland_tex(dirt, moist_top, level):
     return gen_block_tex(base, level)
 
 
+def gen_cane_tex(center_sprite, level):
+    """压缩甘蔗：甘蔗图案里，核心方块的颜色与甘蔗本来的绿按连续小像素段混排
+    （几个像素连着一段），保留甘蔗明暗；每深一层整体变黑 5%（9 层=黑 40%）。"""
+    cane = load_base("block/sugar_cane").convert("RGBA")
+    ref = load_base(center_sprite).convert("RGBA")
+    base = avg_color(ref)
+    base_lum = 0.299 * base[0] + 0.587 * base[1] + 0.114 * base[2]
+    if base_lum <= 0:
+        base_lum = 1.0
+
+    def lum(p):
+        return 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2]
+
+    ip = cane.load()
+    w, h = cane.size
+    opaque = [(x, y) for y in range(h) for x in range(w) if ip[x, y][3] > 0]
+    mean_lum = (sum(lum(ip[x, y]) for x, y in opaque) / len(opaque)) if opaque else 1.0
+
+    run_id = 0
+    for y in range(h):
+        x = 0
+        while x < w:
+            if ip[x, y][3] == 0:
+                x += 1
+                continue
+            seg_start = x
+            seg_len = 2 + (run_id % 2)  # 2-3 像素连续一段
+            while x < w and ip[x, y][3] != 0 and x - seg_start < seg_len:
+                x += 1
+            use_block = run_id % 2 == 1
+            run_id += 1
+            if not use_block:
+                continue
+            for xx in range(seg_start, x):
+                r, g, b, a = ip[xx, y]
+                f = lum((r, g, b)) / mean_lum
+                ip[xx, y] = (min(255, int(base[0] * f)), min(255, int(base[1] * f)),
+                             min(255, int(base[2] * f)), a)
+    if level > 1:
+        f = 1.0 - 0.05 * (level - 1)
+        for y in range(h):
+            for x in range(w):
+                r, g, b, a = ip[x, y]
+                if a:
+                    ip[x, y] = (int(r * f), int(g * f), int(b * f), a)
+    return cane
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-root", default=ROOT)
@@ -382,25 +439,36 @@ def main():
         for _, prefix, _, _ in LEVELS[:3]:
             item_tex[f"{prefix}_{food}"] = level_tint(base, int(prefix[:-1]))
 
-    # 盔甲：图标=铁甲图标重着色为石灰色再逐级染色；实体层=铁甲层重着色
+    # 盔甲：图标=铁甲图标重着色；实体层=铁甲层重着色。
     stone_avg = avg_color(load_base("block/stone"))
     stone_color = (int(stone_avg[0]), int(stone_avg[1]), int(stone_avg[2]))
+    armor_colors = {1: stone_color, 2: stone_color, 3: stone_color, 4: stone_color, 5: stone_color,
+                    6: (34, 46, 94), 7: (198, 98, 18), 8: (156, 26, 26), 9: stone_color}
     for piece in ARMOR_PIECES:
         icon = load_base("item/iron_" + piece)
         for _, prefix, _, _ in LEVELS:
             level = int(prefix[:-1])
             item_tex[f"{prefix}_stone_{piece}"] = level_tint(
-                recolor_by_lum(icon, icon, stone_color + (255,)), level)
+                recolor_by_lum(icon, icon, armor_colors[level] + (255,)), level)
     for layer, src in (("humanoid", "humanoid/iron"), ("humanoid_leggings", "humanoid_leggings/iron")):
         layer_img = load_base(src)
         for _, prefix, _, _ in LEVELS:
             level = int(prefix[:-1])
-            armor_layer_tex[f"{layer}/stone_{prefix}"] = level_tint(
-                recolor_full(layer_img, stone_color), level, rim=False)
+            if level >= 9:
+                armor_layer_tex[f"{layer}/stone_{prefix}"] = Image.new("RGBA", layer_img.size, (0, 0, 0, 0))
+            else:
+                armor_layer_tex[f"{layer}/stone_{prefix}"] = recolor_full(layer_img, armor_colors[level])
 
-    # 387 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 12 作物 = 570 块级贴图键中的 550 张
-    # （farmland 有 9 张但 crop 侧模型走 cross，本计数以 block_tex 实际键数为准）
-    assert len(block_tex) == 618, len(block_tex)
+    # 压缩甘蔗（3 风味 × 9 级）：甘蔗图案 + 核心方块颜色按连续像素段混排，每层变黑 5%
+    cane_flavors = [("cane", "block/dirt"), ("cobblestone_cane", "block/cobblestone"),
+                    ("mineral_cane", "block/diamond_block")]
+    for flavor, center_sprite in cane_flavors:
+        for _, prefix, _, _ in LEVELS:
+            level = int(prefix[:-1])
+            block_tex[f"{prefix}_{flavor}"] = gen_cane_tex(center_sprite, level)
+
+    # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 12 作物 + 27 甘蔗中计入贴图的部分 = 717
+    assert len(block_tex) == 717, len(block_tex)
     print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}, armor layers: {len(armor_layer_tex)}")
     for sub in SUBPROJECTS:
         rel = os.path.relpath(sub, ROOT)
