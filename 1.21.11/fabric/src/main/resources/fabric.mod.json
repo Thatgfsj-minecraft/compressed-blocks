@@ -10,6 +10,9 @@
   "license": "MIT",
   "environment": "*",
   "icon": "assets/compressedblocks/icon.png",
+  "mixins": [
+    "compressedblocks.mixins.json"
+  ],
   "entrypoints": {
     "main": [
       "dev.compressedblocks.fabric.CompressedBlocksFabric"

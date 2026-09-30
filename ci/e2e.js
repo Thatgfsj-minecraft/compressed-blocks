@@ -18,7 +18,7 @@ const TOOLS = ['pickaxe', 'axe', 'shovel', 'hoe', 'sword'];
 
 // 与 CompressedBlocks.java 一致的期望值
 const BASE_DUR = { stone: 131, wood: 59 };
-const SPEED_LADDER = [6.0, 8.0, 12.0, 14.4, 17.28, 20.736, 24.8832, 29.85984, 35.831808];
+const SPEED_LADDER = [6.0, 8.0, 12.0, 18.0, 27.0, 40.5, 60.75, 91.125, 136.6875];
 const UNBREAKABLE_FROM = 6;
 
 function durability(level, kind) {

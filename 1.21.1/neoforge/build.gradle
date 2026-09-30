@@ -44,6 +44,12 @@ processResources {
     }
 }
 
+jar {
+    manifest {
+        attributes(['MixinConfigs': 'compressedblocks.mixins.json'])
+    }
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.release = 21

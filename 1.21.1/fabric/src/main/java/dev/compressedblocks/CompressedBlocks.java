@@ -25,6 +25,7 @@ import net.minecraft.world.item.component.Tool;
 import net.minecraft.world.item.component.Unbreakable;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
@@ -52,8 +53,8 @@ public final class CompressedBlocks {
         "sextuple_compressed", "septuple_compressed", "octuple_compressed", "nonuple_compressed"
     };
 
-    /** 挖掘速度阶梯：一重=铁 6.0、二重=钻 8.0、三重=金 12.0，四重=三重×1.2、五重=四重×1.2……逐级连乘。 */
-    private static final float[] SPEED = {6.0F, 8.0F, 12.0F, 14.4F, 17.28F, 20.736F, 24.8832F, 29.85984F, 35.831808F};
+    /** 挖掘速度阶梯：一重=铁 6.0、二重=钻 8.0、三重=金 12.0，四重=三重×1.5、五重=四重×1.5……逐级连乘。 */
+    private static final float[] SPEED = {6.0F, 8.0F, 12.0F, 18.0F, 27.0F, 40.5F, 60.75F, 91.125F, 136.6875F};
 
     public enum ToolKind { NONE, STONE, WOOD }
 
@@ -175,6 +176,20 @@ public final class CompressedBlocks {
         }
     }
 
+    /** 挖掘等级阶梯：7 重=铁、8 重=钻石、9 重=下界合金；其余保持原版石级/木级。 */
+    private static TagKey<Block> incorrectTagFor(int level, boolean stone) {
+        if (level >= 9) {
+            return BlockTags.INCORRECT_FOR_NETHERITE_TOOL;
+        }
+        if (level == 8) {
+            return BlockTags.INCORRECT_FOR_DIAMOND_TOOL;
+        }
+        if (level == 7) {
+            return BlockTags.INCORRECT_FOR_IRON_TOOL;
+        }
+        return stone ? BlockTags.INCORRECT_FOR_STONE_TOOL : BlockTags.INCORRECT_FOR_WOODEN_TOOL;
+    }
+
     static {
         for (Material m : MATERIALS) {
             for (int level = 1; level <= LEVELS; level++) {
@@ -202,6 +217,9 @@ public final class CompressedBlocks {
                     int durability = durabilityFor(level, m.toolKind());
                     boolean unbreakable = level >= UNBREAKABLE_FROM;
                     Item item = buildTool(m, level, t, name, unbreakable);
+                    if (level == LEVELS) {
+                        CompressedHooks.registerLevel9Tool(item);
+                    }
                     float[] stats = m.toolKind() == ToolKind.STONE ? STONE_TOOL_STATS[t] : WOOD_TOOL_STATS[t];
                     double expectedDamage = stats[0] + (m.toolKind() == ToolKind.STONE ? 1.0F : 0.0F) + level;
                     ITEMS.add(new ItemEntry(name, item, Tab.TOOLS, durability, SPEED[level - 1], unbreakable,
@@ -221,12 +239,12 @@ public final class CompressedBlocks {
         ToolKind kind = m.toolKind();
         boolean stone = kind == ToolKind.STONE;
         float[] stats = stone ? STONE_TOOL_STATS[toolIndex] : WOOD_TOOL_STATS[toolIndex];
-        // 1.21.1 工具的耐久/速度/伤害加成/修复材料全部来自 Tier
+        // 1.21.1 工具的耐久/速度/伤害加成/修复材料/挖掘等级（7/8/9 重升铁/钻/下界合金）全部来自 Tier
         Tier tier = new CompressedTier(
             durabilityFor(level, kind),
             SPEED[level - 1],
             (stone ? 1.0F : 0.0F) + level,
-            stone ? BlockTags.INCORRECT_FOR_STONE_TOOL : BlockTags.INCORRECT_FOR_WOODEN_TOOL,
+            incorrectTagFor(level, stone),
             stone ? 5 : 15,
             Ingredient.of(TagKey.create(Registries.ITEM, id("repair_" + m.key())))
         );
@@ -278,9 +296,34 @@ public final class CompressedBlocks {
         .displayItems((parameters, output) -> acceptTabItems(output))
         .build();
 
+    private static TagKey<Item> vanillaItemTag(String path) {
+        return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(path));
+    }
+
+    private static ItemEntry itemEntry(String name) {
+        for (ItemEntry e : ITEMS) {
+            if (e.name().equals(name)) {
+                return e;
+            }
+        }
+        return null;
+    }
+
+    private static void assertTier(List<String> errors, String name, Block state, boolean expectHarvest) {
+        ItemEntry e = itemEntry(name);
+        if (e == null) {
+            errors.add("missing item for tier check: " + name);
+            return;
+        }
+        boolean got = new ItemStack(e.item()).isCorrectToolForDrops(state.defaultBlockState());
+        if (got != expectHarvest) {
+            errors.add(name + " harvest " + state + " = " + got + ", want " + expectHarvest);
+        }
+    }
+
     /**
-     * 启动自检：注册计数、耐久公式、unbreakable、速度阶梯、攻击伤害逐项比对服务端权威数据。
-     * 任何版本升级/映射变化导致的行为漂移都会在这里第一时间爆掉（日志搜 SELF-TEST）。
+     * 启动自检：注册计数、翻译键、耐久公式、unbreakable、速度阶梯、攻击伤害、挖掘等级阶梯、
+     * 附魔标签逐项比对服务端权威数据。任何版本升级/映射变化都会在这里第一时间爆掉（日志搜 SELF-TEST）。
      */
     public static void selfTest() {
         List<String> errors = new ArrayList<>();
@@ -305,7 +348,13 @@ public final class CompressedBlocks {
                 errors.add("item not registered: " + e.name());
             }
             if (e.expectedSpeed() == 0.0F) {
+                if (!e.item().getDescriptionId().equals("item." + MOD_ID + "." + e.name())) {
+                    errors.add("stick translation key mismatch: " + e.name());
+                }
                 continue; // 压缩木棍：无耐久/工具组件
+            }
+            if (!e.item().getDescriptionId().equals("item." + MOD_ID + "." + e.name())) {
+                errors.add("item translation key mismatch: " + e.name());
             }
             ItemStack stack = new ItemStack(e.item());
             if (stack.getMaxDamage() != e.expectedDurability()) {
@@ -348,6 +397,32 @@ public final class CompressedBlocks {
                 }
             }
         }
+        TagKey<Item> mining = vanillaItemTag("enchantable/mining");
+        TagKey<Item> durability = vanillaItemTag("enchantable/durability");
+        TagKey<Item> sharpWeapon = vanillaItemTag("enchantable/sharp_weapon");
+        // 附魔生效前提：必须挂在原版 enchantable/* 物品标签里
+        for (ItemEntry e : ITEMS) {
+            if (e.expectedSpeed() == 0.0F) {
+                continue;
+            }
+            ItemStack stack = new ItemStack(e.item());
+            if (!stack.is(durability)) {
+                errors.add(e.name() + " not in #enchantable/durability");
+            }
+            if (e.name().endsWith("_pickaxe") && !stack.is(mining)) {
+                errors.add(e.name() + " not in #enchantable/mining");
+            }
+            if ((e.name().endsWith("_sword") || e.name().endsWith("_axe")) && !stack.is(sharpWeapon)) {
+                errors.add(e.name() + " not in #enchantable/sharp_weapon");
+            }
+        }
+        // 挖掘等级阶梯：6 重仍为石级，7 重=铁，8 重/9 重=钻石级及以上
+        assertTier(errors, "compressed_cobblestone_pickaxe", Blocks.DIAMOND_ORE, false);
+        assertTier(errors, "sextuple_compressed_cobblestone_pickaxe", Blocks.DIAMOND_ORE, false);
+        assertTier(errors, "septuple_compressed_cobblestone_pickaxe", Blocks.DIAMOND_ORE, true);
+        assertTier(errors, "septuple_compressed_cobblestone_pickaxe", Blocks.OBSIDIAN, false);
+        assertTier(errors, "octuple_compressed_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
+        assertTier(errors, "nonuple_compressed_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
         if (!errors.isEmpty()) {
             throw new IllegalStateException("SELF-TEST FAILED: " + String.join("; ", errors));
         }

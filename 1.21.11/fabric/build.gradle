@@ -2,6 +2,12 @@ plugins {
     id 'fabric-loom' version '1.17.21'
 }
 
+loom {
+    mixin {
+        defaultRefmapName = 'compressedblocks.mixins.refmap.json'
+    }
+}
+
 version = '0.1.0'
 group = 'dev.compressedblocks'
 

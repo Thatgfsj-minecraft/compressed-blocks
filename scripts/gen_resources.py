@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """压缩方块 mod 资源生成器：blockstate/模型/物品模型定义/配方/战利品表/标签/语言文件。
 输出必须与仓库内容逐字节一致：重跑本脚本后 git status 应保持为空。
+1.21.1 目标加 --target 1.21.1（旧配方格式、无物品模型定义）。
 
 命名规则（与 CompressedBlocks.java 严格一致）：
   方块   <prefix>_<mat>                        prefix ∈ compressed/double_compressed/.../nonuple_compressed
@@ -204,6 +205,17 @@ def gen_data(data, blocks, tools):
                         ("mineable/axe", axe), ("needs_stone_tool", stone_tool),
                         ("needs_diamond_tool", diamond_tool)]:
         dump(f"{data}/minecraft/tags/block/{tag}.json", {"replace": False, "values": values})
+    # 基础工具标签覆盖：把我们的工具加进原版 #pickaxes/#swords/#axes/#shovels/#hoes，
+    # 附魔（enchantable/* 全部由它们引用）、修复等系统自动生效
+    tool_tag_values = {
+        "pickaxes": [f"{NS}:{n}" for n in tools if n.endswith("_pickaxe")],
+        "swords": [f"{NS}:{n}" for n in tools if n.endswith("_sword")],
+        "axes": [f"{NS}:{n}" for n in tools if n.endswith("_axe")],
+        "shovels": [f"{NS}:{n}" for n in tools if n.endswith("_shovel")],
+        "hoes": [f"{NS}:{n}" for n in tools if n.endswith("_hoe")],
+    }
+    for tag, values in tool_tag_values.items():
+        dump(f"{data}/minecraft/tags/item/{tag}.json", {"replace": False, "values": values})
     # 工具修复材料标签：该材料任意重数压缩方块
     for mat, _, _, can in MATERIALS:
         if not can:
