@@ -16,6 +16,9 @@
   "entrypoints": {
     "main": [
       "dev.compressedblocks.fabric.CompressedBlocksFabric"
+    ],
+    "client": [
+      "dev.compressedblocks.fabric.CompressedBlocksFabricClient"
     ]
   },
   "depends": {

@@ -15,12 +15,8 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.Enchantments;
-import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -34,6 +30,13 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public final class CompressedHooks {
     private static final Set<Item> LEVEL9_TOOLS = new HashSet<>();
+    private static final EquipmentSlot[] ARMOR_SLOTS = {
+        EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
+    };
+    /** 常规效果时长：5 秒短刷新（摘下即过期，无粒子）。 */
+    private static final int DURATION = 100;
+    /** 夜视时长 20 秒：低于 10 秒原版会闪黑屏警告，必须给长。 */
+    private static final int NIGHT_VISION_DURATION = 400;
     /** 基岩挖掘进度：与原版钻石镐挖黑曜石一致（硬度 50、速度 8 → 约 9.4 秒）。 */
     private static final float BEDROCK_PROGRESS_PER_TICK = 1.0F / 187.5F;
     /** 英文提示防刷屏：每玩家 1 秒一条。 */
@@ -66,28 +69,43 @@ public final class CompressedHooks {
     // ------------------------------------------------------------------ 护甲
 
     /**
-     * 护甲每刻结算（服务端玩家 tick 调用）：
-     * 溢出防御 → 抗性提升（等级=溢出总和）；四件全九重 → 饱食度与饱和度常满。
+     * 护甲每刻结算（服务端玩家 tick 调用）。0.3.1 分部位效果——不再向装备注入任何附魔，
+     * 不干扰原版附魔（海底行者/速冻已删除）：
+     * 头盔 ≥6 重：水下呼吸+夜视；护腿 ≥6 重：抗性 1/2/3/5（按重数）+ 9 重急迫2；
+     * 胸甲 ≥8 重：生存飞行（疾跑=鞘翅速度）；靴子：无。
+     * 木质盔甲按有效重数（重数-1）自动降档。不死+饱食度常满：仅九重石甲满套。
      */
     public static void armorTick(ServerPlayer player) {
-        // 效果阶梯（任意穿戴件取最高重数；短时长刷新，摘下即过期，无粒子）：
-        // 6 重=抗性1+夜视；7 重=抗性2+夜视；8 重=抗性3+夜视+水下呼吸+海底行者+飞行；
-        // 9 重=抗性5+夜视+水下呼吸+海底行者+飞行+速度1+急迫2（不死=九重满套伤害事件，饱食常满）
-        int max = CompressedBlocks.wornMaxLevel(player);
-        if (max >= 6) {
-            addEffect(player, MobEffects.RESISTANCE, CompressedBlocks.resistanceAmplifier(max));
-            addEffect(player, MobEffects.NIGHT_VISION, 0);
+        for (EquipmentSlot slot : ARMOR_SLOTS) {
+            int[] info = CompressedBlocks.armorInfoOf(player.getItemBySlot(slot));
+            if (info == null) {
+                continue;
+            }
+            int level = info[1];
+            switch (info[0]) {
+                case 0 -> {
+                    if (level >= 6) {
+                        addEffect(player, MobEffects.WATER_BREATHING, 0, DURATION);
+                        // 夜视给 20 秒：原版剩余 <10 秒会闪黑屏，短时长刷新观感极差
+                        addEffect(player, MobEffects.NIGHT_VISION, 0, NIGHT_VISION_DURATION);
+                    }
+                }
+                case 2 -> {
+                    int amp = CompressedBlocks.resistanceAmplifier(level);
+                    if (amp >= 0) {
+                        addEffect(player, MobEffects.RESISTANCE, amp, DURATION);
+                    }
+                    if (level >= 9) {
+                        addEffect(player, MobEffects.HASTE, 1, DURATION);
+                    }
+                }
+                default -> {
+                }
+            }
         }
-        if (max >= 8) {
-            addEffect(player, MobEffects.WATER_BREATHING, 0);
-            ensureDepthStrider(player);
-        }
-        if (max >= 9) {
-            addEffect(player, MobEffects.SPEED, 0);
-            addEffect(player, MobEffects.HASTE, 1);
-        }
-        // 飞行：满套（4 件）且每件 ≥8 重；疾跑时飞行速度提到鞘翅级
-        boolean mayFly = CompressedBlocks.fullSetAtLeast(player, 8);
+        // 飞行：穿戴 ≥8 重（有效重数）胸甲；疾跑时飞行速度提到鞘翅级
+        int[] chest = CompressedBlocks.armorInfoOf(player.getItemBySlot(EquipmentSlot.CHEST));
+        boolean mayFly = chest != null && chest[0] == 1 && chest[1] >= 8;
         var abilities = player.getAbilities();
         if (mayFly) {
             if (!abilities.mayfly) {
@@ -100,7 +118,7 @@ public final class CompressedHooks {
                 player.onUpdateAbilities();
             }
         } else if (abilities.mayfly && !abilities.instabuild) {
-            // 脱下满套立刻收回飞行（含正在飞：强制落地）
+            // 脱下胸甲立刻收回飞行（含正在飞：强制落地）
             abilities.mayfly = false;
             abilities.flying = false;
             abilities.setFlyingSpeed(0.05F);
@@ -112,24 +130,8 @@ public final class CompressedHooks {
         }
     }
 
-    private static void addEffect(ServerPlayer player, Holder<MobEffect> effect, int amplifier) {
-        player.addEffect(new MobEffectInstance(effect, 100, amplifier, true, false));
-    }
-
-    /** 海底行者 3：注入到穿戴中的本模组靴子（不满 3 级才写）。 */
-    private static void ensureDepthStrider(ServerPlayer player) {
-        ItemStack boots = player.getItemBySlot(EquipmentSlot.FEET);
-        if (boots.isEmpty() || !CompressedBlocks.isCompressedBoots(boots)) {
-            return;
-        }
-        ItemEnchantments cur = boots.getOrDefault(DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY);
-        Holder<Enchantment> depthStrider = player.level().registryAccess()
-            .lookupOrThrow(Registries.ENCHANTMENT).getOrThrow(Enchantments.DEPTH_STRIDER);
-        if (cur.getLevel(depthStrider) < 3) {
-            ItemEnchantments.Mutable mutable = new ItemEnchantments.Mutable(cur);
-            mutable.set(depthStrider, 3);
-            boots.set(DataComponents.ENCHANTMENTS, mutable.toImmutable());
-        }
+    private static void addEffect(ServerPlayer player, Holder<MobEffect> effect, int amplifier, int duration) {
+        player.addEffect(new MobEffectInstance(effect, duration, amplifier, true, false));
     }
 
     /** 铁砧材料修理：本模组物品 1 个材料修 50%（原版 25%）。返回是否改写了结果。 */
@@ -213,6 +215,20 @@ public final class CompressedHooks {
             .append(Component.literal(level + "x+ Compressed Dirt/Sand").withStyle(ChatFormatting.GOLD))
             .append(Component.literal("! Found: ").withStyle(ChatFormatting.RED))
             .append(Component.literal(found).withStyle(ChatFormatting.GRAY)), false);
+    }
+
+    /** 盆栽土壤等级不足（作物/树苗/甘蔗重数 > 土壤重数）。 */
+    public static void sendPotHint(ServerPlayer player, String enName, int level, int soilLevel) {
+        if (!hintReady(player)) {
+            return;
+        }
+        player.displayClientMessage(Component.empty()
+            .append(Component.literal("[Compressed Blocks] ").withStyle(ChatFormatting.DARK_GRAY))
+            .append(Component.literal(enName).withStyle(ChatFormatting.GOLD))
+            .append(Component.literal(" needs ").withStyle(ChatFormatting.RED))
+            .append(Component.literal(level + "x+ Compressed Dirt/Sand in the pot").withStyle(ChatFormatting.GOLD))
+            .append(Component.literal("! Pot soil: ").withStyle(ChatFormatting.RED))
+            .append(Component.literal(soilLevel + "x").withStyle(ChatFormatting.GRAY)), false);
     }
 
     /** 锄头等级不足（锄压缩泥土）。 */

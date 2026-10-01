@@ -32,6 +32,16 @@ public class CompressedSoilItem extends BlockItem {
         this.foodNutrition = foodNutrition;
     }
 
+    /** 种植所需土壤等级（盆栽交互用）。 */
+    public int level() {
+        return this.level;
+    }
+
+    /** 英文名（盆栽等级不足提示用）。 */
+    public String enName() {
+        return this.enName;
+    }
+
     @Override
     public InteractionResult place(BlockPlaceContext ctx) {
         BlockState soil = ctx.getLevel().getBlockState(ctx.getClickedPos().below());

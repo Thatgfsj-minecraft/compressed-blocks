@@ -2,12 +2,14 @@ package dev.compressedblocks.neoforge;
 
 import dev.compressedblocks.CompressedBlocks;
 import dev.compressedblocks.CompressedHooks;
+import dev.compressedblocks.CompressedPotBlockEntity;
 import java.util.HashSet;
 import java.util.Set;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
@@ -51,11 +53,19 @@ public class CompressedBlocksNeoForge {
                     }
                 }
             });
+        } else if (event.getRegistryKey() == Registries.BLOCK_ENTITY_TYPE) {
+            event.register(Registries.BLOCK_ENTITY_TYPE, helper -> {
+                // 1.21.11 原版构造器私有，NeoForge 提供公开便捷构造
+                CompressedBlocks.POT_TYPE = new BlockEntityType<>(CompressedPotBlockEntity::new,
+                    CompressedBlocks.POT, CompressedBlocks.HOPPER_POT);
+                helper.register(CompressedBlocks.id("pot"), CompressedBlocks.POT_TYPE);
+            });
         } else if (event.getRegistryKey() == Registries.CREATIVE_MODE_TAB) {
             event.register(Registries.CREATIVE_MODE_TAB, helper -> {
                 helper.register(CompressedBlocks.id("blocks"), CompressedBlocks.TAB_BLOCKS);
                 helper.register(CompressedBlocks.id("tools"), CompressedBlocks.TAB_TOOLS);
                 helper.register(CompressedBlocks.id("food"), CompressedBlocks.TAB_FOOD);
+                helper.register(CompressedBlocks.id("pots"), CompressedBlocks.TAB_POTS);
             });
         }
     }

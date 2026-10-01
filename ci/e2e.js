@@ -18,8 +18,10 @@ const STORAGE_MATS = ['cobblestone', 'stone', 'cobbled_deepslate', 'deepslate',
   'granite', 'diorite', 'andesite', 'calcite', 'tuff', 'sandstone', 'red_sandstone',
   'basalt', 'blackstone', 'dripstone_block', 'terracotta', 'quartz_block', 'purpur_block',
   'prismarine', 'amethyst_block', 'glowstone', 'clay', 'hay_block', 'bone_block',
-  'moss_block', 'snow', 'blue_ice', 'mud'];
-const CANES = ['cane', 'dirt_cane', 'sand_cane', 'clay_cane', 'cobblestone_cane', 'mineral_cane'];
+  'moss_block', 'snow', 'blue_ice', 'mud', 'gunpowder'];
+// 甘蔗 = 纯甘蔗 + 每种储存材料一条线（id 材料段去掉 _block 后缀）
+const CANES = ['cane', ...STORAGE_MATS.map((m) => m.replace(/_block$/, '') + '_cane')];
+const POTS = ['pot', 'hopper_pot'];
 const WOODS = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'mangrove', 'cherry', 'pale_oak'];
 const CROPS = ['wheat', 'carrot', 'potato', 'beetroot'];
 const CROP_LEVELS = LEVELS.slice(0, 3);
@@ -56,7 +58,7 @@ const PRODUCE = [...CROP_LEVELS.map((p) => `${p}_wheat`), ...CROP_LEVELS.map((p)
 const CROP_ITEMS = ['wheat', 'beetroot'].flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}_seeds`))
   .concat(['carrot', 'potato'].flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}`)));
 const ALL_ITEMS = [...STORAGE_BLOCKS, ...LEAVES, ...SAPLINGS, ...CANE_BLOCKS, ...CROP_ITEMS,
-  ...TOOL_IDS, ...ARMOR_IDS, ...FOOD_IDS, ...PRODUCE, ...STICKS];
+  ...POTS.flatMap((p) => [p]), ...TOOL_IDS, ...ARMOR_IDS, ...FOOD_IDS, ...PRODUCE, ...STICKS];
 
 let failures = 0;
 function check(name, ok, detail) {
@@ -67,13 +69,14 @@ function check(name, ok, detail) {
 }
 
 (async () => {
-  if (ALL_ITEMS.length !== 867) throw new Error(`item list ${ALL_ITEMS.length} != 867`);
+  if (ALL_ITEMS.length !== 1292) throw new Error(`item list ${ALL_ITEMS.length} != 1292`);
   const rcon = await new Rcon().connect(PORT, '127.0.0.1', 'testpass');
   const cmd = (c) => rcon.command(c);
 
   // 0) 探针自检：先证明测试工具自身可靠（超平坦 0 -64 0 必是基岩）
   // 测试区先 forceload，防区块卸载导致实体丢失/方块断言失败
-  await cmd('forceload add -48 -48 47 47');
+  // （注意：空服无玩家时边界加载区块不计时，BE/随机刻断言放 SELF-TEST 进程内验证）
+  await cmd('forceload add -160 -160 47 47');
   const probe1 = await cmd('execute if block 0 -64 0 minecraft:bedrock');
   check('probe-self bedrock', /Test passed/.test(probe1), probe1);
   const probe2 = await cmd('execute if block 0 -64 0 minecraft:stone');
@@ -210,6 +213,19 @@ function check(name, ok, detail) {
   const armorVal = await cmd('attribute @e[tag=cbz,limit=1] minecraft:armor get');
   check('9x chestplate armor = 2+10', /is 12(\.0)?($|\s|,)/.test(armorVal.trim()), armorVal.trim());
   await cmd('kill @e[tag=cbz]');
+
+  // 6) 盆栽：放置 + BE NBT 读写回路。生长→自动收割→补种闭环在 SELF-TEST 内直接驱动
+  //    serverTick 验证（1.21.11 空服无玩家时区块为边界加载不计时，RCON tick sprint 驱不动 BE）。
+  await cmd(`setblock 4 -59 20 ${NS}:hopper_pot`);
+  const potMerge = await cmd(
+    `data merge block 4 -59 20 {Soil:"${NS}:1x_dirt",Plant:"${NS}:1x_cane",Seed:"${NS}:1x_cane",Growth:5}`);
+  check('pot BE merge', !/Unknown|Failed|Could not/i.test(potMerge), potMerge.trim());
+  const potGrowth = await cmd('data get block 4 -59 20 Growth');
+  check('pot BE growth round-trip', /: 5(,|$|\s)/.test(potGrowth.trim()), potGrowth.trim());
+  const potPlant = await cmd('data get block 4 -59 20 Plant');
+  check('pot BE plant round-trip', /1x_cane/.test(potPlant.trim()), potPlant.trim());
+  await cmd(`setblock 4 -59 20 minecraft:air`);
+  await cmd('kill @e[type=minecraft:item]');
 
   await cmd('stop');
   rcon.destroy();

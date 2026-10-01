@@ -101,6 +101,8 @@ BUILD_MATERIALS = [
     ("snow", "Snow Block", "雪块", "shovel", None),
     ("blue_ice", "Blue Ice", "蓝冰", "pickaxe", None),
     ("mud", "Mud", "泥巴", "shovel", None),
+    # 原版无方块形态：物品 sprite 合成方块底图（压缩火药块，甘蔗/储存链用）
+    ("gunpowder", "Block of Gunpowder", "火药块", "shovel", None),
 ]
 
 WOODS = [
@@ -218,34 +220,41 @@ def stick_names():
     return [f"{p}_stick" for p in LV]
 
 
-# 压缩甘蔗六风味：cane=纯甘蔗皮（无核心）；其余核心方块分别为对应压缩方块，矿物甘蔗用矿物块标签
-CANE_FLAVORS = {
-    "cane": ("Sugar Cane", "甘蔗"),
-    "dirt_cane": ("Dirt Cane", "泥土甘蔗"),
-    "sand_cane": ("Sand Cane", "沙子甘蔗"),
-    "clay_cane": ("Clay Cane", "黏土甘蔗"),
-    "cobblestone_cane": ("Cobblestone Cane", "原石甘蔗"),
-    "mineral_cane": ("Mineral Cane", "矿物甘蔗"),
-}
-
-CANE_CENTERS = {"cane": None, "dirt_cane": "dirt", "sand_cane": "sand", "clay_cane": "clay",
-                "cobblestone_cane": "cobblestone", "mineral_cane": None}
-
-CANE_UNPACK = {"dirt_cane": "dirt", "sand_cane": "sand", "clay_cane": "clay",
-               "cobblestone_cane": "cobblestone", "mineral_cane": "diamond_block"}
-
-MINERAL_MATS = ("coal_block", "copper_block", "iron_block", "lapis_block",
-                "gold_block", "redstone_block", "emerald_block", "diamond_block")
+# 压缩甘蔗全材料化：纯甘蔗（1x_cane）+ 每种储存材料一条甘蔗线。
+# id：材料 key 去掉 "_block" 后缀 + "_cane"（coal_block → coal_cane，全部唯一）。
+# 显示名：去掉 "Block of " 前缀 / " Block" / " Bale" 后缀（骨块保留，用户命名 骨块甘蔗）。
 
 
-def cane_center_id(flavor, p):
-    """甘蔗配方的居中方块：泥土/圆石用固定方块，矿物甘蔗用矿物块标签。"""
-    mat = CANE_CENTERS[flavor]
-    return f"#{NS}:mineral_cane_{p}" if mat is None else f"{NS}:{p}_{mat}"
+def cane_key(mat_key):
+    return mat_key[:-6] if mat_key.endswith("_block") else mat_key
+
+
+def cane_en(mat_en):
+    if mat_en.startswith("Block of "):
+        return mat_en[len("Block of "):]
+    if mat_en.endswith(" Block"):
+        return mat_en[: -len(" Block")]
+    if mat_en.endswith(" Bale"):
+        return mat_en[: -len(" Bale")]
+    return mat_en
+
+
+def cane_zh(mat):
+    if mat[0] == "bone_block":
+        return mat[2]
+    return mat[2][:-1] if mat[2].endswith("块") else mat[2]
 
 
 def cane_names():
-    return [f"{p}_{f}" for f in CANE_FLAVORS for p in LV]
+    out = [f"{p}_cane" for p in LV]
+    for mat in storage_materials():
+        key = cane_key(mat[0])
+        out += [f"{p}_{key}_cane" for p in LV]
+    return out
+
+
+def pot_names():
+    return ["pot", "hopper_pot"]
 
 
 # ---------------------------------------------------------------- assets
@@ -283,6 +292,46 @@ def gen_assets(res):
         dump(f"{res}/models/block/{name}.json",
              {"parent": "minecraft:block/cross", "render_type": "minecraft:cutout",
               "textures": {"cross": f"{NS}:block/{name}"}})
+        dump(f"{res}/items/{name}.json",
+             {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
+    # 压缩盆栽（普通/漏斗）：中空陶盆元素模型，土壤与作物由方块实体渲染器绘制
+    for name in pot_names():
+        hopper = name == "hopper_pot"
+        side = f"{NS}:block/{'hopper_pot_side' if hopper else 'pot_side'}"
+        model = {
+            "textures": {"particle": side, "side": side,
+                         "top": f"{NS}:block/pot_top", "bottom": f"{NS}:block/pot_bottom"},
+            "elements": [
+                {"from": [2, 0, 2], "to": [14, 2, 14],
+                 "faces": {"down": {"texture": "#bottom", "cullface": "down"},
+                           "up": {"texture": "#top"}, "north": {"texture": "#side"},
+                           "south": {"texture": "#side"}, "west": {"texture": "#side"},
+                           "east": {"texture": "#side"}}},
+                {"from": [2, 2, 2], "to": [14, 12, 4],
+                 "faces": {"north": {"texture": "#side", "cullface": "north"},
+                           "south": {"texture": "#side"}, "west": {"texture": "#side"},
+                           "east": {"texture": "#side"}, "up": {"texture": "#top"},
+                           "down": {"texture": "#bottom"}}},
+                {"from": [2, 2, 12], "to": [14, 12, 14],
+                 "faces": {"south": {"texture": "#side", "cullface": "south"},
+                           "north": {"texture": "#side"}, "west": {"texture": "#side"},
+                           "east": {"texture": "#side"}, "up": {"texture": "#top"},
+                           "down": {"texture": "#bottom"}}},
+                {"from": [2, 2, 4], "to": [4, 12, 12],
+                 "faces": {"west": {"texture": "#side", "cullface": "west"},
+                           "east": {"texture": "#side"}, "north": {"texture": "#side"},
+                           "south": {"texture": "#side"}, "up": {"texture": "#top"},
+                           "down": {"texture": "#bottom"}}},
+                {"from": [12, 2, 4], "to": [14, 12, 12],
+                 "faces": {"east": {"texture": "#side", "cullface": "east"},
+                           "west": {"texture": "#side"}, "north": {"texture": "#side"},
+                           "south": {"texture": "#side"}, "up": {"texture": "#top"},
+                           "down": {"texture": "#bottom"}}},
+            ],
+        }
+        dump(f"{res}/blockstates/{name}.json",
+             {"variants": {"": {"model": f"{NS}:block/{name}"}}})
+        dump(f"{res}/models/block/{name}.json", model)
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
     # 耕地：15/16 模板，无物品
@@ -366,11 +415,22 @@ def gen_lang(res):
         lv = next(l for l in LEVELS if name.startswith(l[0] + "_"))
         en[f"block.{NS}.{name}"] = f"{lv[1]} Farmland"
         zh[f"block.{NS}.{name}"] = f"{lv[2]}耕地"
+    storage_mats = storage_materials()
+    cane_mat_of_key = {cane_key(m[0]): m for m in storage_mats}
     for name in cane_names():
         lv = next(l for l in LEVELS if name.startswith(l[0] + "_"))
-        flavor = name[len(lv[0]) + 1:]
-        en[f"block.{NS}.{name}"] = f"{lv[1]} {CANE_FLAVORS[flavor][0]}"
-        zh[f"block.{NS}.{name}"] = f"{lv[2]}{CANE_FLAVORS[flavor][1]}"
+        rest = name[len(lv[0]) + 1:]
+        if rest == "cane":
+            en[f"block.{NS}.{name}"] = f"{lv[1]} Sugar Cane"
+            zh[f"block.{NS}.{name}"] = f"{lv[2]}甘蔗"
+        else:
+            mat = cane_mat_of_key[rest[:-5]]
+            en[f"block.{NS}.{name}"] = f"{lv[1]} {cane_en(mat[1])} Cane"
+            zh[f"block.{NS}.{name}"] = f"{lv[2]}压缩{cane_zh(mat)}甘蔗"
+    en["block." + NS + ".pot"] = "Compressed Pot"
+    zh["block." + NS + ".pot"] = "压缩盆栽"
+    en["block." + NS + ".hopper_pot"] = "Compressed Hopper Pot"
+    zh["block." + NS + ".hopper_pot"] = "压缩漏斗盆栽"
     crop_en = {c[0]: c[1] for c in CROPS}
     crop_zh = {c[0]: c[2] for c in CROPS}
     for name in crop_block_names():
@@ -423,6 +483,8 @@ def gen_lang(res):
     zh["itemGroup.compressedblocks.tools"] = "压缩工具"
     en["itemGroup.compressedblocks.food"] = "Compressed Food"
     zh["itemGroup.compressedblocks.food"] = "压缩食物"
+    en["itemGroup.compressedblocks.pots"] = "Compressed Pots"
+    zh["itemGroup.compressedblocks.pots"] = "压缩盆栽"
     dump(f"{res}/lang/en_us.json", dict(sorted(en.items())), indent=2)
     dump(f"{res}/lang/zh_cn.json", dict(sorted(zh.items())), indent=2)
 
@@ -535,15 +597,25 @@ def gen_data(data):
         else:
             compress(cur, f"{NS}:{LV[i - 1]}_cane")
             unpack(cur, f"{NS}:{LV[i - 1]}_cane")
-    # 风味甘蔗：每级独立 = 8× 同级压缩甘蔗 + 1× 同级核心方块；分解只返还同级核心方块
-    for flavor in CANE_FLAVORS:
-        if flavor == "cane":
-            continue
+    # 材料甘蔗（每种储存材料一条线）：1x = 8× 一重压缩甘蔗 + 1× 一重压缩方块居中；
+    # 高级 = 9× 低级甘蔗；分解返还同级压缩方块（用户设计：升级链可逆回方块一级）
+    for mat in storage_materials():
+        key = cane_key(mat[0])
         for i, p in enumerate(LV):
-            cur = f"{NS}:{p}_{flavor}"
-            shaped(f"{p}_{flavor}", ["CCC", "CBC", "CCC"],
-                   {"C": f"{NS}:{p}_cane", "B": cane_center_id(flavor, p)}, cur)
-            unpack(cur, f"{NS}:{p}_{CANE_UNPACK[flavor]}", count=1)
+            cur = f"{NS}:{p}_{key}_cane"
+            if i == 0:
+                shaped(f"{p}_{key}_cane", ["CCC", "CBC", "CCC"],
+                       {"C": f"{NS}:1x_cane", "B": f"{NS}:1x_{mat[0]}"}, cur)
+                unpack(cur, f"{NS}:1x_{mat[0]}", count=1)
+            else:
+                compress(cur, f"{NS}:{LV[i - 1]}_{key}_cane")
+                unpack(cur, f"{NS}:{p}_{mat[0]}", count=1)
+    # ---- 压缩盆栽：5× 任意一重压缩方块（船形）；盆栽+漏斗=漏斗盆栽
+    dump(f"{data}/{NS}/tags/item/pot_material.json",
+         {"replace": False, "values": sorted(f"{NS}:1x_{m[0]}" for m in storage_materials())})
+    shaped("pot", ["A A", "AAA"], {"A": f"#{NS}:pot_material"}, f"{NS}:pot")
+    shapeless("hopper_pot", [f"{NS}:pot", "minecraft:hopper"], f"{NS}:hopper_pot",
+              category="misc")
     # ---- 食物：面包=3 压缩小麦（原版 3 麦→面包），牛肉=9 肉，西瓜见上
     shaped("1x_bread", ["WWW"], {"W": f"{NS}:1x_wheat"}, f"{NS}:1x_bread", category="misc")
     for i, p in enumerate(LV[:FOOD_MAX_LEVEL]):
@@ -597,9 +669,12 @@ def gen_data(data):
             "pools": [{"rolls": 1.0, "bonus_rolls": 0.0,
                        "entries": [{"type": "minecraft:item", "name": f"{NS}:{name}"}],
                        "conditions": [{"condition": "minecraft:survives_explosion"}]}]})
+    # 压缩盆栽：掉落自身（盆内土壤/作物由方块实体 onRemove 补发）
+    for name in pot_names():
+        dump(f"{data}/{NS}/loot_table/blocks/{name}.json", self_drop(name))
     # ---- 方块标签（并入原版命名空间）
     # 所有压缩方块统一镐子采掘；挖掘等级：L1-2 石镐、L3-4 铁镐、L5+ 钻镐封顶
-    pickaxe = [f"{NS}:{n}" for n in storage_names()]
+    pickaxe = [f"{NS}:{n}" for n in storage_names()] + [f"{NS}:{n}" for n in pot_names()]
     stone_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) <= 2]
     iron_tool = [f"{NS}:{n}" for n in storage_names() if 3 <= int(n.split("_", 1)[0][:-1]) <= 4]
     diamond_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) >= 5]
@@ -649,9 +724,6 @@ def gen_data(data):
         dump(f"{data}/{NS}/tags/item/stone_armor_{p}.json",
              {"replace": False, "values": [f"{NS}:{p}_stone", f"{NS}:{p}_deepslate",
                                            f"{NS}:{p}_cobblestone", f"{NS}:{p}_cobbled_deepslate"]})
-        # 矿物甘蔗核心：8 种压缩矿物块
-        dump(f"{data}/{NS}/tags/item/mineral_cane_{p}.json",
-             {"replace": False, "values": sorted(f"{NS}:{p}_{m}" for m in MINERAL_MATS)})
     # ---- 世界树特征：9 树种 × 9 级，形状与原版一致
     n = gen_tree_features(data)
     assert n == 126, n
@@ -754,15 +826,17 @@ def main():
     subs = [os.path.join(ROOT, args.target, loader) for loader in ("fabric", "neoforge")]
 
     blocks = (storage_names() + leaves_names() + sapling_names() + farmland_names()
-              + crop_block_names() + cane_names())
+              + crop_block_names() + cane_names() + pot_names())
     items = (storage_names() + leaves_names() + sapling_names() + crop_block_names() + cane_names()
-             + tool_names() + armor_names() + food_names() + crop_produce_names() + stick_names())
-    assert len(storage_names()) == 450, len(storage_names())
+             + pot_names() + tool_names() + armor_names() + food_names() + crop_produce_names()
+             + stick_names())
+    assert len(storage_names()) == 459, len(storage_names())
     assert len(tool_names()) == 90, len(tool_names())
-    assert len(blocks) == 687, len(blocks)
-    assert len(items) == 867, len(items)
+    assert len(blocks) == 1112, len(blocks)
+    assert len(items) == 1292, len(items)
     print(f"blocks={len(blocks)} items={len(items)} (tools={len(tool_names())} armor={len(armor_names())} "
-          f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())})")
+          f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())} "
+          f"canes={len(cane_names())})")
     for sub in subs:
         if not os.path.exists(os.path.join(sub, "build.gradle")):
             print(f"skip {sub} (no build.gradle)")

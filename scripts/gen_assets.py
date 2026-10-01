@@ -14,6 +14,7 @@
 import argparse
 import colorsys
 import os
+import random
 import sys
 
 from PIL import Image, ImageDraw
@@ -93,6 +94,8 @@ BUILD_MATERIALS = [
     ("snow", "Snow Block", "雪块", "snow", 0),
     ("blue_ice", "Blue Ice", "蓝冰", "blue_ice", 0),
     ("mud", "Mud", "泥巴", "mud", 0),
+    # 原版无方块形态：sprite 名 "gunpowder" 走物品 sprite 合成（gen_gunpowder_base）
+    ("gunpowder", "Block of Gunpowder", "火药块", "gunpowder", 0),
 ]
 
 # 树：key / en / zh / 树叶 sprite / 树苗 sprite / 生物染色（None=贴图自带色）
@@ -327,11 +330,27 @@ def gen_farmland_tex(dirt, moist_top, level):
     return gen_block_tex(base, level)
 
 
-def gen_cane_tex(center_sprite, level):
+def gen_gunpowder_base():
+    """火药块底图：原版无方块形态——火药物品 sprite 主色噪点打底 + 居中 12×12 堆叠。"""
+    sprite = load_base("item/gunpowder")
+    avg = avg_color(sprite)
+    base = Image.new("RGBA", (SIZE, SIZE))
+    px = base.load()
+    rng = random.Random(7)
+    for y in range(SIZE):
+        for x in range(SIZE):
+            f = 0.72 + rng.random() * 0.26
+            px[x, y] = (int(avg[0] * f), int(avg[1] * f), int(avg[2] * f), 255)
+    big = sprite.resize((12, 12), Image.NEAREST)
+    base.paste(big, (2, 2), big)
+    return base
+
+
+def gen_cane_tex(center_img, level):
     """压缩甘蔗：有核心方块时，核心颜色与甘蔗本来的绿按连续小像素段混排（几个像素连着一段），
     保留甘蔗明暗；无核心 = 纯甘蔗皮。变黑：纯甘蔗每层 5%（9 层=45%），方块甘蔗每层 5%（L1 不变，9 层=40%）。"""
     cane = load_base("block/sugar_cane").convert("RGBA")
-    if center_sprite is None:
+    if center_img is None:
         f = 1.0 - 0.05 * level
         ip = cane.load()
         for y in range(cane.height):
@@ -340,7 +359,7 @@ def gen_cane_tex(center_sprite, level):
                 if a:
                     ip[x, y] = (int(r * f), int(g * f), int(b * f), a)
         return cane
-    ref = load_base(center_sprite).convert("RGBA")
+    ref = center_img.convert("RGBA")
     base = avg_color(ref)
     base_lum = 0.299 * base[0] + 0.587 * base[1] + 0.114 * base[2]
     if base_lum <= 0:
@@ -396,7 +415,7 @@ def main():
         for k, e, z, sp, _ in BUILD_MATERIALS:
             if k == mat[0]:
                 sprite = sp
-        base = load_base("block/" + sprite)
+        base = gen_gunpowder_base() if sprite == "gunpowder" else load_base("block/" + sprite)
         for _, prefix, _, _ in LEVELS:
             block_tex[f"{prefix}_{key}"] = gen_block_tex(base, int(prefix[:-1]))
 
@@ -517,17 +536,42 @@ def main():
             else:
                 armor_layer_tex[f"{layer}/stone_{prefix}"] = recolor_full(layer_img, stone_color)
 
-    # 压缩甘蔗（3 风味 × 9 级）：甘蔗图案 + 核心方块颜色按连续像素段混排，每层变黑 5%
-    cane_flavors = [("cane", None), ("dirt_cane", "block/dirt"), ("sand_cane", "block/sand"),
-                    ("clay_cane", "block/clay"), ("cobblestone_cane", "block/cobblestone"),
-                    ("mineral_cane", "block/diamond_block")]
-    for flavor, center_sprite in cane_flavors:
-        for _, prefix, _, _ in LEVELS:
-            level = int(prefix[:-1])
-            block_tex[f"{prefix}_{flavor}"] = gen_cane_tex(center_sprite, level)
+    # 压缩甘蔗（纯甘蔗 + 51 材料 × 9 级）：甘蔗图案 + 材料颜色按连续像素段混排，逐层变黑 5%
+    def mat_base_img(key):
+        for k, e, z, sp, _ in BUILD_MATERIALS:
+            if k == key:
+                return gen_gunpowder_base() if key == "gunpowder" else load_base("block/" + sp)
+        return load_base("block/" + key)
 
-    # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 12 作物 + 27 甘蔗中计入贴图的部分 = 717
-    assert len(block_tex) == 735, len(block_tex)
+    def cane_key(k):
+        return k[:-6] if k.endswith("_block") else k
+
+    cane_specs = [("cane", None)] + [(cane_key(k) + "_cane", mat_base_img(k))
+                                     for k, e, z, t in MATERIALS] + \
+                 [(cane_key(k) + "_cane", mat_base_img(k)) for k, e, z, _, _ in BUILD_MATERIALS]
+    for key, sprite in cane_specs:
+        for _, prefix, _, _ in LEVELS:
+            block_tex[f"{prefix}_{key}"] = gen_cane_tex(sprite, int(prefix[:-1]))
+
+    # 盆栽（陶盆）：底/侧/顶 + 漏斗变体金属带；顶面中间 8×8 深色内腔（土壤由方块实体渲染器画）
+    terra = load_base("block/terracotta")
+    block_tex["pot_side"] = gen_block_tex(terra, 1)
+    pot_top = block_tex["pot_side"].copy()
+    pxt = pot_top.load()
+    for y in range(4, 12):
+        for x in range(4, 12):
+            pxt[x, y] = (52, 40, 34, 255)
+    block_tex["pot_top"] = pot_top
+    block_tex["pot_bottom"] = darken(terra, 0.85)
+    hopper_side = block_tex["pot_side"].copy()
+    pxh = hopper_side.load()
+    for y in range(5, 8):
+        for x in range(SIZE):
+            pxh[x, y] = (92, 94, 102, 255)
+    block_tex["hopper_pot_side"] = hopper_side
+
+    # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 60 作物阶段 + 468 甘蔗 + 4 盆栽 = 1162
+    assert len(block_tex) == 1162, len(block_tex)
     print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}, armor layers: {len(armor_layer_tex)}")
     for sub in SUBPROJECTS:
         rel = os.path.relpath(sub, ROOT)
