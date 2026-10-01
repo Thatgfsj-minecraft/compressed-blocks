@@ -6,15 +6,18 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.SugarCaneBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -86,6 +89,18 @@ public class CompressedPotBlock extends Block implements EntityBlock {
             level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.BLOCKS, 1.0F, 1.0F);
             return InteractionResult.CONSUME;
         }
+        // 斧头右键：取出作物（树苗/甘蔗），掉在盆边
+        if (stack.getItem() instanceof AxeItem && pot.plant() != null) {
+            if (level.isClientSide()) {
+                return InteractionResult.SUCCESS;
+            }
+            ItemStack taken = pot.takePlant();
+            if (!taken.isEmpty()) {
+                Block.popResource(level, pos, taken);
+                level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.BLOCKS, 1.0F, 1.0F);
+            }
+            return InteractionResult.CONSUME;
+        }
         if (pot.soil() == null) {
             if (stack.getItem() instanceof BlockItem bi && soilLevelOf(bi.getBlock().defaultBlockState()) > 0) {
                 if (level.isClientSide()) {
@@ -150,27 +165,27 @@ public class CompressedPotBlock extends Block implements EntityBlock {
         return InteractionResult.CONSUME;
     }
 
-    /** 盆被破坏（非活塞推动）：补发盆内土壤与作物（原版容器同款钩子）。 */
-    @Override
-    protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos,
-                                               boolean movedByPiston) {
-        if (!movedByPiston && !state.is(level.getBlockState(pos).getBlock())
-            && level.getBlockEntity(pos) instanceof CompressedPotBlockEntity pot) {
-            pot.dropContents(level);
-        }
-    }
-
-    /** 持有物是否压缩泥土/沙子（返回等级，非土壤 = 0）。 */
+    /**
+     * 持有物是否土壤（返回等级，非土壤 = 0）：压缩泥土/沙子带各自重数；
+     * 原版/模组泥土系（#minecraft:dirt）与沙子系（#minecraft:sand）算 1 级。
+     */
     private static int soilLevelOf(BlockState state) {
         Integer dirt = CompressedBlocks.dirtLevel(state);
         if (dirt != null) {
             return dirt;
         }
         Integer sand = CompressedBlocks.sandLevel(state);
-        return sand != null ? sand : 0;
+        if (sand != null) {
+            return sand;
+        }
+        return state.is(BlockTags.DIRT) || state.is(BlockTags.SAND) ? 1 : 0;
     }
 
-    /** 持有物是否可种植（压缩作物种子/树苗/甘蔗）。 */
+    /**
+     * 持有物是否可种植：
+     * 本模组种子/树苗/甘蔗按各自重数；通用兼容——#minecraft:saplings（原版与模组树苗）、
+     * #minecraft:crops（原版与模组作物，含南瓜/西瓜茎/火把花/瓶子草）、原版甘蔗，一律 1 级。
+     */
     private static Plantable plantableOf(ItemStack stack) {
         if (stack.getItem() instanceof CompressedSoilItem item) {
             return new Plantable(item.getBlock().defaultBlockState(), item.level(),
@@ -179,6 +194,13 @@ public class CompressedPotBlock extends Block implements EntityBlock {
         if (stack.getItem() instanceof CompressedCaneItem item) {
             return new Plantable(item.getBlock().defaultBlockState(), item.level(),
                 item.enName(), itemId(stack));
+        }
+        if (stack.getItem() instanceof BlockItem bi) {
+            BlockState def = bi.getBlock().defaultBlockState();
+            if (def.is(BlockTags.SAPLINGS) || def.is(BlockTags.CROPS)
+                || bi.getBlock() instanceof SugarCaneBlock) {
+                return new Plantable(def, 1, itemId(stack), itemId(stack));
+            }
         }
         return null;
     }

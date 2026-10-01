@@ -403,6 +403,36 @@ def gen_cane_tex(center_img, level):
     return cane
 
 
+def gen_seeds_tex(sprite, level):
+    """压缩种子图标（用户定稿）：
+    1 重 = 原版图标不动 + 左下角偏移副本（看起来两颗）；
+    2 重 = 再加一颗（三颗堆叠，阶梯往左下）；
+    3 重 = 保持三颗，整体轮廓边缘发白（高亮）。
+    """
+    out = Image.new("RGBA", (SIZE, SIZE))
+    offsets = [(0, 0), (-3, 3)] if level == 1 else [(0, 0), (-3, 3), (-6, 6)]
+    for dx, dy in offsets:
+        out.paste(sprite, (dx, dy), sprite)
+    if level >= 3:
+        px = out.load()
+        edge = []
+        for y in range(SIZE):
+            for x in range(SIZE):
+                if px[x, y][3] == 0:
+                    continue
+                for ddx, ddy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = x + ddx, y + ddy
+                    if not (0 <= nx < SIZE and 0 <= ny < SIZE) or px[nx, ny][3] == 0:
+                        edge.append((x, y))
+                        break
+        for x, y in edge:
+            r, g, b, a = px[x, y]
+            px[x, y] = (min(255, int(r * 0.35 + 255 * 0.65)),
+                        min(255, int(g * 0.35 + 255 * 0.65)),
+                        min(255, int(b * 0.35 + 255 * 0.65)), a)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-root", default=ROOT)
@@ -461,7 +491,14 @@ def main():
         if seed_sprite:
             seeds = load_base(seed_sprite)
             for _, prefix, _, _ in LEVELS[:3]:
-                item_tex[f"{prefix}_{crop}_seeds"] = level_tint(seeds, int(prefix[:-1]))
+                item_tex[f"{prefix}_{crop}_seeds"] = gen_seeds_tex(seeds, int(prefix[:-1]))
+    # 更多压缩种子（原版其余种子 × 3 级）：同样的堆叠图标
+    extra_seeds = [("pumpkin_seeds", "item/pumpkin_seeds"), ("melon_seeds", "item/melon_seeds"),
+                   ("torchflower_seeds", "item/torchflower_seeds"), ("pitcher_pod", "item/pitcher_pod")]
+    for key, sp in extra_seeds:
+        seeds = load_base(sp)
+        for _, prefix, _, _ in LEVELS[:3]:
+            item_tex[f"{prefix}_{key}"] = gen_seeds_tex(seeds, int(prefix[:-1]))
     for food, _, _, sprite in FOODS:
         base = load_base(sprite)
         for _, prefix, _, _ in LEVELS[:3]:

@@ -13,6 +13,7 @@ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
@@ -149,6 +150,15 @@ public class CompressedPotBlockEntity extends BlockEntity {
         }
     }
 
+    /** 盆被替换/破坏（1.21.11 移除路径，原版容器同款钩子）：掉落盆内土壤与作物。 */
+    @Override
+    public void preRemoveSideEffects(BlockPos pos, BlockState state) {
+        super.preRemoveSideEffects(pos, state);
+        if (getLevel() instanceof ServerLevel server) {
+            dropContents(server);
+        }
+    }
+
     /** 服务端生长计时：漏斗盆栽仅在下方有容器时自动收割入箱，否则原地等待玩家右键（与普通盆栽一致）。 */
     public static void serverTick(Level level, BlockPos pos, BlockState state, CompressedPotBlockEntity be) {
         if (be.plant == null) {
@@ -175,19 +185,24 @@ public class CompressedPotBlockEntity extends BlockEntity {
         }
     }
 
-    /** 收获掉落：作物=原版战利品表（含时运）；树苗=原木×4-6+树苗；甘蔗=2-4×自身。 */
+    /**
+     * 收获掉落：作物（压缩+原版+模组，#minecraft:crops）走方块自身命名空间的战利品表（含时运）；
+     * 压缩树苗=同重数原木×4-6+树苗；通用树苗（#minecraft:saplings）找同命名空间 "{wood}_log"
+     * ×4-6，找不到给木棍；其余（甘蔗等）=2-4×自身；最后一律补发一份作物本体（自动补种不消耗）。
+     */
     private List<ItemStack> drops(ServerLevel server, Player player) {
         List<ItemStack> out = new ArrayList<>();
         Block block = this.plant.getBlock();
-        String name = BuiltInRegistries.BLOCK.getKey(block).getPath();
-        if (block instanceof CompressedCropBlock) {
-            ResourceKey<LootTable> key = ResourceKey.create(Registries.LOOT_TABLE,
-                CompressedBlocks.id("blocks/" + name));
+        Identifier blockId = BuiltInRegistries.BLOCK.getKey(block);
+        String name = blockId.getPath();
+        if (block instanceof CompressedCropBlock || this.plant.is(BlockTags.CROPS)) {
             // 原版作物战利品表带 age=7 条件：收割走满龄状态
             BlockState lootState = this.plant;
             if (block instanceof CompressedCropBlock crop) {
                 lootState = crop.getStateForAge(crop.getMaxAge());
             }
+            ResourceKey<LootTable> key = ResourceKey.create(Registries.LOOT_TABLE,
+                blockId.withPrefix("blocks/"));
             LootParams params = new LootParams.Builder(server)
                 .withParameter(LootContextParams.ORIGIN, Vec3.atCenterOf(getBlockPos()))
                 .withParameter(LootContextParams.BLOCK_STATE, lootState)
@@ -203,6 +218,14 @@ public class CompressedPotBlockEntity extends BlockEntity {
             var log = BuiltInRegistries.BLOCK.get(CompressedBlocks.id(logName));
             log.ifPresent(h -> out.add(new ItemStack(h.value().asItem(),
                 SAPLING_LOGS + server.random.nextInt(3))));
+        } else if (this.plant.is(BlockTags.SAPLINGS) && name.endsWith("_sapling")) {
+            String wood = name.substring(0, name.length() - "_sapling".length());
+            var log = BuiltInRegistries.BLOCK.get(
+                Identifier.fromNamespaceAndPath(blockId.getNamespace(), wood + "_log"));
+            int count = SAPLING_LOGS + server.random.nextInt(3);
+            out.add(log.filter(h -> h.value().asItem() != net.minecraft.world.item.Items.AIR)
+                .map(h -> new ItemStack(h.value().asItem(), count))
+                .orElse(new ItemStack(net.minecraft.world.item.Items.STICK, count)));
         } else {
             ItemStack cane = itemStack(this.plantItem);
             cane.setCount(CANE_MIN + server.random.nextInt(3));

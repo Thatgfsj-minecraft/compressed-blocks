@@ -634,6 +634,21 @@ public final class CompressedBlocks {
             BLOCKS.add(new BlockReg(name, block, name));
             ITEMS.add(new ItemReg(name, item, Tab.POTS, true));
         }
+        // 5d. 更多压缩种子（原版其余种子 × 3 级）：盆栽通用兼容可直接种植
+        String[][] extraSeeds = {
+            {"pumpkin_seeds", "Pumpkin Seeds"},
+            {"melon_seeds", "Melon Seeds"},
+            {"torchflower_seeds", "Torchflower Seeds"},
+            {"pitcher_pod", "Pitcher Pod"}
+        };
+        for (String[] s : extraSeeds) {
+            for (int level = 1; level <= CROP_MAX_LEVEL; level++) {
+                String name = LEVEL_PREFIX[level - 1] + "_" + s[0];
+                Item item = new Item(new Item.Properties()
+                    .setId(ResourceKey.create(Registries.ITEM, id(name))));
+                ITEMS.add(new ItemReg(name, item, Tab.FOOD, false));
+            }
+        }
         // 6. 压缩食物（3 种 × 3 级）：canAlwaysEat，溢出转回升
         for (FoodDef f : FOODS) {
             for (int level = 1; level <= FOOD_MAX_LEVEL; level++) {
@@ -897,8 +912,8 @@ public final class CompressedBlocks {
         if (BLOCKS.size() != 1112) {
             errors.add("block registry size " + BLOCKS.size() + " != 1112");
         }
-        if (expectItems != 1292) {
-            errors.add("item registry size " + expectItems + " != 1292");
+        if (expectItems != 1304) {
+            errors.add("item registry size " + expectItems + " != 1304");
         }
         // 方块：注册、翻译键、物品映射
         for (BlockReg b : BLOCKS) {

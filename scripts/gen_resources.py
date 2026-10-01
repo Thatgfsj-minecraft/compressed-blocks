@@ -220,6 +220,14 @@ def stick_names():
     return [f"{p}_stick" for p in LV]
 
 
+# 更多压缩种子（原版其余种子 × 3 级）：盆栽通用兼容可直接种植（#minecraft:crops）
+EXTRA_SEEDS = ["pumpkin_seeds", "melon_seeds", "torchflower_seeds", "pitcher_pod"]
+
+
+def extra_seed_names():
+    return [f"{p}_{k}" for k in EXTRA_SEEDS for p in LV[:CROP_MAX_LEVEL]]
+
+
 # 压缩甘蔗全材料化：纯甘蔗（1x_cane）+ 每种储存材料一条甘蔗线。
 # id：材料 key 去掉 "_block" 后缀 + "_cane"（coal_block → coal_cane，全部唯一）。
 # 显示名：去掉 "Block of " 前缀 / " Block" / " Bale" 后缀（骨块保留，用户命名 骨块甘蔗）。
@@ -362,7 +370,8 @@ def gen_assets(res):
                  {"parent": "minecraft:item/generated",
                   "textures": {"layer0": f"{NS}:item/{crop_item_id(crop, p)}"}})
     # 纯物品模型
-    simple = tool_names() + armor_names() + food_names() + crop_produce_names() + stick_names()
+    simple = (tool_names() + armor_names() + food_names() + crop_produce_names() + stick_names()
+              + extra_seed_names())
     for name in simple:
         parent = "minecraft:item/handheld" if name in set(tool_names()) else "minecraft:item/generated"
         dump(f"{res}/models/item/{name}.json",
@@ -478,6 +487,15 @@ def gen_lang(res):
         lv = next(l for l in LEVELS if name.startswith(l[0] + "_"))
         en[f"item.{NS}.{name}"] = f"{lv[1]} Stick"
         zh[f"item.{NS}.{name}"] = f"{lv[2]}木棍"
+    extra_seed_zh = {"pumpkin_seeds": "南瓜种子", "melon_seeds": "西瓜种子",
+                     "torchflower_seeds": "火把花种子", "pitcher_pod": "瓶子草荚果"}
+    extra_seed_en = {"pumpkin_seeds": "Pumpkin Seeds", "melon_seeds": "Melon Seeds",
+                     "torchflower_seeds": "Torchflower Seeds", "pitcher_pod": "Pitcher Pod"}
+    for name in extra_seed_names():
+        lv = next(l for l in LEVELS if name.startswith(l[0] + "_"))
+        key = name[len(lv[0]) + 1:]
+        en[f"item.{NS}.{name}"] = f"{lv[1]} {extra_seed_en[key]}"
+        zh[f"item.{NS}.{name}"] = f"{lv[2]}{extra_seed_zh[key]}"
     en["itemGroup.compressedblocks.blocks"] = "Compressed Blocks"
     zh["itemGroup.compressedblocks.blocks"] = "压缩方块"
     en["itemGroup.compressedblocks.tools"] = "Compressed Tools"
@@ -586,6 +604,13 @@ def gen_data(data):
         for i, p in enumerate(LV[:CROP_MAX_LEVEL]):
             cur = f"{NS}:{p}_{crop}_seeds"
             prev = f"minecraft:{crop}_seeds" if i == 0 else f"{NS}:{LV[i - 1]}_{crop}_seeds"
+            compress(cur, prev)
+            unpack(cur, prev)
+    # ---- 更多压缩种子（南瓜/西瓜/火把花/瓶子草荚果 × 3 级）：9↔1
+    for seed_id in EXTRA_SEEDS:
+        for i, p in enumerate(LV[:CROP_MAX_LEVEL]):
+            cur = f"{NS}:{p}_{seed_id}"
+            prev = f"minecraft:{seed_id}" if i == 0 else f"{NS}:{LV[i - 1]}_{seed_id}"
             compress(cur, prev)
             unpack(cur, prev)
     # ---- 压缩甘蔗：8 甘蔗 + 核心方块居中 → 1x；9× 升级；1x 可拆回核心方块（矿物甘蔗拆出压缩钻石块）
@@ -830,11 +855,11 @@ def main():
               + crop_block_names() + cane_names() + pot_names())
     items = (storage_names() + leaves_names() + sapling_names() + crop_block_names() + cane_names()
              + pot_names() + tool_names() + armor_names() + food_names() + crop_produce_names()
-             + stick_names())
+             + stick_names() + extra_seed_names())
     assert len(storage_names()) == 459, len(storage_names())
     assert len(tool_names()) == 90, len(tool_names())
     assert len(blocks) == 1112, len(blocks)
-    assert len(items) == 1292, len(items)
+    assert len(items) == 1304, len(items)
     print(f"blocks={len(blocks)} items={len(items)} (tools={len(tool_names())} armor={len(armor_names())} "
           f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())} "
           f"canes={len(cane_names())})")

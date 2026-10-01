@@ -55,10 +55,13 @@ const STICKS = LEVELS.map((p) => `${p}_stick`);
 const ARMOR_IDS = LEVELS.flatMap((p) => ARMOR.flatMap((a) => [`${p}_stone_${a}`, `${p}_wood_${a}`]));
 const FOOD_IDS = FOODS.flatMap((f) => CROP_LEVELS.map((p) => `${p}_${f}`));
 const PRODUCE = [...CROP_LEVELS.map((p) => `${p}_wheat`), ...CROP_LEVELS.map((p) => `${p}_beetroot`)];
+const EXTRA_SEEDS = ['pumpkin_seeds', 'melon_seeds', 'torchflower_seeds', 'pitcher_pod'];
+const EXTRA_SEED_ITEMS = EXTRA_SEEDS.flatMap((k) => CROP_LEVELS.map((p) => `${p}_${k}`));
 const CROP_ITEMS = ['wheat', 'beetroot'].flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}_seeds`))
   .concat(['carrot', 'potato'].flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}`)));
 const ALL_ITEMS = [...STORAGE_BLOCKS, ...LEAVES, ...SAPLINGS, ...CANE_BLOCKS, ...CROP_ITEMS,
-  ...POTS.flatMap((p) => [p]), ...TOOL_IDS, ...ARMOR_IDS, ...FOOD_IDS, ...PRODUCE, ...STICKS];
+  ...POTS.flatMap((p) => [p]), ...TOOL_IDS, ...ARMOR_IDS, ...FOOD_IDS, ...PRODUCE, ...STICKS,
+  ...EXTRA_SEED_ITEMS];
 
 let failures = 0;
 function check(name, ok, detail) {
@@ -69,7 +72,7 @@ function check(name, ok, detail) {
 }
 
 (async () => {
-  if (ALL_ITEMS.length !== 1292) throw new Error(`item list ${ALL_ITEMS.length} != 1292`);
+  if (ALL_ITEMS.length !== 1304) throw new Error(`item list ${ALL_ITEMS.length} != 1304`);
   const rcon = await new Rcon().connect(PORT, '127.0.0.1', 'testpass');
   const cmd = (c) => rcon.command(c);
 
@@ -226,6 +229,22 @@ function check(name, ok, detail) {
   check('pot BE growth round-trip', g >= 5 && g <= 600, potGrowth.trim());
   const potPlant = await cmd('data get block 4 -59 20 Plant');
   check('pot BE plant round-trip', /1x_cane/.test(potPlant.trim()), potPlant.trim());
+  // 破坏带土带苗的盆栽：应掉落盆本体 + 土壤 + 作物（preRemoveSideEffects 移除路径）
+  const merge2 = await cmd(`data merge block 4 -59 20 {Soil:"${NS}:1x_dirt",Plant:"${NS}:1x_cane",Seed:"${NS}:1x_cane"}`);
+  check('pot BE re-merge', !/Unknown|Failed|Could not/i.test(merge2), merge2.trim());
+  await cmd('kill @e[type=minecraft:item]');
+  const broke = await cmd(`setblock 4 -59 20 minecraft:air destroy`);
+  check('pot break executes', !/Unknown|Failed|Could not/i.test(broke), broke.trim());
+  await new Promise((r) => setTimeout(r, 400));
+  async function expectDrop(id) {
+    const res = await cmd(
+      `execute if entity @e[type=minecraft:item,x=4,y=-59,z=20,distance=..4,nbt={Item:{id:"${NS}:${id}"}}]`);
+    return /Test passed/.test(res);
+  }
+  check('pot break drops soil', await expectDrop('1x_dirt'));
+  check('pot break drops plant', await expectDrop('1x_cane'));
+  check('pot break drops pot', await expectDrop('hopper_pot'));
+  await cmd('kill @e[type=minecraft:item]');
   await cmd(`setblock 4 -59 20 minecraft:air`);
   await cmd('kill @e[type=minecraft:item]');
 
