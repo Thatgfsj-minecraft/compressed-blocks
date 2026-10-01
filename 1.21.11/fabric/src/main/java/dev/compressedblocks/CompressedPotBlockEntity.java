@@ -149,7 +149,7 @@ public class CompressedPotBlockEntity extends BlockEntity {
         }
     }
 
-    /** 服务端生长计时：满进度当刻漏斗盆栽自动收割（含从存档加载即满进度的情况）。 */
+    /** 服务端生长计时：漏斗盆栽仅在下方有容器时自动收割入箱，否则原地等待玩家右键（与普通盆栽一致）。 */
     public static void serverTick(Level level, BlockPos pos, BlockState state, CompressedPotBlockEntity be) {
         if (be.plant == null) {
             return;
@@ -158,9 +158,14 @@ public class CompressedPotBlockEntity extends BlockEntity {
             be.growth++;
             be.setChanged();
         }
-        if (be.growth >= GROWTH_TICKS && be.isHopperPot()) {
+        if (be.growth >= GROWTH_TICKS && be.isHopperPot() && be.hasContainerBelow()) {
             be.harvest(null);
         }
+    }
+
+    /** 下方方块是否是容器（箱子/木桶/漏斗等）。 */
+    private boolean hasContainerBelow() {
+        return getLevel() != null && getLevel().getBlockEntity(getBlockPos().below()) instanceof Container;
     }
 
     /** 客户端本地推进进度（Botany Pots 同款）：渲染平滑长大，不发包。 */
