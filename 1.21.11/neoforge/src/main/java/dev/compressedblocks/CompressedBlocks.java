@@ -1131,7 +1131,7 @@ public final class CompressedBlocks {
         pot.setLevel(level);
         pot.setSoil(blockByName("1x_dirt").defaultBlockState());
         pot.setPlant(blockByName(plantName).defaultBlockState(), MOD_ID + ":" + seedName);
-        for (int i = 0; i < CompressedPotBlockEntity.GROWTH_TICKS; i++) {
+        for (int i = 0; i < pot.requiredGrowth(); i++) {
             CompressedPotBlockEntity.serverTick(level, potPos, potBlock.defaultBlockState(), pot);
         }
         int got = 0;

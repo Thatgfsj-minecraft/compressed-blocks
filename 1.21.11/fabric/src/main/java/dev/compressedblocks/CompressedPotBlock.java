@@ -165,11 +165,8 @@ public class CompressedPotBlock extends Block implements EntityBlock {
         return InteractionResult.CONSUME;
     }
 
-    /**
-     * 持有物是否土壤（返回等级，非土壤 = 0）：压缩泥土/沙子带各自重数；
-     * 原版/模组泥土系（#minecraft:dirt）与沙子系（#minecraft:sand）算 1 级。
-     */
-    private static int soilLevelOf(BlockState state) {
+    /** 持有物是否土壤（返回等级，非土壤 = 0）：压缩泥土/沙子带各自重数；原版/mod 泥土系/沙子系 = 1。 */
+    static int soilLevelOf(BlockState state) {
         Integer dirt = CompressedBlocks.dirtLevel(state);
         if (dirt != null) {
             return dirt;

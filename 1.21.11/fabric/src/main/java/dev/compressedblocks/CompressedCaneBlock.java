@@ -18,6 +18,11 @@ public class CompressedCaneBlock extends SugarCaneBlock {
         this.level = level;
     }
 
+    /** 压缩重数（盆栽生长提速用）。 */
+    public int level() {
+        return this.level;
+    }
+
     @Override
     protected boolean canSurvive(BlockState state, LevelReader level, BlockPos pos) {
         BlockState below = level.getBlockState(pos.below());

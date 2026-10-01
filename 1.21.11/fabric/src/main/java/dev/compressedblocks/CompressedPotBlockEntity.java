@@ -41,7 +41,7 @@ import net.minecraft.world.phys.Vec3;
  * 甘蔗=2-4×自身。
  */
 public class CompressedPotBlockEntity extends BlockEntity {
-    /** 一茬生长时长：30 秒（用户要求比 60 秒减半）。 */
+    /** 基础生长时长：30 秒（最慢档——土壤等级 = 作物等级时）。 */
     public static final int GROWTH_TICKS = 600;
     /** 树苗盆栽原木数量基准（原版橡树 4-6 根）。 */
     private static final int SAPLING_LOGS = 4;
@@ -70,13 +70,41 @@ public class CompressedPotBlockEntity extends BlockEntity {
         return itemStack(this.plantItem);
     }
 
+    /**
+     * 本茬所需生长 tick：土壤等级每比作物高 1 级提速 5%（原版/mod 植物记 0 级），
+     * 例如 9 级地种 1 级作物提速 40%、种原版树提速 45%；基础 = 最慢档 600 tick。
+     */
+    public int requiredGrowth() {
+        if (this.plant == null || this.soil == null) {
+            return GROWTH_TICKS;
+        }
+        int soilLevel = CompressedPotBlock.soilLevelOf(this.soil);
+        int plantLevel = plantLevelOf(this.plant);
+        float boost = 1.0F + Math.max(0, soilLevel - plantLevel) * 0.05F;
+        return Math.max(1, Math.round(GROWTH_TICKS / boost));
+    }
+
+    /** 作物的等级：压缩植物各自的重数；原版/模组植物无等级记 0。 */
+    private static int plantLevelOf(BlockState state) {
+        if (state.getBlock() instanceof CompressedSaplingBlock s) {
+            return s.level();
+        }
+        if (state.getBlock() instanceof CompressedCropBlock c) {
+            return c.level();
+        }
+        if (state.getBlock() instanceof CompressedCaneBlock c) {
+            return c.level();
+        }
+        return 0;
+    }
+
     /** 生长进度 0..1（未种植 = 0）。 */
     public float growthFraction() {
-        return this.plant == null ? 0.0F : Math.min(1.0F, this.growth / (float) GROWTH_TICKS);
+        return this.plant == null ? 0.0F : Math.min(1.0F, this.growth / (float) requiredGrowth());
     }
 
     public boolean grown() {
-        return this.plant != null && this.growth >= GROWTH_TICKS;
+        return this.plant != null && this.growth >= requiredGrowth();
     }
 
     public boolean isHopperPot() {
@@ -164,11 +192,12 @@ public class CompressedPotBlockEntity extends BlockEntity {
         if (be.plant == null) {
             return;
         }
-        if (be.growth < GROWTH_TICKS) {
+        int required = be.requiredGrowth();
+        if (be.growth < required) {
             be.growth++;
             be.setChanged();
         }
-        if (be.growth >= GROWTH_TICKS && be.isHopperPot() && be.hasContainerBelow()) {
+        if (be.growth >= required && be.isHopperPot() && be.hasContainerBelow()) {
             be.harvest(null);
         }
     }
@@ -180,7 +209,7 @@ public class CompressedPotBlockEntity extends BlockEntity {
 
     /** 客户端本地推进进度（Botany Pots 同款）：渲染平滑长大，不发包。 */
     public static void clientTick(Level level, BlockPos pos, BlockState state, CompressedPotBlockEntity be) {
-        if (be.plant != null && be.growth < GROWTH_TICKS) {
+        if (be.plant != null && be.growth < be.requiredGrowth()) {
             be.growth++;
         }
     }
