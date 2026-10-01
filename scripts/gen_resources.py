@@ -687,6 +687,10 @@ def gen_data(data):
                    f"{NS}:{p}_stone_{piece}", category="equipment")
             shaped(f"{p}_wood_{piece}", pattern, {"X": f"#{NS}:wood_tool_{p}"},
                    f"{NS}:{p}_wood_{piece}", category="equipment")
+    # ---- 压缩原木 → 压缩木棍：2 根竖放 = 16 根（原版 2 木板 = 4 木棍；1 原木 = 4 木板 → 2 原木 = 16）
+    for p in LV:
+        shaped(f"{p}_stick_from_log", ["L", "L"], {"L": f"#{NS}:wood_tool_{p}"},
+               f"{NS}:{p}_stick", count=16)
     # ---- 战利品表
     for name in storage_names():
         dump(f"{data}/{NS}/loot_table/blocks/{name}.json", self_drop(name))
