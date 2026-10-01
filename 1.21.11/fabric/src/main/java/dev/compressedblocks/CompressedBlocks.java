@@ -289,6 +289,12 @@ public final class CompressedBlocks {
     private static final Map<Block, Integer> SAND_LEVELS = new IdentityHashMap<>();
     private static final Map<Integer, Block> FARMLAND = new IdentityHashMap<>();
 
+    /** 渲染层注册用分组：cross/crop 类植物 → CUTOUT，树叶 → CUTOUT_MIPPED（客户端入口注册）。 */
+    public static final List<Block> SAPLING_BLOCKS = new ArrayList<>();
+    public static final List<Block> CANE_BLOCKS = new ArrayList<>();
+    public static final List<Block> CROP_BLOCKS = new ArrayList<>();
+    public static final List<Block> LEAVES_BLOCKS = new ArrayList<>();
+
     /** 压缩盆栽（普通/漏斗）与共享方块实体类型。 */
     public static CompressedPotBlock POT;
     public static CompressedPotBlock HOPPER_POT;
@@ -473,6 +479,7 @@ public final class CompressedBlocks {
             level, LEVEL_EN_PREFIX[level - 1] + " " + enName);
         BLOCKS.add(new BlockReg(name, block, name));
         ITEMS.add(new ItemReg(name, item, Tab.POTS, true));
+        CANE_BLOCKS.add(block);
     }
 
     // ------------------------------------------------------------------ 构建
@@ -520,6 +527,7 @@ public final class CompressedBlocks {
                     .randomTicks()
                     .sound(SoundType.GRASS)
                     .noOcclusion());
+                LEAVES_BLOCKS.add(block);
                 BlockItem item = new BlockItem(block,
                     new Item.Properties()
                         .setId(ResourceKey.create(Registries.ITEM, id(name)))
@@ -548,6 +556,7 @@ public final class CompressedBlocks {
                     level, false, enName);
                 BLOCKS.add(new BlockReg(name, block, name));
                 ITEMS.add(new ItemReg(name, item, Tab.POTS, true));
+                SAPLING_BLOCKS.add(block);
             }
         }
         // 4. 压缩耕地（9 级）：无物品；锄 N 级压缩泥土需 N 级+锄头
@@ -575,6 +584,7 @@ public final class CompressedBlocks {
                     .noCollision()
                     .randomTicks()
                     .sound(SoundType.CROP));
+                CROP_BLOCKS.add(block);
                 String enName = c.hasSeeds() ? enFood + " Seeds" : enFood;
                 // 压缩胡萝卜/土豆同时是压缩食物：随时可吃 + 溢出转回升（数值 = 原版 × 9^重）
                 int foodN = c.hasSeeds() ? 0

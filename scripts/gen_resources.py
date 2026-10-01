@@ -274,34 +274,40 @@ def gen_assets(res):
         dump(f"{res}/blockstates/{name}.json",
              {"variants": {"": {"model": f"{NS}:block/{name}"}}})
         if name in leaf_set:
-            # 树叶带透明像素：必须声明 cutout_mipped（1.21.4+ 无 render_type 默认 SOLID 不透明）
+            # 树叶透明像素：chunk 层走 CUTOUT_MIPPED（客户端入口注册），模型内 render_type 在 1.21.11 无效
             dump(f"{res}/models/block/{name}.json",
-                 {"parent": "minecraft:block/cube_all", "render_type": "minecraft:cutout_mipped",
+                 {"parent": "minecraft:block/cube_all",
                   "textures": {"all": f"{NS}:block/{name}"}})
         else:
             dump(f"{res}/models/block/{name}.json",
                  {"parent": "minecraft:block/cube_all", "textures": {"all": f"{NS}:block/{name}"}})
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
-    # 树苗：cross，stage 0/1 同模型；透明模型必须声明 render_type（1.21.4+ 默认 SOLID 不透明）
+    # 树苗：cross 单模型；物品走 item/generated 独立模型（原版同构——cross 无 display，直指会全尺寸渲染）
     for name in sapling_names():
         dump(f"{res}/blockstates/{name}.json",
              {"variants": {"stage=0": {"model": f"{NS}:block/{name}"},
                            "stage=1": {"model": f"{NS}:block/{name}"}}})
         dump(f"{res}/models/block/{name}.json",
-             {"parent": "minecraft:block/cross", "render_type": "minecraft:cutout",
+             {"parent": "minecraft:block/cross",
               "textures": {"cross": f"{NS}:block/{name}"}})
+        dump(f"{res}/models/item/{name}.json",
+             {"parent": "minecraft:item/generated",
+              "textures": {"layer0": f"{NS}:block/{name}"}})
         dump(f"{res}/items/{name}.json",
-             {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
-    # 压缩甘蔗：cross 单模型（age 属性不换图）
+             {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
+    # 压缩甘蔗：cross 单模型（age 属性不换图）；物品走 item/generated 独立模型
     for name in cane_names():
         dump(f"{res}/blockstates/{name}.json",
              {"variants": {"": {"model": f"{NS}:block/{name}"}}})
         dump(f"{res}/models/block/{name}.json",
-             {"parent": "minecraft:block/cross", "render_type": "minecraft:cutout",
+             {"parent": "minecraft:block/cross",
               "textures": {"cross": f"{NS}:block/{name}"}})
+        dump(f"{res}/models/item/{name}.json",
+             {"parent": "minecraft:item/generated",
+              "textures": {"layer0": f"{NS}:block/{name}"}})
         dump(f"{res}/items/{name}.json",
-             {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
+             {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
     # 压缩盆栽（普通/漏斗）：12×12 底面、6px 高、1px 薄壁，
     # display 挂原版 block/block 的 GUI 等距视角（物品图标 3D 显示），土壤/作物由 BER 绘制
     pot_display = {
@@ -371,7 +377,7 @@ def gen_assets(res):
             dump(f"{res}/blockstates/{block}.json", {"variants": variants})
             for n in range(stages):
                 dump(f"{res}/models/block/{p}_{crop}_stage{n}.json",
-                     {"parent": "minecraft:block/crop", "render_type": "minecraft:cutout",
+                     {"parent": "minecraft:block/crop",
                       "textures": {"crop": f"{NS}:block/{p}_{crop}_stage{n}"}})
             # 作物 BlockItem：物品模型
             dump(f"{res}/items/{crop_item_id(crop, p)}.json",

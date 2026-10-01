@@ -1,1 +1,1 @@
-{"parent":"minecraft:block/cross","render_type":"minecraft:cutout","textures":{"cross":"compressedblocks:block/9x_birch_sapling"}}
+{"parent":"minecraft:block/cross","textures":{"cross":"compressedblocks:block/9x_birch_sapling"}}

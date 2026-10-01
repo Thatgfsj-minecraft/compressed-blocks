@@ -1,1 +1,1 @@
-{"parent":"minecraft:block/cross","render_type":"minecraft:cutout","textures":{"cross":"compressedblocks:block/2x_pale_oak_sapling"}}
+{"parent":"minecraft:block/cross","textures":{"cross":"compressedblocks:block/2x_pale_oak_sapling"}}

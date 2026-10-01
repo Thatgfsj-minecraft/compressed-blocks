@@ -1,1 +1,1 @@
-{"parent":"minecraft:block/crop","render_type":"minecraft:cutout","textures":{"crop":"compressedblocks:block/1x_potato_stage0"}}
+{"parent":"minecraft:block/crop","textures":{"crop":"compressedblocks:block/1x_potato_stage0"}}
