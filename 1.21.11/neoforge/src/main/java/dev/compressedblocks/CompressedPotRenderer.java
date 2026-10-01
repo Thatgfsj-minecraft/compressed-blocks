@@ -46,13 +46,15 @@ public class CompressedPotRenderer implements BlockEntityRenderer<CompressedPotB
     public void submit(PotRenderState state, PoseStack pose, SubmitNodeCollector collector,
                        CameraRenderState camera) {
         int light = state.lightCoords;
+        // 显式 (1,1,1) 颜色 + 模型直提：绕过 renderSingleBlock 的 null-level 染色解析
+        // （该路径会把贴图染成异常红色），贴图保持本色
         if (state.soil != null && state.cameraAbove) {
             // 10px 见方、5px 高，填进内腔（3..13），顶面低于盆沿避免共面
             pose.pushPose();
             pose.translate(0.5, 0.0, 0.5);
             pose.scale(0.625F, 0.3125F, 0.625F);
             pose.translate(-0.5, 0.0, -0.5);
-            collector.submitBlock(pose, state.soil, light, 0, 0);
+            submitModel(state.soil, pose, collector, light);
             pose.popPose();
         }
         if (state.plant != null) {
@@ -67,9 +69,15 @@ public class CompressedPotRenderer implements BlockEntityRenderer<CompressedPotB
             pose.translate(0.5, 0.375, 0.5);
             pose.scale(s, s, s);
             pose.translate(-0.5, 0.0, -0.5);
-            collector.submitBlock(pose, st, light, 0, 0);
+            submitModel(st, pose, collector, light);
             pose.popPose();
         }
+    }
+
+    private void submitModel(BlockState st, PoseStack pose, SubmitNodeCollector collector, int light) {
+        collector.submitBlockModel(pose,
+            net.minecraft.client.renderer.ItemBlockRenderTypes.getRenderType(st),
+            this.dispatcher.getBlockModel(st), 1.0F, 1.0F, 1.0F, light, 0, 0);
     }
 
     /** 盆栽渲染状态：盆内土壤、作物、生长进度与相机相对高度。 */
