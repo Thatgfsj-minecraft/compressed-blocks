@@ -294,7 +294,7 @@ def gen_assets(res):
               "textures": {"cross": f"{NS}:block/{name}"}})
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
-    # 压缩盆栽（普通/漏斗）：中空陶盆元素模型，土壤与作物由方块实体渲染器绘制
+    # 压缩盆栽（普通/漏斗）：8px 矮陶盆元素模型，土壤与作物由方块实体渲染器绘制
     for name in pot_names():
         hopper = name == "hopper_pot"
         side = f"{NS}:block/{'hopper_pot_side' if hopper else 'pot_side'}"
@@ -307,22 +307,22 @@ def gen_assets(res):
                            "up": {"texture": "#top"}, "north": {"texture": "#side"},
                            "south": {"texture": "#side"}, "west": {"texture": "#side"},
                            "east": {"texture": "#side"}}},
-                {"from": [2, 2, 2], "to": [14, 12, 4],
+                {"from": [2, 2, 2], "to": [14, 8, 4],
                  "faces": {"north": {"texture": "#side", "cullface": "north"},
                            "south": {"texture": "#side"}, "west": {"texture": "#side"},
                            "east": {"texture": "#side"}, "up": {"texture": "#top"},
                            "down": {"texture": "#bottom"}}},
-                {"from": [2, 2, 12], "to": [14, 12, 14],
+                {"from": [2, 2, 12], "to": [14, 8, 14],
                  "faces": {"south": {"texture": "#side", "cullface": "south"},
                            "north": {"texture": "#side"}, "west": {"texture": "#side"},
                            "east": {"texture": "#side"}, "up": {"texture": "#top"},
                            "down": {"texture": "#bottom"}}},
-                {"from": [2, 2, 4], "to": [4, 12, 12],
+                {"from": [2, 2, 4], "to": [4, 8, 12],
                  "faces": {"west": {"texture": "#side", "cullface": "west"},
                            "east": {"texture": "#side"}, "north": {"texture": "#side"},
                            "south": {"texture": "#side"}, "up": {"texture": "#top"},
                            "down": {"texture": "#bottom"}}},
-                {"from": [12, 2, 4], "to": [14, 12, 12],
+                {"from": [12, 2, 4], "to": [14, 8, 12],
                  "faces": {"east": {"texture": "#side", "cullface": "east"},
                            "west": {"texture": "#side"}, "north": {"texture": "#side"},
                            "south": {"texture": "#side"}, "up": {"texture": "#top"},
@@ -425,8 +425,9 @@ def gen_lang(res):
             zh[f"block.{NS}.{name}"] = f"{lv[2]}甘蔗"
         else:
             mat = cane_mat_of_key[rest[:-5]]
+            # 重数前缀已含「压缩」：不要重复拼接
             en[f"block.{NS}.{name}"] = f"{lv[1]} {cane_en(mat[1])} Cane"
-            zh[f"block.{NS}.{name}"] = f"{lv[2]}压缩{cane_zh(mat)}甘蔗"
+            zh[f"block.{NS}.{name}"] = f"{lv[2]}{cane_zh(mat)}甘蔗"
     en["block." + NS + ".pot"] = "Compressed Pot"
     zh["block." + NS + ".pot"] = "压缩盆栽"
     en["block." + NS + ".hopper_pot"] = "Compressed Hopper Pot"

@@ -221,7 +221,9 @@ function check(name, ok, detail) {
     `data merge block 4 -59 20 {Soil:"${NS}:1x_dirt",Plant:"${NS}:1x_cane",Seed:"${NS}:1x_cane",Growth:5}`);
   check('pot BE merge', !/Unknown|Failed|Could not/i.test(potMerge), potMerge.trim());
   const potGrowth = await cmd('data get block 4 -59 20 Growth');
-  check('pot BE growth round-trip', /: 5(,|$|\s)/.test(potGrowth.trim()), potGrowth.trim());
+  // 盆栽现在真的在计时（服务端 ticker 生效）：断言 Growth 可写且 >= 5（读取期间可能已递增）
+  const g = parseInt((potGrowth.match(/block data: (\d+)/) || [])[1] ?? '-1', 10);
+  check('pot BE growth round-trip', g >= 5 && g <= 600, potGrowth.trim());
   const potPlant = await cmd('data get block 4 -59 20 Plant');
   check('pot BE plant round-trip', /1x_cane/.test(potPlant.trim()), potPlant.trim());
   await cmd(`setblock 4 -59 20 minecraft:air`);

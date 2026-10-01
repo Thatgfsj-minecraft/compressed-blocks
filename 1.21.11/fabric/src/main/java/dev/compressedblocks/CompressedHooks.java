@@ -233,6 +233,29 @@ public final class CompressedHooks {
             .append(Component.literal(soilLevel + "x").withStyle(ChatFormatting.GRAY)), false);
     }
 
+    /** 空手右键盆栽：动作栏（上方）显示盆内土壤/作物/生长进度，名字走本地化。 */
+    public static void sendPotContents(ServerPlayer player, BlockState soil, ItemStack plant, float growth) {
+        if (soil == null && plant.isEmpty()) {
+            player.displayClientMessage(Component.empty()
+                .append(Component.literal("[Compressed Blocks] ").withStyle(ChatFormatting.DARK_GRAY))
+                .append(Component.literal("Empty pot").withStyle(ChatFormatting.GRAY)), true);
+            return;
+        }
+        Component msg = Component.empty()
+            .append(Component.literal("[Compressed Blocks] ").withStyle(ChatFormatting.DARK_GRAY))
+            .append(soil == null
+                ? Component.literal("No soil").withStyle(ChatFormatting.RED)
+                : soil.getBlock().getName().copy().withStyle(ChatFormatting.GOLD));
+        if (!plant.isEmpty()) {
+            msg = msg.copy()
+                .append(Component.literal(" + ").withStyle(ChatFormatting.DARK_GRAY))
+                .append(plant.getHoverName().copy().withStyle(ChatFormatting.GREEN))
+                .append(Component.literal(" (" + Math.round(growth * 100.0F) + "%)")
+                    .withStyle(ChatFormatting.YELLOW));
+        }
+        player.displayClientMessage(msg, true);
+    }
+
     /** 锄头等级不足（锄压缩泥土）。 */
     public static void sendTillHint(ServerPlayer player, int hoeLevel, int dirtLevel) {
         if (!hintReady(player)) {

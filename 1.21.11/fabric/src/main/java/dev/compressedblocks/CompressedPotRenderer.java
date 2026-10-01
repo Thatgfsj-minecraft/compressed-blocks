@@ -14,8 +14,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * 盆栽渲染（Botany Pots 同款思路，1.21.6+ RenderState 管线）：盆内画土壤（0.5 缩放沉入盆口内腔），
- * 作物画在盆沿上、按生长进度从 0.2 缩放到 0.5（服务端分 8 档同步，视觉阶梯增长）。
+ * 盆栽渲染（Botany Pots 同款参数，1.21.6+ RenderState 管线）：
+ * 土壤 = 整块方块压扁（0.75×0.375×0.75）填进盆口内腔，只在相机高于盆时绘制（防侧面穿模）；
+ * 作物 = 基部沉在盆口下（y=0.375），随生长从 0.40 平滑缩放到 1.00，长成后探出盆口。
+ * 进度由客户端本地 tick 推进，每帧读取，无级跳变。
  */
 public class CompressedPotRenderer implements BlockEntityRenderer<CompressedPotBlockEntity, CompressedPotRenderer.PotRenderState> {
     private final BlockRenderDispatcher dispatcher;
@@ -37,31 +39,31 @@ public class CompressedPotRenderer implements BlockEntityRenderer<CompressedPotB
         state.plant = be.plant();
         state.growth = be.growthFraction();
         state.grown = be.grown();
+        state.cameraAbove = cameraPos != null && cameraPos.y >= be.getBlockPos().getY();
     }
 
     @Override
     public void submit(PotRenderState state, PoseStack pose, SubmitNodeCollector collector,
                        CameraRenderState camera) {
         int light = state.lightCoords;
-        if (state.soil != null) {
+        if (state.soil != null && state.cameraAbove) {
             pose.pushPose();
             pose.translate(0.5, 0.125, 0.5);
-            pose.scale(0.5F, 0.5F, 0.5F);
+            pose.scale(0.75F, 0.375F, 0.75F);
             pose.translate(-0.5, 0.0, -0.5);
             collector.submitBlock(pose, state.soil, light, 0, 0);
             pose.popPose();
         }
         if (state.plant != null) {
-            float f = state.growth;
-            float s = 0.2F + 0.3F * f;
+            float s = 0.4F + 0.6F * state.growth;
             BlockState st = state.plant;
             if (st.getBlock() instanceof CropBlock crop) {
-                st = crop.getStateForAge(Math.round(f * crop.getMaxAge()));
+                st = crop.getStateForAge(Math.round(state.growth * crop.getMaxAge()));
             } else if (st.getBlock() instanceof SaplingBlock && state.grown) {
                 st = st.setValue(SaplingBlock.STAGE, 1);
             }
             pose.pushPose();
-            pose.translate(0.5, 0.75, 0.5);
+            pose.translate(0.5, 0.375, 0.5);
             pose.scale(s, s, s);
             pose.translate(-0.5, 0.0, -0.5);
             collector.submitBlock(pose, st, light, 0, 0);
@@ -69,11 +71,12 @@ public class CompressedPotRenderer implements BlockEntityRenderer<CompressedPotB
         }
     }
 
-    /** 盆栽渲染状态：盆内土壤、作物与其生长进度（主类为 CompressedPotBlockEntity）。 */
+    /** 盆栽渲染状态：盆内土壤、作物、生长进度与相机相对高度。 */
     public static class PotRenderState extends BlockEntityRenderState {
         public BlockState soil;
         public BlockState plant;
         public float growth;
         public boolean grown;
+        public boolean cameraAbove;
     }
 }

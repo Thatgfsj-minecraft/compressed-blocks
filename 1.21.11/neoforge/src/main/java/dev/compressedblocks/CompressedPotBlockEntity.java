@@ -7,6 +7,9 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -29,15 +32,16 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * 压缩盆栽方块实体：土壤与作物都存盆内（Botany Pots 机制——作物不是真实方块，
- * 盆上方永远为空）。growth 服务端计时，每 1200 tick（60 秒）一茬；分 8 档 sendBlockUpdated
- * 同步给客户端渲染器。成熟后玩家右键收割并自动补种；漏斗盆栽成熟自动收割，
- * 产物优先插入下方容器（原版箱子/木桶/漏斗都实现 Container），塞不下就地掉落。
+ * 盆上方永远为空）。growth 服务端计时、客户端本地同步推进（双端 ticker，进度平滑、
+ * 无每刻发包）；数据变化（填土/种植/收割/取出）经 getUpdatePacket 全量同步。
+ * 成熟后玩家右键收割并自动补种；漏斗盆栽成熟自动收割，产物优先插入下方容器
+ * （原版箱子/木桶/漏斗都实现 Container），塞不下就地掉落。
  * 收获规则（用户定稿）：作物=原版战利品表（时运用收割者手持物）；树苗=同重数原木 4-6 根+树苗；
  * 甘蔗=2-4×自身。
  */
 public class CompressedPotBlockEntity extends BlockEntity {
-    /** 一茬生长时长：60 秒。 */
-    public static final int GROWTH_TICKS = 1200;
+    /** 一茬生长时长：30 秒（用户要求比 60 秒减半）。 */
+    public static final int GROWTH_TICKS = 600;
     /** 树苗盆栽原木数量基准（原版橡树 4-6 根）。 */
     private static final int SAPLING_LOGS = 4;
     /** 甘蔗盆栽收获份数下限（原版一株成熟甘蔗约 2 节）。 */
@@ -58,6 +62,11 @@ public class CompressedPotBlockEntity extends BlockEntity {
 
     public BlockState plant() {
         return this.plant;
+    }
+
+    /** 盆内作物对应的物品（取出/展示用），未种植 = EMPTY。 */
+    public ItemStack plantItemStack() {
+        return itemStack(this.plantItem);
     }
 
     /** 生长进度 0..1（未种植 = 0）。 */
@@ -140,28 +149,25 @@ public class CompressedPotBlockEntity extends BlockEntity {
         }
     }
 
-    /** 服务端生长计时：满进度后漏斗盆栽自动收割（含从存档加载即满进度的情况）。 */
+    /** 服务端生长计时：满进度当刻漏斗盆栽自动收割（含从存档加载即满进度的情况）。 */
     public static void serverTick(Level level, BlockPos pos, BlockState state, CompressedPotBlockEntity be) {
         if (be.plant == null) {
             return;
         }
-        if (be.growth >= GROWTH_TICKS) {
-            if (be.isHopperPot()) {
-                be.harvest(null);
-            }
-            return;
-        }
-        be.growth++;
-        if (stageOf(be.growth) != stageOf(be.growth - 1) || be.growth >= GROWTH_TICKS) {
-            be.sync();
+        if (be.growth < GROWTH_TICKS) {
+            be.growth++;
+            be.setChanged();
         }
         if (be.growth >= GROWTH_TICKS && be.isHopperPot()) {
             be.harvest(null);
         }
     }
 
-    private static int stageOf(int growth) {
-        return growth * 8 / GROWTH_TICKS;
+    /** 客户端本地推进进度（Botany Pots 同款）：渲染平滑长大，不发包。 */
+    public static void clientTick(Level level, BlockPos pos, BlockState state, CompressedPotBlockEntity be) {
+        if (be.plant != null && be.growth < GROWTH_TICKS) {
+            be.growth++;
+        }
     }
 
     /** 收获掉落：作物=原版战利品表（含时运）；树苗=原木×4-6+树苗；甘蔗=2-4×自身。 */
@@ -291,6 +297,12 @@ public class CompressedPotBlockEntity extends BlockEntity {
             this.plantItem = null;
             this.growth = 0;
         }
+    }
+
+    /** 全量同步盆内数据（Botany Pots 同款：覆写 getUpdatePacket，默认 null 永不同步）。 */
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     @Override

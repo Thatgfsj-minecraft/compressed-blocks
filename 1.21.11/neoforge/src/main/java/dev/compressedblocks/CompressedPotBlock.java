@@ -31,7 +31,8 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * 漏斗盆栽：成熟自动收割并优先插入下方容器。
  */
 public class CompressedPotBlock extends Block implements EntityBlock {
-    private static final VoxelShape SHAPE = Block.box(2, 0, 2, 14, 12, 14);
+    /** 与 Botany Pots 同款：8px 矮盆。 */
+    private static final VoxelShape SHAPE = Block.box(2, 0, 2, 14, 8, 14);
     /** 可种植物品（压缩种子/树苗/甘蔗物品）的运行时描述。 */
     private record Plantable(BlockState state, int level, String enName, String itemId) {
     }
@@ -60,11 +61,15 @@ public class CompressedPotBlock extends Block implements EntityBlock {
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state,
                                                                   BlockEntityType<T> type) {
-        if (level.isClientSide() || type != CompressedBlocks.POT_TYPE) {
+        if (type != CompressedBlocks.POT_TYPE) {
             return null;
         }
-        return (BlockEntityTicker<T>) (BlockEntityTicker<CompressedPotBlockEntity>)
-            CompressedPotBlockEntity::serverTick;
+        // 双端 ticker（Botany Pots 同款）：客户端本地推进进度让渲染平滑，服务端权威收割
+        return level.isClientSide()
+            ? (BlockEntityTicker<T>) (BlockEntityTicker<CompressedPotBlockEntity>)
+                CompressedPotBlockEntity::clientTick
+            : (BlockEntityTicker<T>) (BlockEntityTicker<CompressedPotBlockEntity>)
+                CompressedPotBlockEntity::serverTick;
     }
 
     @Override
@@ -130,18 +135,19 @@ public class CompressedPotBlock extends Block implements EntityBlock {
             level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.BLOCKS, 1.0F, 1.0F);
             return InteractionResult.CONSUME;
         }
-        if (player.isShiftKeyDown()) {
-            if (level.isClientSide()) {
-                return InteractionResult.SUCCESS;
-            }
-            ItemStack taken = pot.plant() != null ? pot.takePlant() : pot.takeSoil();
-            if (!taken.isEmpty()) {
-                Block.popResource(level, pos, taken);
-                level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.BLOCKS, 1.0F, 1.0F);
+        if (!player.isShiftKeyDown()) {
+            // 空手右键：动作栏（上方）显示盆内内容与生长进度
+            if (!level.isClientSide() && player instanceof ServerPlayer sp) {
+                CompressedHooks.sendPotContents(sp, pot.soil(), pot.plantItemStack(), pot.growthFraction());
             }
             return InteractionResult.CONSUME;
         }
-        return InteractionResult.PASS;
+        ItemStack taken = pot.plant() != null ? pot.takePlant() : pot.takeSoil();
+        if (!taken.isEmpty()) {
+            Block.popResource(level, pos, taken);
+            level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.BLOCKS, 1.0F, 1.0F);
+        }
+        return InteractionResult.CONSUME;
     }
 
     /** 盆被破坏（非活塞推动）：补发盆内土壤与作物（原版容器同款钩子）。 */
