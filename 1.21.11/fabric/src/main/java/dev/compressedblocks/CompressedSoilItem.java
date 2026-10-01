@@ -65,7 +65,9 @@ public class CompressedSoilItem extends BlockItem {
         if (!level.isClientSide() && entity instanceof ServerPlayer player) {
             int overflow = this.foodNutrition - (20 - hungerBefore);
             if (overflow > 0) {
-                player.addEffect(CompressedHooks.foodRegen(overflow));
+                for (var effect : CompressedHooks.foodEffects(overflow)) {
+                    player.addEffect(effect);
+                }
             }
         }
         return result;

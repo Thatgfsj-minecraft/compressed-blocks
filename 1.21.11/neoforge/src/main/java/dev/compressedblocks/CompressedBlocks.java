@@ -219,12 +219,26 @@ public final class CompressedBlocks {
     private record FoodDef(String key, String en, float nutrition, float saturation) {
     }
 
-    /** 原版数值：面包 5/6.0、牛肉 8/12.8、西瓜片 2/1.2、腐肉 4/0.8（无饥饿副作用）；N 级压缩 = ×9^N。 */
+    /** 原版数值（名称与生/熟数值全部对齐原版）；N 级压缩 = ×9^N。 */
     private static final List<FoodDef> FOODS = List.of(
         new FoodDef("bread", "Bread", 5.0F, 6.0F),
-        new FoodDef("beef", "Beef", 8.0F, 12.8F),
+        new FoodDef("beef", "Raw Beef", 3.0F, 1.8F),
+        new FoodDef("cooked_beef", "Steak", 8.0F, 12.8F),
+        new FoodDef("porkchop", "Raw Porkchop", 3.0F, 1.8F),
+        new FoodDef("cooked_porkchop", "Cooked Porkchop", 8.0F, 12.8F),
+        new FoodDef("mutton", "Raw Mutton", 2.0F, 1.2F),
+        new FoodDef("cooked_mutton", "Cooked Mutton", 6.0F, 9.6F),
+        new FoodDef("chicken", "Raw Chicken", 2.0F, 1.2F),
+        new FoodDef("cooked_chicken", "Cooked Chicken", 6.0F, 7.2F),
+        new FoodDef("rabbit", "Raw Rabbit", 3.0F, 1.8F),
+        new FoodDef("cooked_rabbit", "Cooked Rabbit", 5.0F, 6.0F),
+        new FoodDef("cod", "Raw Cod", 2.0F, 0.4F),
+        new FoodDef("cooked_cod", "Cooked Cod", 5.0F, 6.0F),
+        new FoodDef("salmon", "Raw Salmon", 2.0F, 0.4F),
+        new FoodDef("cooked_salmon", "Cooked Salmon", 6.0F, 9.6F),
         new FoodDef("melon", "Watermelon", 2.0F, 1.2F),
-        new FoodDef("rotten_flesh", "Rotten Flesh", 4.0F, 0.8F)
+        new FoodDef("rotten_flesh", "Rotten Flesh", 4.0F, 0.8F),
+        new FoodDef("baked_potato", "Baked Potato", 5.0F, 6.0F)
     );
 
     // ------------------------------------------------------------------ 护甲
@@ -922,8 +936,8 @@ public final class CompressedBlocks {
         if (BLOCKS.size() != 1112) {
             errors.add("block registry size " + BLOCKS.size() + " != 1112");
         }
-        if (expectItems != 1304) {
-            errors.add("item registry size " + expectItems + " != 1304");
+        if (expectItems != 1346) {
+            errors.add("item registry size " + expectItems + " != 1346");
         }
         // 方块：注册、翻译键、物品映射
         for (BlockReg b : BLOCKS) {

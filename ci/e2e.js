@@ -25,7 +25,9 @@ const POTS = ['pot', 'hopper_pot'];
 const WOODS = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'mangrove', 'cherry', 'pale_oak'];
 const CROPS = ['wheat', 'carrot', 'potato', 'beetroot'];
 const CROP_LEVELS = LEVELS.slice(0, 3);
-const FOODS = ['bread', 'beef', 'melon', 'rotten_flesh'];
+const FOODS = ['bread', 'beef', 'cooked_beef', 'porkchop', 'cooked_porkchop', 'mutton',
+  'cooked_mutton', 'chicken', 'cooked_chicken', 'rabbit', 'cooked_rabbit', 'cod',
+  'cooked_cod', 'salmon', 'cooked_salmon', 'melon', 'rotten_flesh', 'baked_potato'];
 const ARMOR = ['helmet', 'chestplate', 'leggings', 'boots'];
 const TOOLS = ['pickaxe', 'axe', 'shovel', 'hoe', 'sword'];
 const TOOL_LINES = ['cobblestone', 'wood'];
@@ -72,7 +74,7 @@ function check(name, ok, detail) {
 }
 
 (async () => {
-  if (ALL_ITEMS.length !== 1304) throw new Error(`item list ${ALL_ITEMS.length} != 1304`);
+  if (ALL_ITEMS.length !== 1346) throw new Error(`item list ${ALL_ITEMS.length} != 1346`);
   const rcon = await new Rcon().connect(PORT, '127.0.0.1', 'testpass');
   const cmd = (c) => rcon.command(c);
 

@@ -128,10 +128,29 @@ CROP_MAX_LEVEL = 3
 
 FOODS = [
     ("bread", "Bread", "面包"),
-    ("beef", "Beef", "牛肉"),
+    ("beef", "Raw Beef", "生牛肉"),
+    ("cooked_beef", "Steak", "牛排"),
+    ("porkchop", "Raw Porkchop", "生猪排"),
+    ("cooked_porkchop", "Cooked Porkchop", "熟猪排"),
+    ("mutton", "Raw Mutton", "羊肉"),
+    ("cooked_mutton", "Cooked Mutton", "熟羊肉"),
+    ("chicken", "Raw Chicken", "生鸡肉"),
+    ("cooked_chicken", "Cooked Chicken", "熟鸡肉"),
+    ("rabbit", "Raw Rabbit", "生兔肉"),
+    ("cooked_rabbit", "Cooked Rabbit", "熟兔肉"),
+    ("cod", "Raw Cod", "生鳕鱼"),
+    ("cooked_cod", "Cooked Cod", "熟鳕鱼"),
+    ("salmon", "Raw Salmon", "生鲑鱼"),
+    ("cooked_salmon", "Cooked Salmon", "熟鲑鱼"),
     ("melon", "Watermelon", "西瓜"),
     ("rotten_flesh", "Rotten Flesh", "腐肉"),
+    ("baked_potato", "Baked Potato", "烤土豆"),
 ]
+# 烤制：生的 → 熟的（烤土豆=土豆）
+COOKED_FROM = [("potato", "baked_potato"), ("beef", "cooked_beef"),
+               ("porkchop", "cooked_porkchop"), ("mutton", "cooked_mutton"),
+               ("chicken", "cooked_chicken"), ("rabbit", "cooked_rabbit"),
+               ("cod", "cooked_cod"), ("salmon", "cooked_salmon")]
 FOOD_MAX_LEVEL = 3
 
 ARMOR_PIECES = ["helmet", "chestplate", "leggings", "boots"]
@@ -676,6 +695,21 @@ def gen_data(data):
         prev = "minecraft:rotten_flesh" if i == 0 else f"{NS}:{LV[i - 1]}_rotten_flesh"
         compress(cur, prev)
         unpack(cur, prev)
+    # 烤制食物：熔炉/烟熏炉烤同重数生的 → 熟的；烤制时间 = 9^层 秒（烟熏减半），三重封顶 5 分钟；经验 ×9^层
+    for i, p in enumerate(LV[:FOOD_MAX_LEVEL]):
+        for raw, cooked in COOKED_FROM:
+            for kind, rtype, seconds in (
+                    ("smelting", "minecraft:smelting", min(9 ** i, 300)),
+                    ("smoking", "minecraft:smoking", min(9 ** i / 2, 150))):
+                path = f"{p}_{cooked}_{kind}"
+                dump(f"{data}/{NS}/recipe/{path}.json", {
+                    "type": rtype, "category": "food",
+                    "ingredient": f"{NS}:{p}_{raw}",
+                    "result": {"id": f"{NS}:{p}_{cooked}"},
+                    "experience": 0.35 * 9 ** i,
+                    "cookingtime": int(seconds * 20),
+                })
+                unlock_advancement(path, f"{NS}:{p}_{cooked}", [f"{NS}:{p}_{raw}"])
     # ---- 工具两条线：材料位=同重数混用标签（圆石线=圆石+深板岩圆石，木线=9 原木），棍位=同重数压缩木棍
     for mat, _, _ in TOOL_LINES:
         for p in LV:
@@ -879,7 +913,7 @@ def main():
     assert len(storage_names()) == 459, len(storage_names())
     assert len(tool_names()) == 90, len(tool_names())
     assert len(blocks) == 1112, len(blocks)
-    assert len(items) == 1304, len(items)
+    assert len(items) == 1346, len(items)
     print(f"blocks={len(blocks)} items={len(items)} (tools={len(tool_names())} armor={len(armor_names())} "
           f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())} "
           f"canes={len(cane_names())})")

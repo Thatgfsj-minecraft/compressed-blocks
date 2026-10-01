@@ -1,7 +1,9 @@
 package dev.compressedblocks;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -165,15 +167,24 @@ public final class CompressedHooks {
 
     // ------------------------------------------------------------------ 食物
 
-    /** 食物营养溢出 → 回升（生命恢复）：≤200 回升1×溢出秒；>200 回升2×(溢出-200)秒；>1000 回升5×(溢出/2)秒。 */
-    public static MobEffectInstance foodRegen(int overflow) {
+    /**
+     * 食物营养溢出 → 回升：
+     * ≤200 回升1×溢出秒；200-1000 回升2×(溢出-200)秒；&gt;1000 生命恢复5+力量5，各上限 10 分钟。
+     */
+    public static List<MobEffectInstance> foodEffects(int overflow) {
+        List<MobEffectInstance> out = new ArrayList<>();
         if (overflow > 1000) {
-            return new MobEffectInstance(MobEffects.REGENERATION, (overflow / 2) * 20, 4);
+            // 生命恢复5 + 力量5，各最多 10 分钟
+            out.add(new MobEffectInstance(MobEffects.REGENERATION, 600 * 20, 4));
+            out.add(new MobEffectInstance(MobEffects.STRENGTH, 600 * 20, 4));
+            return out;
         }
         if (overflow > 200) {
-            return new MobEffectInstance(MobEffects.REGENERATION, (overflow - 200) * 20, 1);
+            out.add(new MobEffectInstance(MobEffects.REGENERATION, (overflow - 200) * 20, 1));
+            return out;
         }
-        return new MobEffectInstance(MobEffects.REGENERATION, overflow * 20, 0);
+        out.add(new MobEffectInstance(MobEffects.REGENERATION, overflow * 20, 0));
+        return out;
     }
 
     // ------------------------------------------------------------------ 英文彩色提示

@@ -124,9 +124,23 @@ CROP_STAGE_SPRITE = {"wheat": "wheat_stage", "carrot": "carrots_stage",
 
 FOODS = [
     ("bread", "Bread", "面包", "item/bread"),
-    ("beef", "Beef", "牛肉", "item/beef"),
+    ("beef", "Raw Beef", "生牛肉", "item/beef"),
+    ("cooked_beef", "Steak", "牛排", "item/cooked_beef"),
+    ("porkchop", "Raw Porkchop", "生猪排", "item/porkchop"),
+    ("cooked_porkchop", "Cooked Porkchop", "熟猪排", "item/cooked_porkchop"),
+    ("mutton", "Raw Mutton", "羊肉", "item/mutton"),
+    ("cooked_mutton", "Cooked Mutton", "熟羊肉", "item/cooked_mutton"),
+    ("chicken", "Raw Chicken", "生鸡肉", "item/chicken"),
+    ("cooked_chicken", "Cooked Chicken", "熟鸡肉", "item/cooked_chicken"),
+    ("rabbit", "Raw Rabbit", "生兔肉", "item/rabbit"),
+    ("cooked_rabbit", "Cooked Rabbit", "熟兔肉", "item/cooked_rabbit"),
+    ("cod", "Raw Cod", "生鳕鱼", "item/cod"),
+    ("cooked_cod", "Cooked Cod", "熟鳕鱼", "item/cooked_cod"),
+    ("salmon", "Raw Salmon", "生鲑鱼", "item/salmon"),
+    ("cooked_salmon", "Cooked Salmon", "熟鲑鱼", "item/cooked_salmon"),
     ("melon", "Watermelon", "西瓜", "item/melon_slice"),
     ("rotten_flesh", "Rotten Flesh", "腐肉", "item/rotten_flesh"),
+    ("baked_potato", "Baked Potato", "烤土豆", "item/baked_potato"),
 ]
 
 ARMOR_PIECES = ["helmet", "chestplate", "leggings", "boots"]
