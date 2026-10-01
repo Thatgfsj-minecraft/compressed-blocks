@@ -47,10 +47,10 @@ public class CompressedPotRenderer implements BlockEntityRenderer<CompressedPotB
                        CameraRenderState camera) {
         int light = state.lightCoords;
         if (state.soil != null && state.cameraAbove) {
-            // 7px 宽、顶面低于盆沿：完全不与盆壁/盆沿共面，避免闪面
+            // 4px 见方，正好填进原版花盆几何的内腔（6..10），顶面低于盆沿
             pose.pushPose();
-            pose.translate(0.5, 0.125, 0.5);
-            pose.scale(0.4375F, 0.34375F, 0.4375F);
+            pose.translate(0.5, 0.0, 0.5);
+            pose.scale(0.25F, 0.25F, 0.25F);
             pose.translate(-0.5, 0.0, -0.5);
             collector.submitBlock(pose, state.soil, light, 0, 0);
             pose.popPose();

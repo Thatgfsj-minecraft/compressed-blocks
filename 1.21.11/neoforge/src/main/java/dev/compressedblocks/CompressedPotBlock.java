@@ -34,8 +34,8 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * 漏斗盆栽：成熟自动收割并优先插入下方容器。
  */
 public class CompressedPotBlock extends Block implements EntityBlock {
-    /** 与 Botany Pots 同款：8px 矮盆。 */
-    private static final VoxelShape SHAPE = Block.box(2, 0, 2, 14, 8, 14);
+    /** 与原版花盆同款：6px 高、6×6 底面。 */
+    private static final VoxelShape SHAPE = Block.box(5, 0, 5, 11, 6, 11);
     /** 可种植物品（压缩种子/树苗/甘蔗物品）的运行时描述。 */
     private record Plantable(BlockState state, int level, String enName, String itemId) {
     }

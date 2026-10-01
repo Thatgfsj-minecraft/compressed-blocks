@@ -302,39 +302,47 @@ def gen_assets(res):
               "textures": {"cross": f"{NS}:block/{name}"}})
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
-    # 压缩盆栽（普通/漏斗）：8px 矮陶盆元素模型，土壤与作物由方块实体渲染器绘制
+    # 压缩盆栽（普通/漏斗）：几何与原版花盆一致（6px 高、1px 薄壁、6×6 底面），
+    # display 挂原版 block/block 的 GUI 等距视角（物品图标 3D 显示），土壤/作物由 BER 绘制
+    pot_display = {
+        "gui": {"rotation": [30, 225, 0], "translation": [0, 0, 0], "scale": [0.625, 0.625, 0.625]},
+        "ground": {"rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.25, 0.25, 0.25]},
+        "fixed": {"rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.5, 0.5, 0.5]},
+        "thirdperson_righthand": {"rotation": [75, 45, 0], "translation": [0, 2.5, 0],
+                                  "scale": [0.375, 0.375, 0.375]},
+        "firstperson_righthand": {"rotation": [0, 45, 0], "translation": [0, 0, 0],
+                                  "scale": [0.4, 0.4, 0.4]},
+        "firstperson_lefthand": {"rotation": [0, 225, 0], "translation": [0, 0, 0],
+                                 "scale": [0.4, 0.4, 0.4]},
+    }
     for name in pot_names():
         hopper = name == "hopper_pot"
         side = f"{NS}:block/{'hopper_pot_side' if hopper else 'pot_side'}"
         model = {
+            "gui_light": "side",
+            "display": pot_display,
             "textures": {"particle": side, "side": side,
                          "top": f"{NS}:block/pot_top", "bottom": f"{NS}:block/pot_bottom"},
             "elements": [
-                {"from": [2, 0, 2], "to": [14, 2, 14],
+                {"from": [5, 0, 5], "to": [6, 6, 11],
                  "faces": {"down": {"texture": "#bottom", "cullface": "down"},
-                           "up": {"texture": "#top"}, "north": {"texture": "#side"},
-                           "south": {"texture": "#side"}, "west": {"texture": "#side"},
-                           "east": {"texture": "#side"}}},
-                {"from": [2, 2, 2], "to": [14, 8, 4],
-                 "faces": {"north": {"texture": "#side", "cullface": "north"},
-                           "south": {"texture": "#side"}, "west": {"texture": "#side"},
-                           "east": {"texture": "#side"}, "up": {"texture": "#top"},
-                           "down": {"texture": "#bottom"}}},
-                {"from": [2, 2, 12], "to": [14, 8, 14],
-                 "faces": {"south": {"texture": "#side", "cullface": "south"},
-                           "north": {"texture": "#side"}, "west": {"texture": "#side"},
-                           "east": {"texture": "#side"}, "up": {"texture": "#top"},
-                           "down": {"texture": "#bottom"}}},
-                {"from": [2, 2, 4], "to": [4, 8, 12],
-                 "faces": {"west": {"texture": "#side", "cullface": "west"},
-                           "east": {"texture": "#side"}, "north": {"texture": "#side"},
-                           "south": {"texture": "#side"}, "up": {"texture": "#top"},
-                           "down": {"texture": "#bottom"}}},
-                {"from": [12, 2, 4], "to": [14, 8, 12],
-                 "faces": {"east": {"texture": "#side", "cullface": "east"},
-                           "west": {"texture": "#side"}, "north": {"texture": "#side"},
-                           "south": {"texture": "#side"}, "up": {"texture": "#top"},
-                           "down": {"texture": "#bottom"}}},
+                           "north": {"texture": "#side", "cullface": "north"},
+                           "south": {"texture": "#side"}, "west": {"texture": "#side", "cullface": "west"},
+                           "east": {"texture": "#side"}, "up": {"texture": "#top"}}},
+                {"from": [10, 0, 5], "to": [11, 6, 11],
+                 "faces": {"down": {"texture": "#bottom", "cullface": "down"},
+                           "north": {"texture": "#side"}, "south": {"texture": "#side", "cullface": "south"},
+                           "west": {"texture": "#side"}, "east": {"texture": "#side", "cullface": "east"},
+                           "up": {"texture": "#top"}}},
+                {"from": [6, 0, 5], "to": [10, 6, 6],
+                 "faces": {"down": {"texture": "#bottom", "cullface": "down"},
+                           "north": {"texture": "#side", "cullface": "north"},
+                           "south": {"texture": "#side"}, "up": {"texture": "#top"}}},
+                {"from": [6, 0, 10], "to": [10, 6, 11],
+                 "faces": {"down": {"texture": "#bottom", "cullface": "down"},
+                           "north": {"texture": "#side"},
+                           "south": {"texture": "#side", "cullface": "south"},
+                           "up": {"texture": "#top"}}},
             ],
         }
         dump(f"{res}/blockstates/{name}.json",
