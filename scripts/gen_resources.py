@@ -302,7 +302,7 @@ def gen_assets(res):
               "textures": {"cross": f"{NS}:block/{name}"}})
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
-    # 压缩盆栽（普通/漏斗）：几何与原版花盆一致（6px 高、1px 薄壁、6×6 底面），
+    # 压缩盆栽（普通/漏斗）：12×12 底面、6px 高、1px 薄壁，
     # display 挂原版 block/block 的 GUI 等距视角（物品图标 3D 显示），土壤/作物由 BER 绘制
     pot_display = {
         "gui": {"rotation": [30, 225, 0], "translation": [0, 0, 0], "scale": [0.625, 0.625, 0.625]},
@@ -324,24 +324,26 @@ def gen_assets(res):
             "textures": {"particle": side, "side": side,
                          "top": f"{NS}:block/pot_top", "bottom": f"{NS}:block/pot_bottom"},
             "elements": [
-                {"from": [5, 0, 5], "to": [6, 6, 11],
+                {"from": [2, 0, 2], "to": [14, 6, 3],
                  "faces": {"down": {"texture": "#bottom", "cullface": "down"},
                            "north": {"texture": "#side", "cullface": "north"},
-                           "south": {"texture": "#side"}, "west": {"texture": "#side", "cullface": "west"},
+                           "south": {"texture": "#side"}, "west": {"texture": "#side"},
                            "east": {"texture": "#side"}, "up": {"texture": "#top"}}},
-                {"from": [10, 0, 5], "to": [11, 6, 11],
+                {"from": [2, 0, 13], "to": [14, 6, 14],
                  "faces": {"down": {"texture": "#bottom", "cullface": "down"},
                            "north": {"texture": "#side"}, "south": {"texture": "#side", "cullface": "south"},
-                           "west": {"texture": "#side"}, "east": {"texture": "#side", "cullface": "east"},
+                           "west": {"texture": "#side"}, "east": {"texture": "#side"},
                            "up": {"texture": "#top"}}},
-                {"from": [6, 0, 5], "to": [10, 6, 6],
+                {"from": [2, 0, 3], "to": [3, 6, 13],
                  "faces": {"down": {"texture": "#bottom", "cullface": "down"},
-                           "north": {"texture": "#side", "cullface": "north"},
-                           "south": {"texture": "#side"}, "up": {"texture": "#top"}}},
-                {"from": [6, 0, 10], "to": [10, 6, 11],
+                           "north": {"texture": "#side"}, "south": {"texture": "#side"},
+                           "west": {"texture": "#side", "cullface": "west"},
+                           "east": {"texture": "#side"}, "up": {"texture": "#top"}}},
+                {"from": [13, 0, 3], "to": [14, 6, 13],
                  "faces": {"down": {"texture": "#bottom", "cullface": "down"},
-                           "north": {"texture": "#side"},
-                           "south": {"texture": "#side", "cullface": "south"},
+                           "north": {"texture": "#side"}, "south": {"texture": "#side"},
+                           "west": {"texture": "#side"},
+                           "east": {"texture": "#side", "cullface": "east"},
                            "up": {"texture": "#top"}}},
             ],
         }
