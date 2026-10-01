@@ -75,9 +75,11 @@ public class CompressedPotRenderer implements BlockEntityRenderer<CompressedPotB
     }
 
     private void submitModel(BlockState st, PoseStack pose, SubmitNodeCollector collector, int light) {
+        // overlay 必须传 NO_OVERLAY：传 0 会采样到 overlay 贴图的受伤红闪行，整个模型混入 30% 纯红
         collector.submitBlockModel(pose,
             net.minecraft.client.renderer.ItemBlockRenderTypes.getRenderType(st),
-            this.dispatcher.getBlockModel(st), 1.0F, 1.0F, 1.0F, light, 0, 0);
+            this.dispatcher.getBlockModel(st), 1.0F, 1.0F, 1.0F, light,
+            net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, 0);
     }
 
     /** 盆栽渲染状态：盆内土壤、作物、生长进度与相机相对高度。 */
