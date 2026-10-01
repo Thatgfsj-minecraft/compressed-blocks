@@ -794,12 +794,12 @@ public final class CompressedBlocks {
         return fullSetAtLeast(player, LEVELS);
     }
 
-    /** 穿戴重数对应的抗性提升等级（0 基）：6 重=1、7 重=2、8 重=3、9 重=5；不足 6 重 = -1（无）。 */
+    /** 穿戴重数对应的抗性提升等级（0 基）：7 重=1、8 重=2、9 重=3；7 重以下 = -1（无效果）。 */
     public static int resistanceAmplifier(int level) {
         if (level >= LEVELS) {
-            return 4;
+            return 2;
         }
-        return level >= 6 ? level - 6 : -1;
+        return level >= 7 ? level - 7 : -1;
     }
 
     /** 穿戴件信息 {部位 0-3, 有效重数}；非本模组护甲 = null（木质盔甲记有效重数 = 重数-1）。 */
@@ -1051,10 +1051,10 @@ public final class CompressedBlocks {
         assertTier(errors, "7x_cobblestone_pickaxe", Blocks.OBSIDIAN, false);
         assertTier(errors, "8x_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
         assertTier(errors, "9x_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
-        // 效果阶梯抽查：6/7/8/9 重 → 抗性 1/2/3/5 级
-        if (resistanceAmplifier(6) != 0 || resistanceAmplifier(7) != 1
-            || resistanceAmplifier(8) != 2 || resistanceAmplifier(9) != 4
-            || resistanceAmplifier(5) != -1) {
+        // 效果阶梯抽查：7/8/9 重 → 护腿抗性 1/2/3 级，6 重及以下无效果
+        if (resistanceAmplifier(7) != 0 || resistanceAmplifier(8) != 1
+            || resistanceAmplifier(9) != 2
+            || resistanceAmplifier(6) != -1 || resistanceAmplifier(5) != -1) {
             errors.add("armor effect ladder wrong");
         }
         selfTestPotFlow(level, errors);

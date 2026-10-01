@@ -70,9 +70,9 @@ public final class CompressedHooks {
 
     /**
      * 护甲每刻结算（服务端玩家 tick 调用）。0.3.1 分部位效果——不再向装备注入任何附魔，
-     * 不干扰原版附魔（海底行者/速冻已删除）：
-     * 头盔 ≥6 重：水下呼吸+夜视；护腿 ≥6 重：抗性 1/2/3/5（按重数）+ 9 重急迫2；
-     * 胸甲 ≥8 重：生存飞行（疾跑=鞘翅速度）；靴子：无。
+     * 不干扰原版附魔；6 重及以下无任何效果（只有不毁）：
+     * 头盔 7 重=夜视、8 重=+水下呼吸；护腿 7/8/9 重=抗性 1/2/3、9 重=+急迫2；
+     * 胸甲 8 重=生存飞行（疾跑=鞘翅速度）；靴子：无。
      * 木质盔甲按有效重数（重数-1）自动降档。不死+饱食度常满：仅九重石甲满套。
      */
     public static void armorTick(ServerPlayer player) {
@@ -84,10 +84,12 @@ public final class CompressedHooks {
             int level = info[1];
             switch (info[0]) {
                 case 0 -> {
-                    if (level >= 6) {
-                        addEffect(player, MobEffects.WATER_BREATHING, 0, DURATION);
+                    if (level >= 7) {
                         // 夜视给 20 秒：原版剩余 <10 秒会闪黑屏，短时长刷新观感极差
                         addEffect(player, MobEffects.NIGHT_VISION, 0, NIGHT_VISION_DURATION);
+                        if (level >= 8) {
+                            addEffect(player, MobEffects.WATER_BREATHING, 0, DURATION);
+                        }
                     }
                 }
                 case 2 -> {
