@@ -122,6 +122,47 @@ CROPS = [
 CROP_STAGE_SPRITE = {"wheat": "wheat_stage", "carrot": "carrots_stage",
                      "potato": "potatoes_stage", "beetroot": "beetroots_stage"}
 
+# 0.3.2 压缩金属包：基色（key 与 gen_resources.COMPAT_METALS 一一对应）
+COMPAT_COLORS = {
+    "tin": (196, 202, 208),
+    "lead": (105, 110, 130),
+    "zinc": (168, 184, 184),
+    "plastic": (228, 228, 232),
+    "silver": (222, 226, 230),
+    "nickel": (158, 158, 162),
+    "bronze": (172, 112, 48),
+    "brass": (198, 162, 62),
+    "electrum": (232, 208, 128),
+    "invar": (192, 198, 192),
+    "constantan": (198, 128, 88),
+    "steel": (128, 134, 140),
+    "manasteel": (88, 188, 168),
+    "uranium": (132, 152, 88),
+    "osmium": (150, 162, 178),
+    "signalum": (224, 96, 36),
+    "enderium": (24, 96, 96),
+    "refined_obsidian": (52, 24, 84),
+    "refined_glowstone": (206, 186, 110),
+    "lumium": (238, 226, 130),
+    "terrasteel": (96, 196, 96),
+    "elementium": (188, 118, 176),
+}
+
+
+def gen_metal_tex(base_rgb, level, seed):
+    """金属压缩块：金属噪点条纹底（不做灰色去色，保留金属色）+ 压缩环。"""
+    rng = random.Random(seed)
+    img = Image.new("RGBA", (SIZE, SIZE))
+    px = img.load()
+    r, g, b = base_rgb
+    for y in range(SIZE):
+        row = 0.90 + rng.random() * 0.20
+        for x in range(SIZE):
+            f = row * (0.94 + rng.random() * 0.12)
+            px[x, y] = (min(255, int(r * f)), min(255, int(g * f)), min(255, int(b * f)), 255)
+    return gen_block_tex(img, level, gray=False)
+
+
 FOODS = [
     ("bread", "Bread", "面包", "item/bread"),
     ("beef", "Raw Beef", "生牛肉", "item/beef"),
@@ -615,11 +656,13 @@ def main():
     block_tex["pot_top"] = pot_top
     block_tex["pot_bottom"] = darken(terra, 0.85)
 
-    # 刷石机（3 压缩等级）：圆石底 + 红石斑点 + 铁色铆钉 + 压缩环
+    # 刷石机（3 压缩等级）：三层结构——上层木头(0..5)、中层原石+红石/铁斑(5..11)、下层铁(11..16)；
+    # 压缩等级 ≥2 上下加黑边
     cobble = load_base("block/cobblestone")
     red = load_base("block/redstone_block")
     red_avg = avg_color(red)
     iron = load_base("block/iron_block")
+    wood = load_base("block/oak_planks")
     for tier in (1, 2, 3):
         img = cobble.copy()
         pxi = img.load()
@@ -629,11 +672,25 @@ def main():
         for x, y in ((1, 1), (14, 1), (1, 14), (14, 14), (7, 1), (8, 14), (1, 7), (14, 8)):
             iron_px = iron.getpixel((x % 16, y % 16))
             pxi[x, y] = (iron_px[0], iron_px[1], iron_px[2], 255)
+        # 上层木头（向下延伸 5px）、下层铁（向上延伸 5px）
+        img.paste(wood.crop((0, 0, 16, 5)), (0, 0))
+        img.paste(iron.crop((0, 0, 16, 5)), (0, 11))
+        if tier >= 2:
+            # 压缩档：上下黑边
+            for x in range(SIZE):
+                pxi[x, 0] = (10, 10, 10, 255)
+                pxi[x, 15] = (10, 10, 10, 255)
         block_tex[f"{['', '2x_', '3x_'][tier - 1]}cobblestone_generator"] = \
-            gen_block_tex(img, tier)
+            gen_block_tex(img, tier, gray=False)
 
-    # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 60 作物阶段 + 468 甘蔗 + 3 盆栽贴图 + 3 刷石机 = 1164
-    assert len(block_tex) == 1164, len(block_tex)
+    # 压缩金属包：金属噪点条纹 + 压缩环，9 级
+    for key, base_rgb in COMPAT_COLORS.items():
+        for _, prefix, _, _ in LEVELS:
+            block_tex[f"{prefix}_{key}_block"] = gen_metal_tex(
+                base_rgb, int(prefix[:-1]), seed=hash(key) & 0xFFFF)
+
+    # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 60 作物阶段 + 468 甘蔗 + 3 盆栽贴图 + 3 刷石机 + 198 金属 = 1362
+    assert len(block_tex) == 1362, len(block_tex)
     print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}, armor layers: {len(armor_layer_tex)}")
     for sub in SUBPROJECTS:
         rel = os.path.relpath(sub, ROOT)

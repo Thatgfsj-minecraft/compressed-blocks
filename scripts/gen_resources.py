@@ -293,6 +293,38 @@ def generator_names():
     return GENERATOR_TIERS
 
 
+# 0.3.2 压缩金属包（科技/魔法 mod 经典材质预置；合成走 #c:*_ingots 通用标签实现跨 mod 适配）
+# (key, en, zh, 挖掘等级: stone|iron|diamond, 发光 0-15)
+COMPAT_METALS = [
+    ("tin", "Tin", "锡", "stone", 0),
+    ("lead", "Lead", "铅", "stone", 0),
+    ("zinc", "Zinc", "锌", "stone", 0),
+    ("plastic", "Plastic", "塑料", "stone", 0),
+    ("silver", "Silver", "银", "iron", 0),
+    ("nickel", "Nickel", "镍", "iron", 0),
+    ("bronze", "Bronze", "青铜", "iron", 0),
+    ("brass", "Brass", "黄铜", "iron", 0),
+    ("electrum", "Electrum", "琥珀金", "iron", 0),
+    ("invar", "Invar", "殷钢", "iron", 0),
+    ("constantan", "Constantan", "康铜", "iron", 0),
+    ("steel", "Steel", "钢", "iron", 0),
+    ("manasteel", "Manasteel", "源质钢", "iron", 0),
+    ("uranium", "Uranium", "铀", "diamond", 0),
+    ("osmium", "Osmium", "锇", "diamond", 0),
+    ("signalum", "Signalum", "信素", "diamond", 0),
+    ("enderium", "Enderium", "末影锭", "diamond", 0),
+    ("refined_obsidian", "Refined Obsidian", "精炼黑曜石", "diamond", 0),
+    ("refined_glowstone", "Refined Glowstone", "精炼萤石", "diamond", 15),
+    ("lumium", "Lumium", "流明", "diamond", 12),
+    ("terrasteel", "Terrasteel", "泰拉钢", "diamond", 0),
+    ("elementium", "Elementium", "元素钢", "diamond", 0),
+]
+
+
+def compat_names():
+    return [f"{p}_{m[0]}_block" for m in COMPAT_METALS for p in LV]
+
+
 # ---------------------------------------------------------------- assets
 
 def gen_assets(res):
@@ -396,6 +428,15 @@ def gen_assets(res):
               "textures": {"layer0": f"{NS}:block/{name}"}})
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
+    # 压缩金属包：cube_all + 压缩环贴图（同储存方块渲染与 3D 物品图标）
+    for name in compat_names():
+        dump(f"{res}/blockstates/{name}.json",
+             {"variants": {"": {"model": f"{NS}:block/{name}"}}})
+        dump(f"{res}/models/block/{name}.json",
+             {"parent": "minecraft:block/cube_all",
+              "textures": {"all": f"{NS}:block/{name}"}})
+        dump(f"{res}/items/{name}.json",
+             {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
     # 耕地：15/16 模板，无物品
     for name in farmland_names():
         p = name.split("_", 1)[0]
@@ -500,8 +541,10 @@ def gen_lang(res):
         en_name, zh_name = generator_lang[name]
         en["block." + NS + "." + name] = en_name
         zh["block." + NS + "." + name] = zh_name
-    en["block." + NS + ".hopper_pot"] = "Compressed Hopper Pot"
-    zh["block." + NS + ".hopper_pot"] = "压缩漏斗盆栽"
+    for key, mat_en, mat_zh, _, _ in COMPAT_METALS:
+        for lv in LEVELS:
+            en[f"block.{NS}.{lv[0]}_{key}_block"] = f"{lv[1]} Compressed {mat_en} Block"
+            zh[f"block.{NS}.{lv[0]}_{key}_block"] = f"{lv[2]}压缩{mat_zh}块"
     crop_en = {c[0]: c[1] for c in CROPS}
     crop_zh = {c[0]: c[2] for c in CROPS}
     for name in crop_block_names():
@@ -723,6 +766,26 @@ def gen_data(data):
             continue
         compress(f"{NS}:{name}", f"{NS}:{generator_names()[i - 1]}")
         unpack(f"{NS}:{name}", f"{NS}:{generator_names()[i - 1]}")
+    # ---- 压缩金属包：9× 对应金属锭 → 压缩块；锭走 #c:*_ingots 通用标签实现跨 mod 适配
+    for key, _, _, _, _ in COMPAT_METALS:
+        for i, p in enumerate(LV):
+            cur = f"{NS}:{p}_{key}_block"
+            if i == 0:
+                shaped(f"{p}_{key}_block", ["PPP", "PPP", "PPP"],
+                       {"P": f"#c:{key}_ingots"}, cur)
+            else:
+                compress(cur, f"{NS}:{LV[i - 1]}_{key}_block")
+                unpack(cur, f"{NS}:{LV[i - 1]}_{key}_block")
+    # 注册进通用 storage_blocks 标签（父标签 + 子标签），供其它 mod 反向识别；
+    # 同时生成空锭标签（replace:false），装有对应金属 mod 时自动合并，配方即刻可用
+    dump(f"{data}/c/tags/item/storage_blocks.json", {"replace": False, "values": [
+        f"#c:storage_blocks/{key}" for key, _, _, _, _ in COMPAT_METALS
+    ] + ["#c:storage_blocks/compressedblocks"]})
+    for key, _, _, _, _ in COMPAT_METALS:
+        dump(f"{data}/c/tags/item/storage_blocks/{key}.json",
+             {"replace": False, "values": [f"{NS}:1x_{key}_block"]})
+        dump(f"{data}/c/tags/item/{key}_ingots.json",
+             {"replace": False, "values": []})
     # ---- 食物：面包=3 压缩小麦（原版 3 麦→面包），牛肉=9 肉，西瓜见上
     shaped("1x_bread", ["WWW"], {"W": f"{NS}:1x_wheat"}, f"{NS}:1x_bread", category="misc")
     for i, p in enumerate(LV[:FOOD_MAX_LEVEL]):
@@ -804,10 +867,15 @@ def gen_data(data):
     # ---- 方块标签（并入原版命名空间）
     # 所有压缩方块统一镐子采掘；挖掘等级：L1-2 石镐、L3-4 铁镐、L5+ 钻镐封顶
     pickaxe = ([f"{NS}:{n}" for n in storage_names()] + [f"{NS}:{n}" for n in pot_names()]
-               + [f"{NS}:{n}" for n in generator_names()])
+               + [f"{NS}:{n}" for n in generator_names()]
+               + [f"{NS}:{n}" for n in compat_names()])
     stone_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) <= 2]
     iron_tool = [f"{NS}:{n}" for n in storage_names() if 3 <= int(n.split("_", 1)[0][:-1]) <= 4]
     diamond_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) >= 5]
+    # 压缩金属包挖掘等级并入同一阶梯
+    for m in COMPAT_METALS:
+        target = {"stone": stone_tool, "iron": iron_tool, "diamond": diamond_tool}[m[3]]
+        target += [f"{NS}:{n}" for n in compat_names() if n.endswith(f"_{m[0]}_block")]
     logs = [f"{NS}:{p}_{w[0]}_log" for w in WOODS for p in LV]
     for tag, values in [("mineable/pickaxe", pickaxe),
                         ("needs_stone_tool", stone_tool), ("needs_iron_tool", iron_tool),
@@ -956,14 +1024,15 @@ def main():
     subs = [os.path.join(ROOT, args.target, loader) for loader in ("fabric", "neoforge")]
 
     blocks = (storage_names() + leaves_names() + sapling_names() + farmland_names()
-              + crop_block_names() + cane_names() + pot_names() + generator_names())
+              + crop_block_names() + cane_names() + pot_names() + generator_names()
+              + compat_names())
     items = (storage_names() + leaves_names() + sapling_names() + crop_block_names() + cane_names()
              + pot_names() + generator_names() + tool_names() + armor_names() + food_names()
-             + crop_produce_names() + stick_names() + extra_seed_names())
+             + crop_produce_names() + stick_names() + extra_seed_names() + compat_names())
     assert len(storage_names()) == 459, len(storage_names())
     assert len(tool_names()) == 90, len(tool_names())
-    assert len(blocks) == 1114, len(blocks)
-    assert len(items) == 1348, len(items)
+    assert len(blocks) == 1312, len(blocks)
+    assert len(items) == 1546, len(items)
     print(f"blocks={len(blocks)} items={len(items)} (tools={len(tool_names())} armor={len(armor_names())} "
           f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())} "
           f"canes={len(cane_names())})")

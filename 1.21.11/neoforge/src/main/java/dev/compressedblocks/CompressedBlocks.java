@@ -314,6 +314,65 @@ public final class CompressedBlocks {
     /** 刷石机（3 压缩等级）与共享方块实体类型（类型由加载器入口构建注入）。 */
     public static BlockEntityType<CobblestoneGeneratorBlockEntity> GENERATOR_TYPE;
 
+    /** 压缩金属包（科技/魔法 mod 经典材质；合成走 #c:*_ingots 通用标签）。(key, 挖掘档 0-2, 发光) */
+    private record CompatMetal(String key, int tier, int light) {
+    }
+
+    private static final List<CompatMetal> COMPAT_METALS = List.of(
+        new CompatMetal("tin", 0, 0),
+        new CompatMetal("lead", 0, 0),
+        new CompatMetal("zinc", 0, 0),
+        new CompatMetal("plastic", 0, 0),
+        new CompatMetal("silver", 1, 0),
+        new CompatMetal("nickel", 1, 0),
+        new CompatMetal("bronze", 1, 0),
+        new CompatMetal("brass", 1, 0),
+        new CompatMetal("electrum", 1, 0),
+        new CompatMetal("invar", 1, 0),
+        new CompatMetal("constantan", 1, 0),
+        new CompatMetal("steel", 1, 0),
+        new CompatMetal("manasteel", 1, 0),
+        new CompatMetal("uranium", 2, 0),
+        new CompatMetal("osmium", 2, 0),
+        new CompatMetal("signalum", 2, 0),
+        new CompatMetal("enderium", 2, 0),
+        new CompatMetal("refined_obsidian", 2, 0),
+        new CompatMetal("refined_glowstone", 2, 15),
+        new CompatMetal("lumium", 2, 12),
+        new CompatMetal("terrasteel", 2, 0),
+        new CompatMetal("elementium", 2, 0)
+    );
+
+    /** 注册压缩金属包：22 材质 × 9 级；挖掘档 stone/iron/diamond；发光金属带光。 */
+    private static void buildCompatMetals() {
+        for (CompatMetal m : COMPAT_METALS) {
+            for (int level = 1; level <= LEVELS; level++) {
+                String name = LEVEL_PREFIX[level - 1] + "_" + m.key() + "_block";
+                BlockBehaviour.Properties props = BlockBehaviour.Properties.of()
+                    .setId(ResourceKey.create(Registries.BLOCK, id(name)))
+                    .mapColor(MapColor.METAL)
+                    .strength(5.0F, STORAGE_BLAST)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL);
+                if (m.light() > 0) {
+                    props = props.lightLevel(state -> m.light());
+                }
+                Block block = new Block(props);
+                BlockItem item = new BlockItem(block,
+                    new Item.Properties()
+                        .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                        .useBlockDescriptionPrefix());
+                BLOCKS.add(new BlockReg(name, block, name));
+                ITEMS.add(new ItemReg(name, item, Tab.BLOCKS, true));
+            }
+        }
+    }
+
+    private static int compatCount() {
+        return COMPAT_METALS.size() * LEVELS;
+    }
+
+
     /** 压缩盆栽（普通/漏斗）与共享方块实体类型。 */
     public static CompressedPotBlock POT;
     public static BlockEntityType<CompressedPotBlockEntity> POT_TYPE;
@@ -654,7 +713,7 @@ public final class CompressedBlocks {
                     .setId(ResourceKey.create(Registries.ITEM, id(name)))
                     .useBlockDescriptionPrefix());
             BLOCKS.add(new BlockReg(name, block, name));
-            ITEMS.add(new ItemReg(name, item, Tab.POTS, true));
+            ITEMS.add(new ItemReg(name, item, Tab.BLOCKS, true));
         }
         // 5d. 刷石机（3 压缩等级）：每秒产出 1 个对应等级原石/压缩原石，压入下方容器
         String[] generatorTiers = {"cobblestone_generator", "2x_cobblestone_generator",
@@ -676,6 +735,7 @@ public final class CompressedBlocks {
             ITEMS.add(new ItemReg(name, item, Tab.BLOCKS, true));
             GENERATOR_BLOCKS.add(block);
         }
+        buildCompatMetals();
         // 5d. 更多压缩种子（原版其余种子 × 3 级）：盆栽通用兼容可直接种植
         String[][] extraSeeds = {
             {"pumpkin_seeds", "Pumpkin Seeds"},
@@ -951,11 +1011,11 @@ public final class CompressedBlocks {
         if (itemCount != expectItems) {
             errors.add("item count " + itemCount + " != " + expectItems);
         }
-        if (BLOCKS.size() != 1114) {
-            errors.add("block registry size " + BLOCKS.size() + " != 1114");
+        if (BLOCKS.size() != 1312) {
+            errors.add("block registry size " + BLOCKS.size() + " != 1312");
         }
-        if (expectItems != 1348) {
-            errors.add("item registry size " + expectItems + " != 1348");
+        if (expectItems != 1546) {
+            errors.add("item registry size " + expectItems + " != 1546");
         }
         // 方块：注册、翻译键、物品映射
         for (BlockReg b : BLOCKS) {
@@ -1116,6 +1176,7 @@ public final class CompressedBlocks {
         }
         selfTestPotFlow(level, errors);
         selfTestGenerator(level, errors);
+        selfTestCompat(errors);
         if (errors.isEmpty()) {
             LOGGER.info("SELF-TEST PASS: blocks={} items={} ({} tools, {} armor, {} food)",
                 BLOCKS.size(), ITEMS.size(), TOOL_REGS.size(), ARMOR_REGS.size(), FOOD_REGS.size());
@@ -1187,6 +1248,37 @@ public final class CompressedBlocks {
         }
         level.setBlock(gpos, Blocks.AIR.defaultBlockState(), 3);
         level.setBlock(gpos.below(), Blocks.AIR.defaultBlockState(), 3);
+    }
+
+
+    /** 压缩金属包抽查：22 材质 × 9 级全部注册且发光档正确。 */
+    private static void selfTestCompat(List<String> errors) {
+        long n = BuiltInRegistries.BLOCK.keySet().stream()
+            .filter(i -> i.getNamespace().equals(MOD_ID))
+            .filter(i -> i.getPath().endsWith("_block"))
+            .filter(i -> {
+                String p = i.getPath();
+                for (String key : new String[] {"tin", "lead", "zinc", "plastic", "silver", "nickel",
+                    "bronze", "brass", "electrum", "invar", "constantan", "steel", "manasteel",
+                    "uranium", "osmium", "signalum", "enderium", "refined_obsidian",
+                    "refined_glowstone", "lumium", "terrasteel", "elementium"}) {
+                    if (p.endsWith("_" + key + "_block")) {
+                        return true;
+                    }
+                }
+                return false;
+            }).count();
+        if (n != COMPAT_METALS.size() * LEVELS) {
+            errors.add("compat metal blocks " + n + " != " + COMPAT_METALS.size() * LEVELS);
+        }
+        Block lumium = blockByName("1x_lumium_block");
+        if (lumium == null || lumium.defaultBlockState().getLightEmission() != 12) {
+            errors.add("lumium light != 12");
+        }
+        Block glow = blockByName("1x_refined_glowstone_block");
+        if (glow == null || glow.defaultBlockState().getLightEmission() != 15) {
+            errors.add("refined glowstone light != 15");
+        }
     }
 
     private static double attackDamage(ItemStack stack) {

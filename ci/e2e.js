@@ -23,6 +23,10 @@ const STORAGE_MATS = ['cobblestone', 'stone', 'cobbled_deepslate', 'deepslate',
 const CANES = ['cane', ...STORAGE_MATS.map((m) => m.replace(/_block$/, '') + '_cane')];
 const POTS = ['pot'];
 const GENERATORS = ['cobblestone_generator', '2x_cobblestone_generator', '3x_cobblestone_generator'];
+const COMPAT = ['tin', 'lead', 'zinc', 'plastic', 'silver', 'nickel', 'bronze', 'brass', 'electrum',
+  'invar', 'constantan', 'steel', 'manasteel', 'uranium', 'osmium', 'signalum', 'enderium',
+  'refined_obsidian', 'refined_glowstone', 'lumium', 'terrasteel', 'elementium'];
+const COMPAT_BLOCKS = COMPAT.flatMap((k) => LEVELS.map((p) => `${p}_${k}_block`));
 const WOODS = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'mangrove', 'cherry', 'pale_oak'];
 const CROPS = ['wheat', 'carrot', 'potato', 'beetroot'];
 const CROP_LEVELS = LEVELS.slice(0, 3);
@@ -63,7 +67,7 @@ const EXTRA_SEED_ITEMS = EXTRA_SEEDS.flatMap((k) => CROP_LEVELS.map((p) => `${p}
 const CROP_ITEMS = ['wheat', 'beetroot'].flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}_seeds`))
   .concat(['carrot', 'potato'].flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}`)));
 const ALL_ITEMS = [...STORAGE_BLOCKS, ...LEAVES, ...SAPLINGS, ...CANE_BLOCKS, ...CROP_ITEMS,
-  ...POTS.flatMap((p) => [p]), ...GENERATORS, ...TOOL_IDS, ...ARMOR_IDS, ...FOOD_IDS, ...PRODUCE,
+  ...POTS.flatMap((p) => [p]), ...GENERATORS, ...COMPAT_BLOCKS, ...TOOL_IDS, ...ARMOR_IDS, ...FOOD_IDS, ...PRODUCE,
   ...STICKS, ...EXTRA_SEED_ITEMS];
 
 let failures = 0;
@@ -75,7 +79,7 @@ function check(name, ok, detail) {
 }
 
 (async () => {
-  if (ALL_ITEMS.length !== 1348) throw new Error(`item list ${ALL_ITEMS.length} != 1349`);
+  if (ALL_ITEMS.length !== 1546) throw new Error(`item list ${ALL_ITEMS.length} != 1349`);
   const rcon = await new Rcon().connect(PORT, '127.0.0.1', 'testpass');
   const cmd = (c) => rcon.command(c);
 
