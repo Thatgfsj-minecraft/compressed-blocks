@@ -645,25 +645,38 @@ def main():
         for _, prefix, _, _ in LEVELS:
             block_tex[f"{prefix}_{key}"] = gen_cane_tex(sprite, int(prefix[:-1]))
 
-    # 盆栽（陶盆）：底/侧/顶 + 漏斗变体金属带；顶面中间 8×8 深色内腔（土壤由方块实体渲染器画）
+    # 盆栽（陶盆）：底/侧/顶。侧面按方块高度分段（贴图行=方块 y：0-1 底板、1-4 腰身、4-6 口沿）；
+    # 顶面 10×10 深色内腔对齐口沿孔位（土壤由方块实体渲染器画）
     terra = load_base("block/terracotta")
-    block_tex["pot_side"] = gen_block_tex(terra, 1)
-    pot_top = block_tex["pot_side"].copy()
+    pot_side = gen_block_tex(terra, 1).copy()
+    pxe = pot_side.load()
+    for y in range(1, 4):
+        for x in range(16):
+            r, g, b, a = pxe[x, y]
+            pxe[x, y] = (int(r * 0.88), int(g * 0.88), int(b * 0.88), a)
+    for y in range(4, 6):
+        for x in range(16):
+            r, g, b, a = pxe[x, y]
+            pxe[x, y] = (min(255, int(r * 1.12)), min(255, int(g * 1.12)),
+                         min(255, int(b * 1.12)), a)
+    block_tex["pot_side"] = pot_side
+    pot_top = gen_block_tex(terra, 1).copy()
     pxt = pot_top.load()
-    for y in range(4, 12):
-        for x in range(4, 12):
+    for y in range(3, 13):
+        for x in range(3, 13):
             pxt[x, y] = (52, 40, 34, 255)
     block_tex["pot_top"] = pot_top
     block_tex["pot_bottom"] = darken(terra, 0.85)
 
-    # 刷石机（3 压缩等级）：三层结构——上层木头(0..5)、中层原石+红石/铁斑(5..11)、下层铁(11..16)；
-    # 压缩等级 ≥2 上下加黑边
+    # 刷石机（3 压缩等级）：整体三层结构——顶面纯木板、底面纯铁；侧面木头(0..5)+
+    # 原石红石斑(5..11)+铁(11..16)；压缩等级 ≥2 上下加黑边
     cobble = load_base("block/cobblestone")
     red = load_base("block/redstone_block")
     red_avg = avg_color(red)
     iron = load_base("block/iron_block")
     wood = load_base("block/oak_planks")
     for tier in (1, 2, 3):
+        prefix = ['', '2x_', '3x_'][tier - 1]
         img = cobble.copy()
         pxi = img.load()
         for x, y in ((2, 3), (3, 2), (12, 4), (13, 3), (4, 12), (3, 13), (11, 13), (12, 12),
@@ -672,7 +685,7 @@ def main():
         for x, y in ((1, 1), (14, 1), (1, 14), (14, 14), (7, 1), (8, 14), (1, 7), (14, 8)):
             iron_px = iron.getpixel((x % 16, y % 16))
             pxi[x, y] = (iron_px[0], iron_px[1], iron_px[2], 255)
-        # 上层木头（向下延伸 5px）、下层铁（向上延伸 5px）
+        # 侧面：上层木头（向下延伸 5px）、下层铁（向上延伸 5px）
         img.paste(wood.crop((0, 0, 16, 5)), (0, 0))
         img.paste(iron.crop((0, 0, 16, 5)), (0, 11))
         if tier >= 2:
@@ -680,8 +693,10 @@ def main():
             for x in range(SIZE):
                 pxi[x, 0] = (10, 10, 10, 255)
                 pxi[x, 15] = (10, 10, 10, 255)
-        block_tex[f"{['', '2x_', '3x_'][tier - 1]}cobblestone_generator"] = \
-            gen_block_tex(img, tier, gray=False)
+        block_tex[f"{prefix}cobblestone_generator"] = gen_block_tex(img, tier, gray=False)
+        # 顶/底面：纯木板 / 纯铁，压缩环自带黑边
+        block_tex[f"{prefix}cobblestone_generator_top"] = gen_block_tex(wood.copy(), tier, gray=False)
+        block_tex[f"{prefix}cobblestone_generator_bottom"] = gen_block_tex(iron.copy(), tier, gray=False)
 
     # 压缩金属包：金属噪点条纹 + 压缩环，9 级
     for key, base_rgb in COMPAT_COLORS.items():
@@ -689,8 +704,9 @@ def main():
             block_tex[f"{prefix}_{key}_block"] = gen_metal_tex(
                 base_rgb, int(prefix[:-1]), seed=hash(key) & 0xFFFF)
 
-    # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 60 作物阶段 + 468 甘蔗 + 3 盆栽贴图 + 3 刷石机 + 198 金属 = 1362
-    assert len(block_tex) == 1362, len(block_tex)
+    # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 60 作物阶段 + 468 甘蔗 + 3 盆栽贴图
+    # + 9 刷石机（侧/顶/底） + 198 金属 = 1368
+    assert len(block_tex) == 1368, len(block_tex)
     print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}, armor layers: {len(armor_layer_tex)}")
     for sub in SUBPROJECTS:
         rel = os.path.relpath(sub, ROOT)
@@ -735,16 +751,23 @@ def main():
 
 
 def recolor_full(img, color):
-    """整图按明度×材料色重着色（盔甲实体层）。"""
+    """整图按明度×材料色重着色（盔甲实体层）：加大明暗对比 + 顶亮底暗斜面光 + 微噪点颗粒。"""
     out = img.copy()
     px = out.load()
-    for y in range(out.height):
+    h = out.height
+    for y in range(h):
         for x in range(out.width):
             r, g, b, a = px[x, y]
             if a == 0:
                 continue
-            lum = (0.299 * r + 0.587 * g + 0.114 * b) / 160.0
-            k = max(0.3, min(1.15, lum))
+            lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+            k = 0.55 + lum * 0.9
+            if y > 0 and px[x, y - 1][3] == 0:
+                k += 0.18  # 上缘露光
+            if y < h - 1 and px[x, y + 1][3] == 0:
+                k -= 0.22  # 下缘落影
+            k += ((x * 7 + y * 13) % 5 - 2) * 0.016  # 确定性噪点：金属/石材颗粒感
+            k = max(0.25, min(1.45, k))
             px[x, y] = (min(255, int(color[0] * k)), min(255, int(color[1] * k)),
                         min(255, int(color[2] * k)), a)
     return out

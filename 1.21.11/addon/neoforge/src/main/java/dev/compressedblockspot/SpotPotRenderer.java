@@ -13,7 +13,7 @@ import net.minecraft.world.level.block.SaplingBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
-/** 压缩盆栽渲染：土壤 10×10×5 填内腔（仅相机高于盆时绘制），作物 0.40→1.00 平滑缩放。 */
+/** 压缩盆栽渲染：土壤 10×10×2 嵌口沿内腔（仅相机高于盆时绘制），作物 0.40→1.00 平滑缩放。 */
 public class SpotPotRenderer implements BlockEntityRenderer<SpotPotBlockEntity, SpotPotRenderer.PotRenderState> {
     private final BlockRenderDispatcher dispatcher;
 
@@ -42,9 +42,10 @@ public class SpotPotRenderer implements BlockEntityRenderer<SpotPotBlockEntity, 
                        CameraRenderState camera) {
         int light = state.lightCoords;
         if (state.soil != null && state.cameraAbove) {
+            // 10px 见方、2px 高，坐在腰身顶（y=4px）、嵌进口沿内腔（3..13），顶面与盆沿齐平不外漏
             pose.pushPose();
-            pose.translate(0.5, 0.0, 0.5);
-            pose.scale(0.625F, 0.3125F, 0.625F);
+            pose.translate(0.5, 0.25, 0.5);
+            pose.scale(0.625F, 0.125F, 0.625F);
             pose.translate(-0.5, 0.0, -0.5);
             submitModel(state.soil, pose, collector, light);
             pose.popPose();

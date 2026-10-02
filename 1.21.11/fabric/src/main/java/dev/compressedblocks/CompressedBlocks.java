@@ -706,6 +706,7 @@ public final class CompressedBlocks {
             .sound(SoundType.STONE)
             .noOcclusion());
         // POT_TYPE 由各加载器入口构建后注入（1.21.11 原版构造器私有，Fabric/NeoForge 各有公开构建路径）
+        // 普通盆栽放压缩工具栏（压缩盆栽创造栏由附属 mod 独有）
         for (String name : new String[] {"pot"}) {
             Block block = POT;
             BlockItem item = new BlockItem(block,
@@ -713,7 +714,7 @@ public final class CompressedBlocks {
                     .setId(ResourceKey.create(Registries.ITEM, id(name)))
                     .useBlockDescriptionPrefix());
             BLOCKS.add(new BlockReg(name, block, name));
-            ITEMS.add(new ItemReg(name, item, Tab.BLOCKS, true));
+            ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
         }
         // 5d. 刷石机（3 压缩等级）：每秒产出 1 个对应等级原石/压缩原石，压入下方容器
         String[] generatorTiers = {"cobblestone_generator", "2x_cobblestone_generator",
@@ -732,7 +733,7 @@ public final class CompressedBlocks {
                     .setId(ResourceKey.create(Registries.ITEM, id(name)))
                     .useBlockDescriptionPrefix());
             BLOCKS.add(new BlockReg(name, block, name));
-            ITEMS.add(new ItemReg(name, item, Tab.BLOCKS, true));
+            ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
             GENERATOR_BLOCKS.add(block);
         }
         buildCompatMetals();
@@ -964,11 +965,8 @@ public final class CompressedBlocks {
         .displayItems((parameters, output) -> acceptItems(output, Tab.FOOD))
         .build();
 
-    public static final CreativeModeTab TAB_POTS = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 3)
-        .title(Component.translatable("itemGroup.compressedblocks.pots"))
-        .icon(() -> icon("pot"))
-        .displayItems((parameters, output) -> acceptItems(output, Tab.POTS))
-        .build();
+    // "压缩盆栽"创造栏由附属 mod compressedblockspot 独有（含压缩甘蔗/树苗的扫描展示），
+    // 主 mod 不再注册 TAB_POTS；Tab.POTS 项仅作归档，附属在场时由附属栏呈现。
 
     // ------------------------------------------------------------------ 自检
 

@@ -84,8 +84,16 @@ public final class CompressedPotsAddon {
             .title(net.minecraft.network.chat.Component.translatable("itemGroup." + MOD_ID + ".pots"))
             .icon(() -> new net.minecraft.world.item.ItemStack(COMPRESSED_POT))
             .displayItems((parameters, output) -> {
-                output.accept(HOPPER_POT);
                 output.accept(COMPRESSED_POT);
+                output.accept(HOPPER_POT);
+                // 本栏仅附属安装时存在：主 mod 的压缩甘蔗/树苗也归这里展示
+                for (Item item : BuiltInRegistries.ITEM) {
+                    net.minecraft.resources.Identifier key = BuiltInRegistries.ITEM.getKey(item);
+                    if (key.getNamespace().equals(MAIN_NS)
+                            && (key.getPath().endsWith("_cane") || key.getPath().endsWith("_sapling"))) {
+                        output.accept(item);
+                    }
+                }
             })
             .build();
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, id("pots"), tab);

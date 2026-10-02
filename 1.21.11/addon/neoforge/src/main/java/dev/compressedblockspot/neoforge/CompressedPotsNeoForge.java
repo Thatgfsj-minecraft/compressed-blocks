@@ -37,10 +37,19 @@ public class CompressedPotsNeoForge {
             event.register(Registries.CREATIVE_MODE_TAB, helper -> {
                 CompressedPotsAddon.TAB = net.minecraft.world.item.CreativeModeTab.builder()
                     .title(net.minecraft.network.chat.Component.translatable("itemGroup.compressedblockspot.pots"))
-                    .icon(() -> new net.minecraft.world.item.ItemStack(CompressedPotsAddon.HOPPER_POT))
+                    .icon(() -> new net.minecraft.world.item.ItemStack(CompressedPotsAddon.COMPRESSED_POT))
                     .displayItems((parameters, output) -> {
-                        output.accept(CompressedPotsAddon.HOPPER_POT);
                         output.accept(CompressedPotsAddon.COMPRESSED_POT);
+                        output.accept(CompressedPotsAddon.HOPPER_POT);
+                        // 本栏仅附属安装时存在：主 mod 的压缩甘蔗/树苗也归这里展示
+                        for (net.minecraft.world.item.Item item : net.minecraft.core.registries.BuiltInRegistries.ITEM) {
+                            net.minecraft.resources.Identifier key =
+                                net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item);
+                            if (key.getNamespace().equals("compressedblocks")
+                                    && (key.getPath().endsWith("_cane") || key.getPath().endsWith("_sapling"))) {
+                                output.accept(item);
+                            }
+                        }
                     })
                     .build();
                 helper.register(CompressedPotsAddon.id("pots"), CompressedPotsAddon.TAB);

@@ -15,7 +15,7 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * 盆栽渲染（Botany Pots 同款参数，1.21.6+ RenderState 管线）：
- * 土壤 = 整块方块压扁（0.75×0.375×0.75）填进盆口内腔，只在相机高于盆时绘制（防侧面穿模）；
+ * 土壤 = 整块方块压扁（0.625×0.125×0.625）嵌在口沿内腔（y=0.25..0.375），只在相机高于盆时绘制（防侧面穿模）；
  * 作物 = 基部沉在盆口下（y=0.375），随生长从 0.40 平滑缩放到 1.00，长成后探出盆口。
  * 进度由客户端本地 tick 推进，每帧读取，无级跳变。
  */
@@ -49,10 +49,10 @@ public class CompressedPotRenderer implements BlockEntityRenderer<CompressedPotB
         // 显式 (1,1,1) 颜色 + 模型直提：绕过 renderSingleBlock 的 null-level 染色解析
         // （该路径会把贴图染成异常红色），贴图保持本色
         if (state.soil != null && state.cameraAbove) {
-            // 10px 见方、5px 高，填进内腔（3..13），顶面低于盆沿避免共面
+            // 10px 见方、2px 高，坐在腰身顶（y=4px）、嵌进口沿内腔（3..13），顶面与盆沿齐平不外漏
             pose.pushPose();
-            pose.translate(0.5, 0.0, 0.5);
-            pose.scale(0.625F, 0.3125F, 0.625F);
+            pose.translate(0.5, 0.25, 0.5);
+            pose.scale(0.625F, 0.125F, 0.625F);
             pose.translate(-0.5, 0.0, -0.5);
             submitModel(state.soil, pose, collector, light);
             pose.popPose();

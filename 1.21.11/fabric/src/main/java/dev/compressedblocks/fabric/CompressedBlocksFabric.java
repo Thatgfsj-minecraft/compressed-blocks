@@ -34,11 +34,10 @@ public class CompressedBlocksFabric implements ModInitializer {
             }
             Registry.register(BuiltInRegistries.ITEM, CompressedBlocks.id(e.name()), e.item());
         }
-        // 创造物品栏：方块/工具/食物/盆栽四个分类栏
+        // 创造物品栏：方块/工具/食物三个分类栏（"压缩盆栽"栏由附属 mod 独有）
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, CompressedBlocks.id("blocks"), CompressedBlocks.TAB_BLOCKS);
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, CompressedBlocks.id("tools"), CompressedBlocks.TAB_TOOLS);
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, CompressedBlocks.id("food"), CompressedBlocks.TAB_FOOD);
-        Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, CompressedBlocks.id("pots"), CompressedBlocks.TAB_POTS);
         Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, CompressedBlocks.id("pot"),
             CompressedBlocks.POT_TYPE = FabricBlockEntityTypeBuilder
                 .create(CompressedPotBlockEntity::new, CompressedBlocks.POT)

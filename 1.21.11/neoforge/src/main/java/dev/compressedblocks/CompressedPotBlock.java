@@ -22,6 +22,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
@@ -32,8 +33,14 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * （压缩植物与自动化漏斗盆栽在附属 mod compressedblockspot 中。）
  */
 public class CompressedPotBlock extends Block implements EntityBlock {
-    /** 12×12 底面、6px 高、1px 薄壁。 */
-    private static final VoxelShape SHAPE = Block.box(2, 0, 2, 14, 6, 14);
+    /** 分层盆：底板 12×12×1 + 实心腰 10×10×3 + 空心口沿 12×12×2（内孔 10×10），与模型 elements 一致。 */
+    private static final VoxelShape SHAPE = Shapes.or(
+        Block.box(2, 0, 2, 14, 1, 14),
+        Block.box(3, 1, 3, 13, 4, 13),
+        Block.box(2, 4, 2, 14, 6, 3),
+        Block.box(2, 4, 13, 14, 6, 14),
+        Block.box(2, 4, 3, 3, 6, 13),
+        Block.box(13, 4, 3, 14, 6, 13));
     /** 可种植物品（原版系种子/树苗/甘蔗）的运行时描述。 */
     private record Plantable(BlockState state, int level, String itemId) {
     }

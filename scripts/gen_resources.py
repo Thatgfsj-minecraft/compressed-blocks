@@ -368,7 +368,8 @@ def gen_assets(res):
               "textures": {"layer0": f"{NS}:block/{name}"}})
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
-    # 压缩盆栽（普通/漏斗）：12×12 底面、6px 高、1px 薄壁，
+    # 压缩盆栽：分层盆——底板 12×12×1 + 实心腰 10×10×3 + 空心口沿 12×12×2（内孔 10×10）。
+    # 所有面按方块坐标取 UV，贴图行与方块高度对齐（口沿亮/腰身暗在贴图行 0..6 分段）。
     # display 挂原版 block/block 的 GUI 等距视角（物品图标 3D 显示），土壤/作物由 BER 绘制
     pot_display = {
         "gui": {"rotation": [30, 225, 0], "translation": [0, 0, 0], "scale": [0.625, 0.625, 0.625]},
@@ -381,51 +382,55 @@ def gen_assets(res):
         "firstperson_lefthand": {"rotation": [0, 225, 0], "translation": [0, 0, 0],
                                  "scale": [0.4, 0.4, 0.4]},
     }
+
+    def pot_element(frm, to, cull_down=False):
+        x0, y0, z0 = frm
+        x1, y1, z1 = to
+        faces = {
+            "north": {"texture": "#side", "uv": [x0, y0, x1, y1]},
+            "south": {"texture": "#side", "uv": [x0, y0, x1, y1]},
+            "west": {"texture": "#side", "uv": [z0, y0, z1, y1]},
+            "east": {"texture": "#side", "uv": [z0, y0, z1, y1]},
+            "up": {"texture": "#top", "uv": [x0, z0, x1, z1]},
+            "down": {"texture": "#bottom", "uv": [x0, z0, x1, z1]},
+        }
+        if cull_down:
+            faces["down"]["cullface"] = "down"
+        return {"from": list(frm), "to": list(to), "faces": faces}
+
+    pot_elements = [
+        pot_element([2, 0, 2], [14, 1, 14], cull_down=True),  # 底板
+        pot_element([3, 1, 3], [13, 4, 13]),                  # 腰身（实心）
+        pot_element([2, 4, 2], [14, 6, 3]),                   # 口沿北
+        pot_element([2, 4, 13], [14, 6, 14]),                 # 口沿南
+        pot_element([2, 4, 3], [3, 6, 13]),                   # 口沿西
+        pot_element([13, 4, 3], [14, 6, 13]),                 # 口沿东
+    ]
     for name in pot_names():
         model = {
             "gui_light": "side",
             "display": pot_display,
             "textures": {"particle": f"{NS}:block/pot_side", "side": f"{NS}:block/pot_side",
                          "top": f"{NS}:block/pot_top", "bottom": f"{NS}:block/pot_bottom"},
-            "elements": [
-                {"from": [2, 0, 2], "to": [14, 6, 3],
-                 "faces": {"down": {"texture": "#bottom", "cullface": "down"},
-                           "north": {"texture": "#side", "cullface": "north"},
-                           "south": {"texture": "#side"}, "west": {"texture": "#side"},
-                           "east": {"texture": "#side"}, "up": {"texture": "#top"}}},
-                {"from": [2, 0, 13], "to": [14, 6, 14],
-                 "faces": {"down": {"texture": "#bottom", "cullface": "down"},
-                           "north": {"texture": "#side"}, "south": {"texture": "#side", "cullface": "south"},
-                           "west": {"texture": "#side"}, "east": {"texture": "#side"},
-                           "up": {"texture": "#top"}}},
-                {"from": [2, 0, 3], "to": [3, 6, 13],
-                 "faces": {"down": {"texture": "#bottom", "cullface": "down"},
-                           "north": {"texture": "#side"}, "south": {"texture": "#side"},
-                           "west": {"texture": "#side", "cullface": "west"},
-                           "east": {"texture": "#side"}, "up": {"texture": "#top"}}},
-                {"from": [13, 0, 3], "to": [14, 6, 13],
-                 "faces": {"down": {"texture": "#bottom", "cullface": "down"},
-                           "north": {"texture": "#side"}, "south": {"texture": "#side"},
-                           "west": {"texture": "#side"},
-                           "east": {"texture": "#side", "cullface": "east"},
-                           "up": {"texture": "#top"}}},
-            ],
+            "elements": pot_elements,
         }
         dump(f"{res}/blockstates/{name}.json",
              {"variants": {"": {"model": f"{NS}:block/{name}"}}})
         dump(f"{res}/models/block/{name}.json", model)
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
-    # 刷石机（3 个压缩等级）：cube_all + 压缩环贴图；物品走 item/generated（贴图同张）
+    # 刷石机（3 个压缩等级）：整体方块——顶面纯木板、底面纯铁、侧面三层；物品继承方块模型（3D 图标）
     for name in generator_names():
         dump(f"{res}/blockstates/{name}.json",
              {"variants": {"": {"model": f"{NS}:block/{name}"}}})
         dump(f"{res}/models/block/{name}.json",
-             {"parent": "minecraft:block/cube_all",
-              "textures": {"all": f"{NS}:block/{name}"}})
+             {"parent": "minecraft:block/cube",
+              "textures": {"up": f"{NS}:block/{name}_top", "down": f"{NS}:block/{name}_bottom",
+                           "north": f"{NS}:block/{name}", "south": f"{NS}:block/{name}",
+                           "west": f"{NS}:block/{name}", "east": f"{NS}:block/{name}",
+                           "particle": f"{NS}:block/{name}"}})
         dump(f"{res}/models/item/{name}.json",
-             {"parent": "minecraft:item/generated",
-              "textures": {"layer0": f"{NS}:block/{name}"}})
+             {"parent": f"{NS}:block/{name}"})
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
     # 压缩金属包：cube_all + 压缩环贴图（同储存方块渲染与 3D 物品图标）
@@ -741,12 +746,10 @@ def gen_data(data):
                 compress(cur, f"{NS}:{LV[i - 1]}_{key}_cane")
                 unpack(cur, f"{NS}:{p}_{mat[0]}", count=1)
     # ---- 压缩盆栽：石头类（原石/石头/花岗岩……）船形合成；只能种原版作物/甘蔗/树木（Java 侧限定）
-    # pot_material：原版石头类 + 全部一重压缩方块（附属 mod compressedblockspot 的压缩盆栽配方沿用）
+    # pot_material：只含一重压缩方块（附属压缩盆栽配方）。原版石头走 pot_stones 合成主 mod 盆栽，
+    # 两个配方不再在原石输入上撞车（否则原石船形会被附属压缩盆栽抢走）
     dump(f"{data}/{NS}/tags/item/pot_material.json", {"replace": False, "values": [
-        f"minecraft:{n}" for n in
-        ("cobblestone", "stone", "granite", "diorite", "andesite", "cobbled_deepslate",
-         "deepslate", "blackstone", "tuff", "calcite", "dripstone_block")
-    ] + [f"{NS}:1x_{m[0]}" for m in storage_materials()]})
+        f"{NS}:1x_{m[0]}" for m in storage_materials()]})
     dump(f"{data}/minecraft/tags/item/pot_stones.json", {"replace": False, "values": [
         "minecraft:cobblestone", "minecraft:stone", "minecraft:granite", "minecraft:diorite",
         "minecraft:andesite", "minecraft:cobbled_deepslate", "minecraft:deepslate",

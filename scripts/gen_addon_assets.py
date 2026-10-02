@@ -37,27 +37,32 @@ def pot_display():
     }
 
 
-POT_ELEMENTS = [
-    {"from": [2, 0, 2], "to": [14, 6, 3],
-     "faces": {"down": {"texture": "#bottom", "cullface": "down"},
-               "north": {"texture": "#side", "cullface": "north"},
-               "south": {"texture": "#side"}, "west": {"texture": "#side"},
-               "east": {"texture": "#side"}, "up": {"texture": "#top"}}},
-    {"from": [2, 0, 13], "to": [14, 6, 14],
-     "faces": {"down": {"texture": "#bottom", "cullface": "down"},
-               "north": {"texture": "#side"}, "south": {"texture": "#side", "cullface": "south"},
-               "west": {"texture": "#side"}, "east": {"texture": "#side"}, "up": {"texture": "#top"}}},
-    {"from": [2, 0, 3], "to": [3, 6, 13],
-     "faces": {"down": {"texture": "#bottom", "cullface": "down"},
-               "north": {"texture": "#side"}, "south": {"texture": "#side"},
-               "west": {"texture": "#side", "cullface": "west"},
-               "east": {"texture": "#side"}, "up": {"texture": "#top"}}},
-    {"from": [13, 0, 3], "to": [14, 6, 13],
-     "faces": {"down": {"texture": "#bottom", "cullface": "down"},
-               "north": {"texture": "#side"}, "south": {"texture": "#side"},
-               "west": {"texture": "#side"},
-               "east": {"texture": "#side", "cullface": "east"}, "up": {"texture": "#top"}}},
-]
+def pot_elements():
+    """分层盆：底板 12×12×1 + 实心腰 10×10×3 + 空心口沿 12×12×2（内孔 10×10）。
+    所有面按方块坐标取 UV，贴图行与方块高度对齐（贴图行 0-4 为漏斗铁底留位）。"""
+    def el(frm, to, cull_down=False):
+        x0, y0, z0 = frm
+        x1, y1, z1 = to
+        faces = {
+            "north": {"texture": "#side", "uv": [x0, y0, x1, y1]},
+            "south": {"texture": "#side", "uv": [x0, y0, x1, y1]},
+            "west": {"texture": "#side", "uv": [z0, y0, z1, y1]},
+            "east": {"texture": "#side", "uv": [z0, y0, z1, y1]},
+            "up": {"texture": "#top", "uv": [x0, z0, x1, z1]},
+            "down": {"texture": "#bottom", "uv": [x0, z0, x1, z1]},
+        }
+        if cull_down:
+            faces["down"]["cullface"] = "down"
+        return {"from": list(frm), "to": list(to), "faces": faces}
+
+    return [
+        el((2, 0, 2), (14, 1, 14), cull_down=True),  # 底板
+        el((3, 1, 3), (13, 4, 13)),                  # 腰身（实心）
+        el((2, 4, 2), (14, 6, 3)),                   # 口沿北
+        el((2, 4, 13), (14, 6, 14)),                 # 口沿南
+        el((2, 4, 3), (3, 6, 13)),                   # 口沿西
+        el((13, 4, 3), (14, 6, 13)),                 # 口沿东
+    ]
 
 POTS = [
     ("compressed_pot", "Pot", "压缩盆栽"),
@@ -93,16 +98,28 @@ def main():
         d_side.save(os.path.join(texdir, "compressed_pot_side.png"))
         d_top.save(os.path.join(texdir, "compressed_pot_top.png"))
         d_bottom.save(os.path.join(texdir, "compressed_pot_bottom.png"))
+        # 漏斗盆栽：底部（贴图行 0-4 = 底板+腰身）铁色、最底 1px 黑线（漏斗特征）；底面整张铁
+        iron = None
+        iron_src = os.path.join(main_tex, "cobblestone_generator_bottom.png")
+        if os.path.exists(iron_src):
+            iron = Image.open(iron_src).convert("RGBA")
         hop = d_side.copy()
         pxh = hop.load()
-        for y in range(13, 16):
-            for x in range(16):
-                pxh[x, y] = (16, 16, 16, 255)
+        if iron is not None:
+            hop.paste(iron.crop((0, 0, 16, 4)), (0, 0))
+        for x in range(16):
+            pxh[x, 0] = (10, 10, 10, 255)
         hop.save(os.path.join(texdir, "compressed_hopper_pot_side.png"))
+        if iron is not None:
+            iron.save(os.path.join(texdir, "compressed_hopper_pot_bottom.png"))
+        else:
+            darken(bottom, 0.7).save(os.path.join(texdir, "compressed_hopper_pot_bottom.png"))
 
         for name, en, zh in POTS:
             hopper = name == "compressed_hopper_pot"
             side_tex = f"{NS}:block/compressed_hopper_pot_side" if hopper else f"{NS}:block/compressed_pot_side"
+            bottom_tex = (f"{NS}:block/compressed_hopper_pot_bottom" if hopper
+                          else f"{NS}:block/compressed_pot_bottom")
             dump(f"{assets}/blockstates/{name}.json",
                  {"variants": {"": {"model": f"{NS}:block/{name}"}}})
             dump(f"{assets}/models/block/{name}.json", {
@@ -110,8 +127,8 @@ def main():
                 "display": pot_display(),
                 "textures": {"particle": side_tex, "side": side_tex,
                              "top": f"{NS}:block/compressed_pot_top",
-                             "bottom": f"{NS}:block/compressed_pot_bottom"},
-                "elements": POT_ELEMENTS,
+                             "bottom": bottom_tex},
+                "elements": pot_elements(),
             })
             dump(f"{assets}/models/item/{name}.json",
                  {"parent": f"{NS}:block/{name}"})
