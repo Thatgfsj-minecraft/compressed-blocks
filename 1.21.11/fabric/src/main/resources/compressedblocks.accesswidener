@@ -1,4 +1,4 @@
-classTweaker v2 named
+accessWidener v2 named
 # 滚动容器取景窗：槽位坐标需随滚动重摆（Slot.x/y 在原版是 final）
 accessible field net/minecraft/world/inventory/Slot x I
 accessible field net/minecraft/world/inventory/Slot y I
