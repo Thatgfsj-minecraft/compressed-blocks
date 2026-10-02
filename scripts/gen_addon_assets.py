@@ -135,11 +135,12 @@ def main():
             "block.compressedblockspot.compressed_hopper_pot": "压缩漏斗盆栽",
         }, indent=2)
 
-        # 配方：压缩盆栽 = 5× 主 mod 盆栽材质系 → 用主 mod 盆栽+任意一重压缩方块？保持独立：
-        # 压缩盆栽 = 主 mod 盆栽 + 压缩泥土（无序）；漏斗盆栽 = 压缩盆栽 + 漏斗
+        # 配方（保持原版设计不变）：压缩盆栽 = 5× 任意一重压缩方块（船形，主 mod pot_material 标签）；
+        # 漏斗盆栽 = 压缩盆栽 + 漏斗（无序）
         dump(f"{data}/recipe/compressed_pot.json", {
-            "type": "minecraft:crafting_shapeless", "category": "building",
-            "ingredients": ["compressedblocks:pot", "compressedblocks:1x_dirt"],
+            "type": "minecraft:crafting_shaped", "category": "building",
+            "pattern": ["A A", "AAA"],
+            "key": {"A": "#compressedblocks:pot_material"},
             "result": {"count": 1, "id": f"{NS}:compressed_pot"},
         })
         dump(f"{data}/recipe/compressed_hopper_pot.json", {

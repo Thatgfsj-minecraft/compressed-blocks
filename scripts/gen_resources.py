@@ -698,6 +698,12 @@ def gen_data(data):
                 compress(cur, f"{NS}:{LV[i - 1]}_{key}_cane")
                 unpack(cur, f"{NS}:{p}_{mat[0]}", count=1)
     # ---- 压缩盆栽：石头类（原石/石头/花岗岩……）船形合成；只能种原版作物/甘蔗/树木（Java 侧限定）
+    # pot_material：原版石头类 + 全部一重压缩方块（附属 mod compressedblockspot 的压缩盆栽配方沿用）
+    dump(f"{data}/{NS}/tags/item/pot_material.json", {"replace": False, "values": [
+        f"minecraft:{n}" for n in
+        ("cobblestone", "stone", "granite", "diorite", "andesite", "cobbled_deepslate",
+         "deepslate", "blackstone", "tuff", "calcite", "dripstone_block")
+    ] + [f"{NS}:1x_{m[0]}" for m in storage_materials()]})
     dump(f"{data}/minecraft/tags/item/pot_stones.json", {"replace": False, "values": [
         "minecraft:cobblestone", "minecraft:stone", "minecraft:granite", "minecraft:diorite",
         "minecraft:andesite", "minecraft:cobbled_deepslate", "minecraft:deepslate",
