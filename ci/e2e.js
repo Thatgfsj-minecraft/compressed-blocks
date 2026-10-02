@@ -68,7 +68,7 @@ const CROP_ITEMS = ['wheat', 'beetroot'].flatMap((c) => CROP_LEVELS.map((p) => `
   .concat(['carrot', 'potato'].flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}`)));
 const ALL_ITEMS = [...STORAGE_BLOCKS, ...LEAVES, ...SAPLINGS, ...CANE_BLOCKS, ...CROP_ITEMS,
   ...POTS.flatMap((p) => [p]), ...GENERATORS, ...COMPAT_BLOCKS, ...TOOL_IDS, ...ARMOR_IDS, ...FOOD_IDS, ...PRODUCE,
-  ...STICKS, ...EXTRA_SEED_ITEMS];
+  ...STICKS, ...EXTRA_SEED_ITEMS, 'compressed_chest', 'compressed_shulker_box'];
 
 let failures = 0;
 function check(name, ok, detail) {
@@ -79,7 +79,7 @@ function check(name, ok, detail) {
 }
 
 (async () => {
-  if (ALL_ITEMS.length !== 1546) throw new Error(`item list ${ALL_ITEMS.length} != 1349`);
+  if (ALL_ITEMS.length !== 1548) throw new Error(`item list ${ALL_ITEMS.length} != 1548`);
   const rcon = await new Rcon().connect(PORT, '127.0.0.1', 'testpass');
   const cmd = (c) => rcon.command(c);
 

@@ -11,6 +11,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -78,6 +79,18 @@ public class CompressedPotBlock extends Block implements EntityBlock {
                                           Player player, InteractionHand hand, BlockHitResult hit) {
         if (!(level.getBlockEntity(pos) instanceof CompressedPotBlockEntity pot)) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
+        }
+        if (stack.getItem() instanceof AxeItem && pot.plant() != null) {
+            // 斧头右键：拔出作物（掉落种子/植物本体），土壤保留
+            if (level.isClientSide()) {
+                return InteractionResult.SUCCESS;
+            }
+            ItemStack seed = pot.takePlant();
+            if (!seed.isEmpty()) {
+                Block.popResource(level, pos, seed);
+                level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.BLOCKS, 1.0F, 0.8F);
+            }
+            return InteractionResult.CONSUME;
         }
         if (pot.grown()) {
             if (level.isClientSide()) {
@@ -167,6 +180,10 @@ public class CompressedPotBlock extends Block implements EntityBlock {
     /** 可种植：只收**原版系**作物/树苗/甘蔗（压缩植物请用附属 mod 的压缩盆栽）。 */
     private static Plantable plantableOf(ItemStack stack) {
         if (stack.getItem() instanceof BlockItem bi) {
+            // 压缩作物/树苗也挂在原版 #crops/#saplings 标签里（供附属盆栽识别），这里按命名空间挡掉
+            if (!"minecraft".equals(BuiltInRegistries.BLOCK.getKey(bi.getBlock()).getNamespace())) {
+                return null;
+            }
             BlockState def = bi.getBlock().defaultBlockState();
             if (def.is(BlockTags.SAPLINGS) || def.is(BlockTags.CROPS)
                 || bi.getBlock() instanceof net.minecraft.world.level.block.SugarCaneBlock) {

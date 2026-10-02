@@ -165,6 +165,11 @@ def main():
             "ingredients": [f"{NS}:compressed_pot", "minecraft:hopper"],
             "result": {"count": 1, "id": f"{NS}:compressed_hopper_pot"},
         })
+        # 盆栽可用镐/斧采掘（并入原版挖掘标签）
+        pot_blocks = [f"{NS}:{name}" for name, _, _ in POTS]
+        for tag in ("mineable/pickaxe", "mineable/axe"):
+            dump(f"{data}/minecraft/tags/block/{tag}.json",
+                 {"replace": False, "values": pot_blocks})
         print(f"addon resources -> {sub}")
 
 

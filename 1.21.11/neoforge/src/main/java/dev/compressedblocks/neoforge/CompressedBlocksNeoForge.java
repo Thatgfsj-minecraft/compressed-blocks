@@ -62,7 +62,22 @@ public class CompressedBlocksNeoForge {
                     CompressedBlocks.POT);
                 CompressedBlocks.GENERATOR_TYPE = new BlockEntityType<>(CobblestoneGeneratorBlockEntity::new,
                     CompressedBlocks.GENERATOR_BLOCKS.toArray(new Block[0]));
+                CompressedBlocks.CHEST_TYPE = new BlockEntityType<dev.compressedblocks.ScrollingContainerBlockEntity>(
+                    (pos, state) -> new dev.compressedblocks.ScrollingContainerBlockEntity(
+                        CompressedBlocks.CHEST_TYPE, pos, state, false),
+                    CompressedBlocks.COMPRESSED_CHEST);
+                CompressedBlocks.SHULKER_TYPE = new BlockEntityType<dev.compressedblocks.ScrollingContainerBlockEntity>(
+                    (pos, state) -> new dev.compressedblocks.ScrollingContainerBlockEntity(
+                        CompressedBlocks.SHULKER_TYPE, pos, state, true),
+                    CompressedBlocks.COMPRESSED_SHULKER);
                 helper.register(CompressedBlocks.id("pot"), CompressedBlocks.POT_TYPE);
+                helper.register(CompressedBlocks.id("compressed_chest"), CompressedBlocks.CHEST_TYPE);
+                helper.register(CompressedBlocks.id("compressed_shulker_box"), CompressedBlocks.SHULKER_TYPE);
+            });
+        } else if (event.getRegistryKey() == Registries.MENU) {
+            event.register(Registries.MENU, helper -> {
+                helper.register(CompressedBlocks.id("compressed_chest"), CompressedBlocks.CHEST_MENU_TYPE);
+                helper.register(CompressedBlocks.id("compressed_shulker_box"), CompressedBlocks.SHULKER_MENU_TYPE);
             });
         } else if (event.getRegistryKey() == Registries.CREATIVE_MODE_TAB) {
             // "压缩盆栽"栏由附属 mod 独有

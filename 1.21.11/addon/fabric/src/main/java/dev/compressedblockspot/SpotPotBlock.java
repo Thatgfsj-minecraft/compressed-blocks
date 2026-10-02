@@ -9,6 +9,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
@@ -104,6 +105,17 @@ public class SpotPotBlock extends Block implements EntityBlock {
                                           Player player, InteractionHand hand, BlockHitResult hit) {
         if (!(level.getBlockEntity(pos) instanceof SpotPotBlockEntity pot)) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
+        }
+        if (stack.getItem() instanceof AxeItem && pot.plant() != null) {
+            // 斧头右键：拔出作物（掉落种子/植物本体），土壤保留
+            if (level.isClientSide()) {
+                return InteractionResult.SUCCESS;
+            }
+            ItemStack seed = pot.takePlant();
+            if (!seed.isEmpty()) {
+                Block.popResource(level, pos, seed);
+            }
+            return InteractionResult.CONSUME;
         }
         if (pot.grown()) {
             if (level.isClientSide()) {

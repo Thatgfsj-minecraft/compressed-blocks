@@ -17,6 +17,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.level.redstone.Orientation;
 
 /**
  * 刷石机（3 个压缩等级）：每秒产出 1 个对应等级的原石/压缩原石，压入下方容器；
@@ -42,6 +43,15 @@ public class CobblestoneGeneratorBlock extends Block implements EntityBlock {
     @Override
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
         return SHAPE;
+    }
+
+    /** 邻居方块更新：重扫输出方向（下/上/北/南/西/东优先级，与放置顺序无关）。 */
+    @Override
+    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock,
+                                   Orientation orientation, boolean movedByPiston) {
+        if (level.getBlockEntity(pos) instanceof CobblestoneGeneratorBlockEntity be) {
+            be.rescanOutput();
+        }
     }
 
     /** 右键直接打开下方容器；潜行右键保留给放置/拆除类操作，无容器时放行原版行为。 */

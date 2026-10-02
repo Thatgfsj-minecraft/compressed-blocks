@@ -1310,6 +1310,8 @@
   "block.compressedblocks.9x_uranium_block":"Nonuple Compressed Compressed Uranium Block",
   "block.compressedblocks.9x_zinc_block":"Nonuple Compressed Compressed Zinc Block",
   "block.compressedblocks.cobblestone_generator":"Cobblestone Generator",
+  "block.compressedblocks.compressed_chest":"Compressed Chest",
+  "block.compressedblocks.compressed_shulker_box":"Compressed Shulker Box",
   "block.compressedblocks.pot":"Pot",
   "item.compressedblocks.1x_baked_potato":"Compressed Baked Potato",
   "item.compressedblocks.1x_beef":"Compressed Raw Beef",

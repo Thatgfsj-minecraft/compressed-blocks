@@ -704,9 +704,92 @@ def main():
             block_tex[f"{prefix}_{key}_block"] = gen_metal_tex(
                 base_rgb, int(prefix[:-1]), seed=hash(key) & 0xFFFF)
 
+    # 压缩箱子：橡木板底 + 深色框 + 铁锁扣（正面）；压缩潜影盒：暗紫 + 盖缝（单一等级）
+    def framed_panel(base):
+        img = base.copy()
+        px = img.load()
+        for i in range(SIZE):
+            px[i, 0] = (72, 48, 24, 255)
+            px[i, 15] = (58, 38, 18, 255)
+            px[0, i] = (66, 43, 21, 255)
+            px[15, i] = (66, 43, 21, 255)
+        return img
+
+    plank_panel = framed_panel(load_base("block/oak_planks"))
+    chest_front = plank_panel.copy()
+    pxc = chest_front.load()
+    for y in range(4, 8):
+        for x in range(7, 9):
+            pxc[x, y] = (208, 208, 208, 255)  # 铁锁扣
+    block_tex["compressed_chest_front"] = gen_block_tex(chest_front, 1, gray=False)
+    block_tex["compressed_chest_side"] = gen_block_tex(plank_panel.copy(), 1, gray=False)
+    block_tex["compressed_chest_top"] = gen_block_tex(plank_panel.copy(), 1, gray=False)
+    block_tex["compressed_chest_bottom"] = gen_block_tex(darken(plank_panel.copy(), 0.85), 1, gray=False)
+
+    def purple_panel(seam):
+        img = Image.new("RGBA", (SIZE, SIZE), (88, 54, 122, 255))
+        px = img.load()
+        for y in range(SIZE):
+            for x in range(SIZE):
+                if (x * 7 + y * 5) % 11 == 0:
+                    px[x, y] = (80, 48, 112, 255)  # 微噪点
+        pxs = img.load()
+        for x in range(SIZE):
+            for y in seam:
+                pxs[x, y] = (52, 30, 76, 255)
+        return img
+
+    block_tex["compressed_shulker_box_side"] = gen_block_tex(
+        purple_panel((4, 13, 14, 15)), 1, gray=False)
+    top = purple_panel(())
+    pxt2 = top.load()
+    for y in range(6, 10):
+        for x in range(6, 10):
+            pxt2[x, y] = (116, 78, 152, 255)  # 顶面把手
+    block_tex["compressed_shulker_box_top"] = gen_block_tex(top, 1, gray=False)
+    block_tex["compressed_shulker_box_bottom"] = gen_block_tex(
+        darken(purple_panel(()).copy(), 0.8), 1, gray=False)
+
+    # 滚动容器 GUI：194×222 面板（6 行窗口 + 背包区 + 右侧滚动条轨道）
+    gui = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+    gpx = gui.load()
+    for y in range(222):
+        for x in range(194):
+            gpx[x, y] = (198, 198, 198, 255)
+    for i in range(194):
+        gpx[i, 0] = (0, 0, 0, 255)
+        gpx[i, 221] = (0, 0, 0, 255)
+    for i in range(222):
+        gpx[0, i] = (0, 0, 0, 255)
+        gpx[193, i] = (0, 0, 0, 255)
+    for r in range(6):
+        for c in range(9):
+            sx, sy = 8 + c * 18 - 1, 17 + r * 18 - 1
+            for i in range(18):
+                gpx[sx + i, sy] = (85, 85, 85, 255)
+                gpx[sx + i, sy + 17] = (255, 255, 255, 255)
+                gpx[sx, sy + i] = (85, 85, 85, 255)
+                gpx[sx + 17, sy + i] = (255, 255, 255, 255)
+    for r in range(3):
+        for c in range(9):
+            sx, sy = 8 + c * 18 - 1, 139 + r * 18 - 1
+            for i in range(18):
+                gpx[sx + i, sy] = (85, 85, 85, 255)
+                gpx[sx + i, sy + 17] = (255, 255, 255, 255)
+                gpx[sx, sy + i] = (85, 85, 85, 255)
+                gpx[sx + 17, sy + i] = (255, 255, 255, 255)
+    for c in range(9):
+        sx, sy = 8 + c * 18 - 1, 197 - 1
+        for i in range(18):
+            gpx[sx + i, sy] = (85, 85, 85, 255)
+            gpx[sx + i, sy + 17] = (255, 255, 255, 255)
+            gpx[sx, sy + i] = (85, 85, 85, 255)
+            gpx[sx + 17, sy + i] = (255, 255, 255, 255)
+    gui_tex = {"compressed_container": gui}
+
     # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 60 作物阶段 + 468 甘蔗 + 3 盆栽贴图
-    # + 9 刷石机（侧/顶/底） + 198 金属 = 1368
-    assert len(block_tex) == 1368, len(block_tex)
+    # + 9 刷石机（侧/顶/底） + 198 金属 + 4 箱子 + 3 潜影盒 = 1375
+    assert len(block_tex) == 1375, len(block_tex)
     print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}, armor layers: {len(armor_layer_tex)}")
     for sub in SUBPROJECTS:
         rel = os.path.relpath(sub, ROOT)
@@ -720,6 +803,10 @@ def main():
             img.save(p)
         for name, img in item_tex.items():
             p = os.path.join(tdir, "item", name + ".png")
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            img.save(p)
+        for name, img in gui_tex.items():
+            p = os.path.join(tdir, "gui", name + ".png")
             os.makedirs(os.path.dirname(p), exist_ok=True)
             img.save(p)
         for name, img in armor_layer_tex.items():

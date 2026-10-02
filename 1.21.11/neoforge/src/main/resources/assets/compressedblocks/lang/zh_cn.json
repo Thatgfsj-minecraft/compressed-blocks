@@ -1310,6 +1310,8 @@
   "block.compressedblocks.9x_uranium_block":"九重压缩压缩铀块",
   "block.compressedblocks.9x_zinc_block":"九重压缩压缩锌块",
   "block.compressedblocks.cobblestone_generator":"刷石机",
+  "block.compressedblocks.compressed_chest":"压缩箱子",
+  "block.compressedblocks.compressed_shulker_box":"压缩潜影盒",
   "block.compressedblocks.pot":"盆栽",
   "item.compressedblocks.1x_baked_potato":"压缩烤土豆",
   "item.compressedblocks.1x_beef":"压缩生牛肉",

@@ -4,6 +4,7 @@ import dev.compressedblocks.CompressedBlocks;
 import dev.compressedblocks.CompressedHooks;
 import dev.compressedblocks.CobblestoneGeneratorBlockEntity;
 import dev.compressedblocks.CompressedPotBlockEntity;
+import dev.compressedblocks.ScrollingContainerBlockEntity;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -48,6 +49,23 @@ public class CompressedBlocksFabric implements ModInitializer {
                 .create(CobblestoneGeneratorBlockEntity::new,
                     CompressedBlocks.GENERATOR_BLOCKS.toArray(new Block[0]))
                 .build());
+        // 压缩箱子/压缩潜影盒：方块实体类型 + 滚动容器菜单类型
+        Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, CompressedBlocks.id("compressed_chest"),
+            CompressedBlocks.CHEST_TYPE = FabricBlockEntityTypeBuilder
+                .<ScrollingContainerBlockEntity>create(
+                    (pos, state) -> new dev.compressedblocks.ScrollingContainerBlockEntity(
+                        CompressedBlocks.CHEST_TYPE, pos, state, false), CompressedBlocks.COMPRESSED_CHEST)
+                .build());
+        Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, CompressedBlocks.id("compressed_shulker_box"),
+            CompressedBlocks.SHULKER_TYPE = FabricBlockEntityTypeBuilder
+                .<ScrollingContainerBlockEntity>create(
+                    (pos, state) -> new dev.compressedblocks.ScrollingContainerBlockEntity(
+                        CompressedBlocks.SHULKER_TYPE, pos, state, true), CompressedBlocks.COMPRESSED_SHULKER)
+                .build());
+        Registry.register(BuiltInRegistries.MENU, CompressedBlocks.id("compressed_chest"),
+            CompressedBlocks.CHEST_MENU_TYPE);
+        Registry.register(BuiltInRegistries.MENU, CompressedBlocks.id("compressed_shulker_box"),
+            CompressedBlocks.SHULKER_MENU_TYPE);
         ServerLifecycleEvents.SERVER_STARTED.register(server -> CompressedBlocks.selfTest(server.overworld()));
         // 护甲结算：抗性提升 + 九重饱食度常满
         ServerTickEvents.END_SERVER_TICK.register(server -> {

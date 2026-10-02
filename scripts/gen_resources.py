@@ -433,6 +433,36 @@ def gen_assets(res):
              {"parent": f"{NS}:block/{name}"})
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
+    # 压缩箱子（带朝向，正面锁扣）：顶/底/正面/侧面；压缩潜影盒（整体方块）top/bottom/side。
+    # 物品继承方块模型（3D 图标）
+    storage_models = {
+        "compressed_chest": ("minecraft:block/cube",
+                             {"up": f"{NS}:block/compressed_chest_top",
+                              "down": f"{NS}:block/compressed_chest_bottom",
+                              "north": f"{NS}:block/compressed_chest_front",
+                              "south": f"{NS}:block/compressed_chest_side",
+                              "west": f"{NS}:block/compressed_chest_side",
+                              "east": f"{NS}:block/compressed_chest_side",
+                              "particle": f"{NS}:block/compressed_chest_side"}),
+        "compressed_shulker_box": ("minecraft:block/cube_bottom_top",
+                                   {"top": f"{NS}:block/compressed_shulker_box_top",
+                                    "bottom": f"{NS}:block/compressed_shulker_box_bottom",
+                                    "side": f"{NS}:block/compressed_shulker_box_side"}),
+    }
+    for name, (parent, tex) in storage_models.items():
+        dump(f"{res}/models/block/{name}.json", {"parent": parent, "textures": tex})
+        if name == "compressed_chest":
+            dump(f"{res}/blockstates/{name}.json",
+                 {"variants": {"facing=north": {"model": f"{NS}:block/{name}"},
+                               "facing=east": {"model": f"{NS}:block/{name}", "y": 90},
+                               "facing=south": {"model": f"{NS}:block/{name}", "y": 180},
+                               "facing=west": {"model": f"{NS}:block/{name}", "y": 270}}})
+        else:
+            dump(f"{res}/blockstates/{name}.json",
+                 {"variants": {"": {"model": f"{NS}:block/{name}"}}})
+        dump(f"{res}/models/item/{name}.json", {"parent": f"{NS}:block/{name}"})
+        dump(f"{res}/items/{name}.json",
+             {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
     # 压缩金属包：cube_all + 压缩环贴图（同储存方块渲染与 3D 物品图标）
     for name in compat_names():
         dump(f"{res}/blockstates/{name}.json",
@@ -546,6 +576,10 @@ def gen_lang(res):
         en_name, zh_name = generator_lang[name]
         en["block." + NS + "." + name] = en_name
         zh["block." + NS + "." + name] = zh_name
+    en["block." + NS + ".compressed_chest"] = "Compressed Chest"
+    zh["block." + NS + ".compressed_chest"] = "压缩箱子"
+    en["block." + NS + ".compressed_shulker_box"] = "Compressed Shulker Box"
+    zh["block." + NS + ".compressed_shulker_box"] = "压缩潜影盒"
     for key, mat_en, mat_zh, _, _ in COMPAT_METALS:
         for lv in LEVELS:
             en[f"block.{NS}.{lv[0]}_{key}_block"] = f"{lv[1]} Compressed {mat_en} Block"
@@ -769,6 +803,11 @@ def gen_data(data):
             continue
         compress(f"{NS}:{name}", f"{NS}:{generator_names()[i - 1]}")
         unpack(f"{NS}:{name}", f"{NS}:{generator_names()[i - 1]}")
+    # ---- 压缩箱子/压缩潜影盒：9→1 压缩（刻意不做 1→9 解包：带内容解包会丢数据）
+    shaped("compressed_chest", ["AAA", "AAA", "AAA"], {"A": "minecraft:chest"},
+           f"{NS}:compressed_chest")
+    shaped("compressed_shulker_box", ["AAA", "AAA", "AAA"], {"A": "minecraft:shulker_box"},
+           f"{NS}:compressed_shulker_box")
     # ---- 压缩金属包：9× 对应金属锭 → 压缩块；锭走 #c:*_ingots 通用标签实现跨 mod 适配
     for key, _, _, _, _ in COMPAT_METALS:
         for i, p in enumerate(LV):
@@ -867,11 +906,23 @@ def gen_data(data):
     # 刷石机：掉落自身
     for name in generator_names():
         dump(f"{data}/{NS}/loot_table/blocks/{name}.json", self_drop(name))
+    # 压缩箱子：掉落自身（内容洒出由 BE preRemoveSideEffects 处理）
+    dump(f"{data}/{NS}/loot_table/blocks/compressed_chest.json", self_drop("compressed_chest"))
+    # 压缩潜影盒：掉落自身 + 内容随物品保留（copy_components，同原版潜影盒）
+    dump(f"{data}/{NS}/loot_table/blocks/compressed_shulker_box.json", {
+        "type": "minecraft:block", "random_sequence": f"{NS}:blocks/compressed_shulker_box",
+        "pools": [{"rolls": 1.0, "bonus_rolls": 0.0,
+                   "conditions": [{"condition": "minecraft:survives_explosion"}],
+                   "entries": [{"type": "minecraft:item", "name": f"{NS}:compressed_shulker_box",
+                                "functions": [{"function": "minecraft:copy_components",
+                                               "source": "block_entity",
+                                               "components": ["minecraft:container"]}]}]}]})
     # ---- 方块标签（并入原版命名空间）
     # 所有压缩方块统一镐子采掘；挖掘等级：L1-2 石镐、L3-4 铁镐、L5+ 钻镐封顶
     pickaxe = ([f"{NS}:{n}" for n in storage_names()] + [f"{NS}:{n}" for n in pot_names()]
                + [f"{NS}:{n}" for n in generator_names()]
-               + [f"{NS}:{n}" for n in compat_names()])
+               + [f"{NS}:{n}" for n in compat_names()]
+               + [f"{NS}:compressed_shulker_box"])
     stone_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) <= 2]
     iron_tool = [f"{NS}:{n}" for n in storage_names() if 3 <= int(n.split("_", 1)[0][:-1]) <= 4]
     diamond_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) >= 5]
@@ -881,6 +932,7 @@ def gen_data(data):
         target += [f"{NS}:{n}" for n in compat_names() if n.endswith(f"_{m[0]}_block")]
     logs = [f"{NS}:{p}_{w[0]}_log" for w in WOODS for p in LV]
     for tag, values in [("mineable/pickaxe", pickaxe),
+                        ("mineable/axe", [f"{NS}:{n}" for n in pot_names()] + [f"{NS}:compressed_chest"]),
                         ("needs_stone_tool", stone_tool), ("needs_iron_tool", iron_tool),
                         ("needs_diamond_tool", diamond_tool),
                         ("logs", logs), ("logs_that_burn", logs),
@@ -1028,14 +1080,15 @@ def main():
 
     blocks = (storage_names() + leaves_names() + sapling_names() + farmland_names()
               + crop_block_names() + cane_names() + pot_names() + generator_names()
-              + compat_names())
+              + compat_names() + ["compressed_chest", "compressed_shulker_box"])
     items = (storage_names() + leaves_names() + sapling_names() + crop_block_names() + cane_names()
              + pot_names() + generator_names() + tool_names() + armor_names() + food_names()
-             + crop_produce_names() + stick_names() + extra_seed_names() + compat_names())
+             + crop_produce_names() + stick_names() + extra_seed_names() + compat_names()
+             + ["compressed_chest", "compressed_shulker_box"])
     assert len(storage_names()) == 459, len(storage_names())
     assert len(tool_names()) == 90, len(tool_names())
-    assert len(blocks) == 1312, len(blocks)
-    assert len(items) == 1546, len(items)
+    assert len(blocks) == 1314, len(blocks)
+    assert len(items) == 1548, len(items)
     print(f"blocks={len(blocks)} items={len(items)} (tools={len(tool_names())} armor={len(armor_names())} "
           f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())} "
           f"canes={len(cane_names())})")

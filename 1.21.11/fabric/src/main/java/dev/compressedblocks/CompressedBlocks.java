@@ -21,7 +21,9 @@ import net.minecraft.util.Unit;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.food.FoodProperties;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
@@ -38,6 +40,8 @@ import net.minecraft.world.item.equipment.ArmorType;
 import net.minecraft.world.item.equipment.EquipmentAssets;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -313,6 +317,22 @@ public final class CompressedBlocks {
 
     /** 刷石机（3 压缩等级）与共享方块实体类型（类型由加载器入口构建注入）。 */
     public static BlockEntityType<CobblestoneGeneratorBlockEntity> GENERATOR_TYPE;
+
+    // 压缩箱子/压缩潜影盒（单一等级，243 格滚动存储）
+    public static CompressedChestBlock COMPRESSED_CHEST;
+    public static CompressedShulkerBlock COMPRESSED_SHULKER;
+    /** 方块实体类型由加载器入口构建注入。 */
+    public static BlockEntityType<ScrollingContainerBlockEntity> CHEST_TYPE;
+    public static BlockEntityType<ScrollingContainerBlockEntity> SHULKER_TYPE;
+    /** 菜单类型（原版公开构造；客户端工厂用哑容器，槽位按索引同步内容）。 */
+    public static final MenuType<ScrollingContainerMenu> CHEST_MENU_TYPE = new MenuType<>(
+        (id, inv) -> new ScrollingContainerMenu(
+            CompressedBlocks.CHEST_MENU_TYPE, id, inv, new SimpleContainer(ScrollingContainerMenu.SIZE)),
+        FeatureFlags.VANILLA_SET);
+    public static final MenuType<ScrollingContainerMenu> SHULKER_MENU_TYPE = new MenuType<>(
+        (id, inv) -> new ScrollingContainerMenu(
+            CompressedBlocks.SHULKER_MENU_TYPE, id, inv, new SimpleContainer(ScrollingContainerMenu.SIZE)),
+        FeatureFlags.VANILLA_SET);
 
     /** 压缩金属包（科技/魔法 mod 经典材质；合成走 #c:*_ingots 通用标签）。(key, 挖掘档 0-2, 发光) */
     private record CompatMetal(String key, int tier, int light) {
@@ -727,7 +747,8 @@ public final class CompressedBlocks {
                     .mapColor(MapColor.COLOR_GRAY)
                     .strength(3.5F, STORAGE_BLAST)
                     .requiresCorrectToolForDrops()
-                    .sound(SoundType.STONE));
+                    .sound(SoundType.STONE)
+                    .noOcclusion());
             BlockItem item = new BlockItem(block,
                 new Item.Properties()
                     .setId(ResourceKey.create(Registries.ITEM, id(name)))
@@ -736,6 +757,30 @@ public final class CompressedBlocks {
             ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
             GENERATOR_BLOCKS.add(block);
         }
+        // 5e. 压缩箱子/压缩潜影盒（单一等级）：243 格滚动存储，压缩工具栏；
+        // 箱子破坏洒出内容，潜影盒破坏内容随物品保留；不能拼大箱子（右键各开各的菜单）
+        COMPRESSED_CHEST = new CompressedChestBlock(BlockBehaviour.Properties.of()
+            .setId(ResourceKey.create(Registries.BLOCK, id("compressed_chest")))
+            .mapColor(MapColor.WOOD)
+            .strength(2.5F, STORAGE_BLAST)
+            .sound(SoundType.WOOD)
+            .noOcclusion());
+        BlockItem chestItem = new BlockItem(COMPRESSED_CHEST, new Item.Properties()
+            .setId(ResourceKey.create(Registries.ITEM, id("compressed_chest")))
+            .useBlockDescriptionPrefix());
+        BLOCKS.add(new BlockReg("compressed_chest", COMPRESSED_CHEST, "compressed_chest"));
+        ITEMS.add(new ItemReg("compressed_chest", chestItem, Tab.TOOLS, true));
+        COMPRESSED_SHULKER = new CompressedShulkerBlock(BlockBehaviour.Properties.of()
+            .setId(ResourceKey.create(Registries.BLOCK, id("compressed_shulker_box")))
+            .mapColor(MapColor.COLOR_PURPLE)
+            .strength(2.5F, STORAGE_BLAST)
+            .sound(SoundType.STONE)
+            .noOcclusion());
+        BlockItem shulkerItem = new BlockItem(COMPRESSED_SHULKER, new Item.Properties()
+            .setId(ResourceKey.create(Registries.ITEM, id("compressed_shulker_box")))
+            .useBlockDescriptionPrefix());
+        BLOCKS.add(new BlockReg("compressed_shulker_box", COMPRESSED_SHULKER, "compressed_shulker_box"));
+        ITEMS.add(new ItemReg("compressed_shulker_box", shulkerItem, Tab.TOOLS, true));
         buildCompatMetals();
         // 5d. 更多压缩种子（原版其余种子 × 3 级）：盆栽通用兼容可直接种植
         String[][] extraSeeds = {
@@ -1009,11 +1054,11 @@ public final class CompressedBlocks {
         if (itemCount != expectItems) {
             errors.add("item count " + itemCount + " != " + expectItems);
         }
-        if (BLOCKS.size() != 1312) {
-            errors.add("block registry size " + BLOCKS.size() + " != 1312");
+        if (BLOCKS.size() != 1314) {
+            errors.add("block registry size " + BLOCKS.size() + " != 1314");
         }
-        if (expectItems != 1546) {
-            errors.add("item registry size " + expectItems + " != 1546");
+        if (expectItems != 1548) {
+            errors.add("item registry size " + expectItems + " != 1548");
         }
         // 方块：注册、翻译键、物品映射
         for (BlockReg b : BLOCKS) {
@@ -1174,6 +1219,7 @@ public final class CompressedBlocks {
         }
         selfTestPotFlow(level, errors);
         selfTestGenerator(level, errors);
+        selfTestStorage(level, errors);
         selfTestCompat(errors);
         if (errors.isEmpty()) {
             LOGGER.info("SELF-TEST PASS: blocks={} items={} ({} tools, {} armor, {} food)",
@@ -1246,6 +1292,70 @@ public final class CompressedBlocks {
         }
         level.setBlock(gpos, Blocks.AIR.defaultBlockState(), 3);
         level.setBlock(gpos.below(), Blocks.AIR.defaultBlockState(), 3);
+        // 六向优先级：先放上方箱子、再放下方箱子 → 应切到下方（下 > 上，与放置顺序无关）
+        BlockPos gpos2 = new BlockPos(13, 90, 4);
+        level.setBlock(gpos2, gen.defaultBlockState(), 3);
+        level.setBlock(gpos2.above(), Blocks.CHEST.defaultBlockState(), 3);
+        level.setBlock(gpos2.below(), Blocks.CHEST.defaultBlockState(), 3);
+        if (!(level.getBlockEntity(gpos2) instanceof CobblestoneGeneratorBlockEntity be2)) {
+            errors.add("generator six-way: no block entity");
+        } else {
+            for (int i = 0; i < 25; i++) {
+                CobblestoneGeneratorBlockEntity.serverTick(level, gpos2, gen.defaultBlockState(), be2);
+            }
+            boolean upGot = containerHasItems(level, gpos2.above());
+            boolean downGot = containerHasItems(level, gpos2.below());
+            if (!downGot) {
+                errors.add("generator did not prefer below container (down > up)");
+            }
+            if (upGot) {
+                errors.add("generator fed above container despite below priority");
+            }
+        }
+        level.setBlock(gpos2, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(gpos2.above(), Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(gpos2.below(), Blocks.AIR.defaultBlockState(), 3);
+    }
+
+    private static boolean containerHasItems(ServerLevel level, BlockPos pos) {
+        if (level.getBlockEntity(pos) instanceof net.minecraft.world.Container container) {
+            for (int i = 0; i < container.getContainerSize(); i++) {
+                if (!container.getItem(i).isEmpty()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** 压缩箱子/潜影盒：243 格容量 + 容器读写 + 菜单类型已注册。 */
+    private static void selfTestStorage(ServerLevel level, List<String> errors) {
+        for (String name : new String[] {"compressed_chest", "compressed_shulker_box"}) {
+            Block block = blockByName(name);
+            if (block == null) {
+                errors.add(name + " missing");
+                continue;
+            }
+            BlockPos pos = new BlockPos(12 + name.length(), 90, 4);
+            level.setBlock(pos, block.defaultBlockState(), 3);
+            if (!(level.getBlockEntity(pos) instanceof ScrollingContainerBlockEntity be)) {
+                errors.add(name + ": no block entity");
+            } else {
+                if (be.getContainerSize() != ScrollingContainerMenu.SIZE) {
+                    errors.add(name + " container size " + be.getContainerSize());
+                }
+                be.setItem(ScrollingContainerMenu.SIZE - 1, new ItemStack(Items.DIAMOND, 7));
+                if (be.getItem(ScrollingContainerMenu.SIZE - 1).getCount() != 7) {
+                    errors.add(name + " set/get failed");
+                }
+                be.setItem(ScrollingContainerMenu.SIZE - 1, ItemStack.EMPTY);
+            }
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        }
+        if (!BuiltInRegistries.MENU.containsKey(CompressedBlocks.id("compressed_chest"))
+            || !BuiltInRegistries.MENU.containsKey(CompressedBlocks.id("compressed_shulker_box"))) {
+            errors.add("storage menu types not registered");
+        }
     }
 
 
