@@ -172,8 +172,15 @@ public class SpotPotBlockEntity extends BlockEntity {
     }
 
     private static boolean hasContainerBelow(SpotPotBlockEntity be) {
-        return be.getLevel() != null
-            && be.getLevel().getBlockEntity(be.getBlockPos().below()) instanceof Container;
+        if (be.getLevel() == null) {
+            return false;
+        }
+        if (be.getLevel().getBlockEntity(be.getBlockPos().below()) instanceof Container) {
+            return true;
+        }
+        return CompressedPotsAddon.ITEM_SINK != null
+            && CompressedPotsAddon.ITEM_SINK.accepts(be.getLevel(), be.getBlockPos().below(),
+                net.minecraft.core.Direction.UP);
     }
 
     private List<ItemStack> drops(ServerLevel server, Player player) {
@@ -216,7 +223,7 @@ public class SpotPotBlockEntity extends BlockEntity {
         return out;
     }
 
-    /** hopper 输出：产物合并进下方容器，放不下留在缓冲返回 false（就地掉落）。 */
+    /** hopper 输出：产物合并进下方容器（原版 Container 或大容量容器钩子），放不下返回 false（就地掉落）。 */
     private boolean insertIntoBelow(ItemStack stack) {
         if (getLevel().getBlockEntity(getBlockPos().below()) instanceof Container container) {
             int size = container.getContainerSize();
@@ -225,7 +232,10 @@ public class SpotPotBlockEntity extends BlockEntity {
                 if (slot.isEmpty() || !ItemStack.isSameItemSameComponents(stack, slot)) {
                     continue;
                 }
-                int room = Math.min(slot.getMaxStackSize(), container.getMaxStackSize()) - slot.getCount();
+                // 大容量容器（储物抽屉等）单格可远超 64：按容器声明的逐物品上限与无参上限取大者
+                int cap = Math.max(Math.min(slot.getMaxStackSize(), container.getMaxStackSize()),
+                    container.getMaxStackSize(stack));
+                int room = cap - slot.getCount();
                 if (room <= 0) {
                     continue;
                 }
@@ -241,9 +251,16 @@ public class SpotPotBlockEntity extends BlockEntity {
             if (size > 0) {
                 container.setChanged();
             }
-            return stack.isEmpty();
         }
-        return false;
+        // 非原版 Container / 大容量余量：走加载器注入的插入钩子（储物抽屉等）
+        if (!stack.isEmpty() && CompressedPotsAddon.ITEM_SINK != null) {
+            long moved = CompressedPotsAddon.ITEM_SINK.insert(getLevel(), getBlockPos().below(),
+                net.minecraft.core.Direction.UP, stack);
+            if (moved > 0) {
+                stack.shrink((int) Math.min(moved, stack.getCount()));
+            }
+        }
+        return stack.isEmpty();
     }
 
     private static ItemStack itemStack(String id) {

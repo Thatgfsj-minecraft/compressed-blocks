@@ -13,6 +13,34 @@ public class CompressedPotsFabric implements ModInitializer {
     @Override
     public void onInitialize() {
         CompressedPotsAddon.init();
+        // 大容量容器插入钩子：Fabric Transfer API（储物抽屉等现代 mod 的标准接口）
+        CompressedPotsAddon.ITEM_SINK = new CompressedPotsAddon.ItemSink() {
+            @Override
+            public boolean accepts(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos,
+                                   net.minecraft.core.Direction side) {
+                return net.fabricmc.fabric.api.transfer.v1.item.ItemStorage.SIDED.find(level, pos, side) != null;
+            }
+
+            @Override
+            public long insert(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos,
+                               net.minecraft.core.Direction side, net.minecraft.world.item.ItemStack stack) {
+                net.fabricmc.fabric.api.transfer.v1.storage.Storage<net.fabricmc.fabric.api.transfer.v1.item.ItemVariant>
+                    storage = net.fabricmc.fabric.api.transfer.v1.item.ItemStorage.SIDED.find(level, pos, side);
+                if (storage == null) {
+                    return 0;
+                }
+                try (net.fabricmc.fabric.api.transfer.v1.transaction.Transaction tx =
+                         net.fabricmc.fabric.api.transfer.v1.transaction.Transaction.openOuter()) {
+                    long moved = storage.insert(
+                        net.fabricmc.fabric.api.transfer.v1.item.ItemVariant.of(stack), stack.getCount(), tx);
+                    if (moved > 0) {
+                        tx.commit();
+                        return moved;
+                    }
+                }
+                return 0;
+            }
+        };
         Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, CompressedPotsAddon.id("pot"),
             CompressedPotsAddon.POT_TYPE = FabricBlockEntityTypeBuilder
                 .create(SpotPotBlockEntity::new,

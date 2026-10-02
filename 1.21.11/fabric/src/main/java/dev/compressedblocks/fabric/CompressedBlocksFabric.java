@@ -10,6 +10,10 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
+import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
+import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
+import net.fabricmc.fabric.api.transfer.v1.storage.Storage;
+import net.fabricmc.fabric.api.transfer.v1.transaction.Transaction;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerPlayer;
@@ -66,6 +70,31 @@ public class CompressedBlocksFabric implements ModInitializer {
             CompressedBlocks.CHEST_MENU_TYPE);
         Registry.register(BuiltInRegistries.MENU, CompressedBlocks.id("compressed_shulker_box"),
             CompressedBlocks.SHULKER_MENU_TYPE);
+        // 大容量容器插入钩子：Fabric Transfer API（储物抽屉等现代 mod 的标准接口）
+        CompressedBlocks.ITEM_SINK = new CompressedBlocks.ItemSink() {
+            @Override
+            public boolean accepts(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos,
+                                   net.minecraft.core.Direction side) {
+                return ItemStorage.SIDED.find(level, pos, side) != null;
+            }
+
+            @Override
+            public long insert(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos,
+                               net.minecraft.core.Direction side, net.minecraft.world.item.ItemStack stack) {
+                Storage<ItemVariant> storage = ItemStorage.SIDED.find(level, pos, side);
+                if (storage == null) {
+                    return 0;
+                }
+                try (Transaction tx = Transaction.openOuter()) {
+                    long moved = storage.insert(ItemVariant.of(stack), stack.getCount(), tx);
+                    if (moved > 0) {
+                        tx.commit();
+                        return moved;
+                    }
+                }
+                return 0;
+            }
+        };
         ServerLifecycleEvents.SERVER_STARTED.register(server -> CompressedBlocks.selfTest(server.overworld()));
         // 护甲结算：抗性提升 + 九重饱食度常满
         ServerTickEvents.END_SERVER_TICK.register(server -> {

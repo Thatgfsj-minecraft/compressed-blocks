@@ -7,7 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -38,6 +40,7 @@ import net.minecraft.world.item.enchantment.Enchantable;
 import net.minecraft.world.item.equipment.ArmorMaterial;
 import net.minecraft.world.item.equipment.ArmorType;
 import net.minecraft.world.item.equipment.EquipmentAssets;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.SimpleContainer;
@@ -317,6 +320,18 @@ public final class CompressedBlocks {
 
     /** 刷石机（3 压缩等级）与共享方块实体类型（类型由加载器入口构建注入）。 */
     public static BlockEntityType<CobblestoneGeneratorBlockEntity> GENERATOR_TYPE;
+
+    /** 大容量容器插入钩子（加载器入口注入：Fabric=Transfer API、NeoForge=IItemHandler），
+     *  兼容储物抽屉等不按原版 Container 64 上限计算的 mod。 */
+    public interface ItemSink {
+        /** 目标位置从给定面是否可接收物品。 */
+        boolean accepts(Level level, BlockPos pos, Direction side);
+
+        /** 尝试插入，返回移动数量。 */
+        long insert(Level level, BlockPos pos, Direction side, ItemStack stack);
+    }
+
+    public static ItemSink ITEM_SINK;
 
     // 压缩箱子/压缩潜影盒（单一等级，243 格滚动存储）
     public static CompressedChestBlock COMPRESSED_CHEST;
@@ -1220,6 +1235,7 @@ public final class CompressedBlocks {
         selfTestPotFlow(level, errors);
         selfTestGenerator(level, errors);
         selfTestStorage(level, errors);
+        selfTestShulkerDrop(level, errors);
         selfTestCompat(errors);
         if (errors.isEmpty()) {
             LOGGER.info("SELF-TEST PASS: blocks={} items={} ({} tools, {} armor, {} food)",
@@ -1356,6 +1372,34 @@ public final class CompressedBlocks {
             || !BuiltInRegistries.MENU.containsKey(CompressedBlocks.id("compressed_shulker_box"))) {
             errors.add("storage menu types not registered");
         }
+    }
+
+    /** 压缩潜影盒掉落实证：getDrops 应构建恰好 1 个带 2 组内容的盒子（内容不落地）。 */
+    private static void selfTestShulkerDrop(ServerLevel level, List<String> errors) {
+        Block block = blockByName("compressed_shulker_box");
+        BlockPos pos = new BlockPos(2, 90, 8);
+        level.setBlock(pos, block.defaultBlockState(), 3);
+        if (!(level.getBlockEntity(pos) instanceof ScrollingContainerBlockEntity be)) {
+            errors.add("shulker drop: no block entity");
+            return;
+        }
+        if (!be.keepsContents()) {
+            errors.add("shulker keepsContents is false");
+        }
+        be.setItem(0, new ItemStack(Items.DIAMOND, 3));
+        be.setItem(1, new ItemStack(Items.DIAMOND, 5));
+        // 6 参公开入口：内部构建 LootParams（含 BLOCK_ENTITY）并分发到方块自己的 getDrops
+        List<ItemStack> drops = Block.getDrops(block.defaultBlockState(), level, pos, be, null, ItemStack.EMPTY);
+        if (drops.size() != 1) {
+            errors.add("shulker getDrops " + drops.size() + " stacks != 1");
+        } else {
+            ItemContainerContents container = drops.get(0).get(DataComponents.CONTAINER);
+            int contents = container == null ? 0 : (int) container.nonEmptyStream().count();
+            if (contents != 2) {
+                errors.add("shulker box contents " + contents + " != 2");
+            }
+        }
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
     }
 
 

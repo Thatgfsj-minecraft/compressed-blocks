@@ -28,6 +28,17 @@ public final class CompressedPotsAddon {
     public static SpotPotBlock HOPPER_POT;
     public static BlockEntityType<SpotPotBlockEntity> POT_TYPE;
 
+    /** 大容量容器插入钩子（加载器入口注入：Fabric=Transfer API），兼容储物抽屉等。 */
+    public interface ItemSink {
+        boolean accepts(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos,
+                        net.minecraft.core.Direction side);
+
+        long insert(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos,
+                    net.minecraft.core.Direction side, net.minecraft.world.item.ItemStack stack);
+    }
+
+    public static ItemSink ITEM_SINK;
+
     public static final List<Block> BLOCKS = new ArrayList<>();
 
     private static final String[] POT_IDS = {"compressed_pot", "compressed_hopper_pot"};

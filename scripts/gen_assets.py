@@ -748,8 +748,8 @@ def main():
             px[15, i] = (10, 10, 10, 255)
         return out
 
-    # 箱子：盖面/盖沿/箱身正面/侧面/内顶（ModelChest UV：盖 (14,0)/(14,14)，箱身 (14,33)/(28,33)/(14,19)）
-    lid_top = chest_src.crop((14, 0, 28, 14))
+    # 箱子：盖沿/箱身正面/侧面/内顶（ModelChest UV）；顶面用 (28,0) 浅木纹带框区域（(14,0) 深色是盖子内侧）
+    lid_top = chest_src.crop((28, 0, 42, 14))
     lid_front = chest_src.crop((14, 14, 28, 19))
     box_front = chest_src.crop((14, 33, 28, 43))
     box_side = chest_src.crop((28, 33, 42, 43))

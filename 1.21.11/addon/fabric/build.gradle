@@ -26,6 +26,8 @@ dependencies {
     implementation files(apiRoot + '/fabric-object-builder-api-v1-4abd26ae/21.1.40+4fc5413f3e/fabric-object-builder-api-v1-4abd26ae-21.1.40+4fc5413f3e.jar')
     compileOnly files(apiRoot + '/fabric-rendering-v1-4abd26ae/16.2.10+0290ad933e/fabric-rendering-v1-4abd26ae-16.2.10+0290ad933e.jar')
     compileOnly files(apiRoot + '/fabric-lifecycle-events-v1-4abd26ae/2.6.15+4ebb5c083e/fabric-lifecycle-events-v1-4abd26ae-2.6.15+4ebb5c083e.jar')
+    compileOnly files(apiRoot + '/fabric-transfer-api-v1-4abd26ae/6.0.25+4fc5413f3e/fabric-transfer-api-v1-4abd26ae-6.0.25+4fc5413f3e.jar')
+    compileOnly files(apiRoot + '/fabric-api-lookup-api-v1-4abd26ae/1.6.114+20dc27073e/fabric-api-lookup-api-v1-4abd26ae-1.6.114+20dc27073e.jar')
 
 }
 

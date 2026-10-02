@@ -33,6 +33,40 @@ public class CompressedBlocksNeoForge {
     }
 
     private void onRegister(RegisterEvent event) {
+        // 大容量容器插入钩子：NeoForge 21.11 Transfer API（储物抽屉等现代 mod 的标准接口）
+        if (CompressedBlocks.ITEM_SINK == null) {
+            CompressedBlocks.ITEM_SINK = new CompressedBlocks.ItemSink() {
+                @Override
+                public boolean accepts(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos,
+                                       net.minecraft.core.Direction side) {
+                    return level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+                        pos, side) != null;
+                }
+
+                @Override
+                public long insert(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos,
+                                   net.minecraft.core.Direction side, net.minecraft.world.item.ItemStack stack) {
+                    net.neoforged.neoforge.transfer.ResourceHandler<net.neoforged.neoforge.transfer.item.ItemResource>
+                        handler = level.getCapability(
+                            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK, pos, side);
+                    if (handler == null) {
+                        return 0;
+                    }
+                    try (net.neoforged.neoforge.transfer.transaction.Transaction tx =
+                             net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                        int moved = 0;
+                        for (int i = 0; i < handler.size() && moved < stack.getCount(); i++) {
+                            moved += handler.insert(i, net.neoforged.neoforge.transfer.item.ItemResource.of(stack),
+                                stack.getCount() - moved, tx);
+                        }
+                        if (moved > 0) {
+                            tx.commit();
+                        }
+                        return moved;
+                    }
+                }
+            };
+        }
         if (event.getRegistryKey() == Registries.BLOCK) {
             event.register(Registries.BLOCK, helper -> {
                 for (CompressedBlocks.BlockReg e : CompressedBlocks.blocks()) {

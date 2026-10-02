@@ -54,14 +54,18 @@ public class CompressedShulkerBlock extends Block implements EntityBlock {
         return super.playerWillDestroy(level, pos, state, player);
     }
 
-    /** 生存/爆炸破坏：直接从方块实体构建掉落物，内容不落地。 */
+    /** 生存/爆炸破坏：直接从方块实体构建掉落物，内容不落地。创造玩家已由 playerWillDestroy 掉落，跳过防双掉。 */
     @Override
     protected List<ItemStack> getDrops(BlockState state, LootParams.Builder builder) {
+        if (builder.getOptionalParameter(LootContextParams.THIS_ENTITY)
+            instanceof Player player && player.isCreative()) {
+            return List.of();
+        }
         if (builder.getOptionalParameter(LootContextParams.BLOCK_ENTITY)
             instanceof ScrollingContainerBlockEntity be) {
             return List.of(boxWithContents(be));
         }
-        return super.getDrops(state, builder);
+        return List.of();
     }
 
     private static ItemStack boxWithContents(ScrollingContainerBlockEntity be) {

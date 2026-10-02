@@ -56,7 +56,7 @@ public class CobblestoneGeneratorBlockEntity extends BlockEntity {
     /** 邻居方块更新时重扫：六向按优先级取第一个容器（与放置顺序无关，下方始终优先上方）。 */
     public void rescanOutput() {
         for (Direction d : SCAN_ORDER) {
-            if (getLevel() != null && getLevel().getBlockEntity(getBlockPos().relative(d)) instanceof Container) {
+            if (isOutputTarget(getBlockPos().relative(d), d)) {
                 this.outDir = d;
                 this.scanned = true;
                 return;
@@ -64,6 +64,18 @@ public class CobblestoneGeneratorBlockEntity extends BlockEntity {
         }
         this.outDir = null;
         this.scanned = true;
+    }
+
+    /** 目标格是否可接收产物：原版 Container 或加载器注入的大容量容器钩子（储物抽屉等）。 */
+    private boolean isOutputTarget(BlockPos target, Direction dir) {
+        if (getLevel() == null) {
+            return false;
+        }
+        if (getLevel().getBlockEntity(target) instanceof Container) {
+            return true;
+        }
+        return CompressedBlocks.ITEM_SINK != null
+            && CompressedBlocks.ITEM_SINK.accepts(getLevel(), target, dir.getOpposite());
     }
 
     /** 服务端：每秒产出 1 个并尽量压入输出方向的容器。 */
@@ -99,32 +111,48 @@ public class CobblestoneGeneratorBlockEntity extends BlockEntity {
         if (this.outDir == null) {
             return;
         }
-        if (!(getLevel().getBlockEntity(getBlockPos().relative(this.outDir)) instanceof Container container)) {
+        Container container = getLevel().getBlockEntity(getBlockPos().relative(this.outDir))
+            instanceof Container c ? c : null;
+        if (container == null && CompressedBlocks.ITEM_SINK == null) {
             this.outDir = null; // 方向失效：等下一次邻居更新再扫
             this.scanned = false;
             return;
         }
-        int size = container.getContainerSize();
-        for (int i = 0; i < size && !this.buffer.isEmpty(); i++) {
-            ItemStack slot = container.getItem(i);
-            if (slot.isEmpty() || !ItemStack.isSameItemSameComponents(this.buffer, slot)) {
-                continue;
+        if (container != null) {
+            int size = container.getContainerSize();
+            for (int i = 0; i < size && !this.buffer.isEmpty(); i++) {
+                ItemStack slot = container.getItem(i);
+                if (slot.isEmpty() || !ItemStack.isSameItemSameComponents(this.buffer, slot)) {
+                    continue;
+                }
+                // 大容量容器（储物抽屉等）单格可远超 64：按容器声明的逐物品上限与无参上限取大者
+                int cap = Math.max(Math.min(slot.getMaxStackSize(), container.getMaxStackSize()),
+                    container.getMaxStackSize(this.buffer));
+                int room = cap - slot.getCount();
+                if (room <= 0) {
+                    continue;
+                }
+                int move = Math.min(room, this.buffer.getCount());
+                slot.grow(move);
+                this.buffer.shrink(move);
             }
-            int room = Math.min(slot.getMaxStackSize(), container.getMaxStackSize()) - slot.getCount();
-            if (room <= 0) {
-                continue;
+            for (int i = 0; i < size && !this.buffer.isEmpty(); i++) {
+                if (container.getItem(i).isEmpty() && container.canPlaceItem(i, this.buffer)) {
+                    container.setItem(i, this.buffer.split(this.buffer.getCount()));
+                }
             }
-            int move = Math.min(room, this.buffer.getCount());
-            slot.grow(move);
-            this.buffer.shrink(move);
+            if (size > 0) {
+                container.setChanged();
+            }
         }
-        for (int i = 0; i < size && !this.buffer.isEmpty(); i++) {
-            if (container.getItem(i).isEmpty() && container.canPlaceItem(i, this.buffer)) {
-                container.setItem(i, this.buffer.split(this.buffer.getCount()));
+        // 非原版 Container / 大容量余量：走加载器注入的插入钩子（Fabric Transfer API / NeoForge IItemHandler）
+        if (!this.buffer.isEmpty() && CompressedBlocks.ITEM_SINK != null) {
+            long moved = CompressedBlocks.ITEM_SINK.insert(server, getBlockPos().relative(this.outDir),
+                this.outDir.getOpposite(), this.buffer);
+            if (moved > 0) {
+                this.buffer.shrink((int) Math.min(moved, this.buffer.getCount()));
+                setChanged();
             }
-        }
-        if (size > 0) {
-            container.setChanged();
         }
         if (!this.buffer.isEmpty()) {
             setChanged();
