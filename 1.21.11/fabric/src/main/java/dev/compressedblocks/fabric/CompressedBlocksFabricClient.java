@@ -2,6 +2,7 @@ package dev.compressedblocks.fabric;
 
 import dev.compressedblocks.CompressedBlocks;
 import dev.compressedblocks.CompressedPotRenderer;
+import dev.compressedblocks.CompressedShulkerRenderer;
 import dev.compressedblocks.ScrollingContainerScreen;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.rendering.v1.BlockRenderLayerMap;
@@ -15,6 +16,7 @@ public class CompressedBlocksFabricClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         BlockEntityRenderers.register(CompressedBlocks.POT_TYPE, CompressedPotRenderer::new);
+        BlockEntityRenderers.register(CompressedBlocks.SHULKER_TYPE, CompressedShulkerRenderer::new);
         MenuScreens.register(CompressedBlocks.CHEST_MENU_TYPE, ScrollingContainerScreen::new);
         MenuScreens.register(CompressedBlocks.SHULKER_MENU_TYPE, ScrollingContainerScreen::new);
         for (Block block : CompressedBlocks.SAPLING_BLOCKS) {

@@ -15,6 +15,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
@@ -42,6 +44,23 @@ public class CompressedShulkerBlock extends Block implements EntityBlock {
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new ScrollingContainerBlockEntity(CompressedBlocks.SHULKER_TYPE, pos, state, true);
+    }
+
+    /** 双端 ticker：推进开盖动画。 */
+    @Override
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state,
+                                                                  BlockEntityType<T> type) {
+        return type == CompressedBlocks.SHULKER_TYPE
+            ? (BlockEntityTicker<T>) (BlockEntityTicker<ScrollingContainerBlockEntity>)
+                ScrollingContainerBlockEntity::clientTick
+            : null;
+    }
+
+    /** blockEvent 转发（原版 BaseEntityBlock.triggerEvent 同款；本方块不继承它，必须自己转发）。 */
+    @Override
+    protected boolean triggerEvent(BlockState state, Level level, BlockPos pos, int type, int data) {
+        BlockEntity be = level.getBlockEntity(pos);
+        return be != null && be.triggerEvent(type, data);
     }
 
     /** 创造模式破坏：也掉落带内容的物品（原版潜影盒同款）。 */

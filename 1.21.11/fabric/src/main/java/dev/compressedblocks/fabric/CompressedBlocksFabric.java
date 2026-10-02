@@ -45,7 +45,7 @@ public class CompressedBlocksFabric implements ModInitializer {
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, CompressedBlocks.id("food"), CompressedBlocks.TAB_FOOD);
         Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, CompressedBlocks.id("pot"),
             CompressedBlocks.POT_TYPE = FabricBlockEntityTypeBuilder
-                .create(CompressedPotBlockEntity::new, CompressedBlocks.POT)
+                .create(CompressedPotBlockEntity::new, CompressedBlocks.POT, CompressedBlocks.HOPPER_POT)
                 .build());
         // 刷石机方块实体类型（产物随压缩等级）
         Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, CompressedBlocks.id("cobblestone_generator"),

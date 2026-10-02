@@ -93,7 +93,7 @@ public class CompressedBlocksNeoForge {
             event.register(Registries.BLOCK_ENTITY_TYPE, helper -> {
                 // 1.21.11 原版构造器私有，NeoForge 提供公开便捷构造
                 CompressedBlocks.POT_TYPE = new BlockEntityType<>(CompressedPotBlockEntity::new,
-                    CompressedBlocks.POT);
+                    CompressedBlocks.POT, CompressedBlocks.HOPPER_POT);
                 CompressedBlocks.GENERATOR_TYPE = new BlockEntityType<>(CobblestoneGeneratorBlockEntity::new,
                     CompressedBlocks.GENERATOR_BLOCKS.toArray(new Block[0]));
                 CompressedBlocks.CHEST_TYPE = new BlockEntityType<dev.compressedblocks.ScrollingContainerBlockEntity>(

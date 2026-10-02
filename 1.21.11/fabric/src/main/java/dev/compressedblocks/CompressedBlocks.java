@@ -410,6 +410,7 @@ public final class CompressedBlocks {
 
     /** 压缩盆栽（普通/漏斗）与共享方块实体类型。 */
     public static CompressedPotBlock POT;
+    public static CompressedPotBlock HOPPER_POT;
     public static BlockEntityType<CompressedPotBlockEntity> POT_TYPE;
 
     public static List<BlockReg> blocks() {
@@ -502,11 +503,14 @@ public final class CompressedBlocks {
     private static Item buildTool(ToolLine line, int level, int toolIndex, String name) {
         boolean stone = line.kind() == ToolKind.STONE;
         float[] stats = line.stats()[toolIndex];
+        // 全部工具：总伤害（含玩家基础 1 点）= 对应原版工具 × 1.6^重（×2 太夸张，用户定档 1.6）
+        float bonus = (1.0F + stats[0] + line.damageBonus()) * (float) Math.pow(1.6, level)
+            - 1.0F - stats[0];
         ToolMaterial material = new ToolMaterial(
             incorrectTagFor(level, stone),
             durabilityFor(level, line.kind()),
             SPEED[level - 1],
-            line.damageBonus() + level,
+            bonus,
             line.enchantability(),
             TagKey.create(Registries.ITEM, id("repair_" + line.key() + "_tool_" + LEVEL_PREFIX[level - 1]))
         );
@@ -527,7 +531,7 @@ public final class CompressedBlocks {
         if (level == LEVELS) {
             CompressedHooks.registerLevel9Tool(item);
         }
-        double damage = stats[0] + line.damageBonus() + level;
+        double damage = stats[0] + bonus;
         TOOL_REGS.add(new ToolReg(name, item, durabilityFor(level, line.kind()), SPEED[level - 1], unbreakable, damage));
         return item;
     }
@@ -733,17 +737,24 @@ public final class CompressedBlocks {
                     caneEnName(m.en()) + " Cane");
             }
         }
-        // 5c. 盆栽（原版配色，主 mod 版）：只能种原版系作物/甘蔗/树木；压缩植物与漏斗盆栽在附属 mod
+        // 5c. 盆栽 + 漏斗盆栽（原版配色，主 mod 版）：只能种原版系作物/甘蔗/树木；
+        // 漏斗盆栽成熟自动收割入下方容器（兼容储物抽屉）；压缩植物/压缩盆栽在附属 mod
         POT = new CompressedPotBlock(BlockBehaviour.Properties.of()
             .setId(ResourceKey.create(Registries.BLOCK, id("pot")))
             .mapColor(MapColor.TERRACOTTA_ORANGE)
             .strength(1.5F, STORAGE_BLAST)
             .sound(SoundType.STONE)
             .noOcclusion());
+        HOPPER_POT = new CompressedPotBlock(BlockBehaviour.Properties.of()
+            .setId(ResourceKey.create(Registries.BLOCK, id("hopper_pot")))
+            .mapColor(MapColor.TERRACOTTA_ORANGE)
+            .strength(1.5F, STORAGE_BLAST)
+            .sound(SoundType.STONE)
+            .noOcclusion(), true);
         // POT_TYPE 由各加载器入口构建后注入（1.21.11 原版构造器私有，Fabric/NeoForge 各有公开构建路径）
-        // 普通盆栽放压缩工具栏（压缩盆栽创造栏由附属 mod 独有）
-        for (String name : new String[] {"pot"}) {
-            Block block = POT;
+        // 普通盆栽与漏斗盆栽放压缩工具栏（压缩盆栽创造栏由附属 mod 独有）
+        for (String name : new String[] {"pot", "hopper_pot"}) {
+            Block block = name.equals("pot") ? POT : HOPPER_POT;
             BlockItem item = new BlockItem(block,
                 new Item.Properties()
                     .setId(ResourceKey.create(Registries.ITEM, id(name)))
@@ -1069,11 +1080,11 @@ public final class CompressedBlocks {
         if (itemCount != expectItems) {
             errors.add("item count " + itemCount + " != " + expectItems);
         }
-        if (BLOCKS.size() != 1314) {
-            errors.add("block registry size " + BLOCKS.size() + " != 1314");
+        if (BLOCKS.size() != 1315) {
+            errors.add("block registry size " + BLOCKS.size() + " != 1315");
         }
-        if (expectItems != 1548) {
-            errors.add("item registry size " + expectItems + " != 1548");
+        if (expectItems != 1549) {
+            errors.add("item registry size " + expectItems + " != 1549");
         }
         // 方块：注册、翻译键、物品映射
         for (BlockReg b : BLOCKS) {
@@ -1233,6 +1244,7 @@ public final class CompressedBlocks {
             errors.add("armor effect ladder wrong");
         }
         selfTestPotFlow(level, errors);
+        selfTestHopperPot(level, errors);
         selfTestGenerator(level, errors);
         selfTestStorage(level, errors);
         selfTestShulkerDrop(level, errors);
@@ -1374,8 +1386,32 @@ public final class CompressedBlocks {
         }
     }
 
-    /** 压缩潜影盒掉落实证：getDrops 应构建恰好 1 个带 2 组内容的盒子（内容不落地）。 */
-    private static void selfTestShulkerDrop(ServerLevel level, List<String> errors) {
+    /** 漏斗盆栽自动收割：成熟后驱动 serverTick，产物应入下方箱子并自动补种。 */
+    private static void selfTestHopperPot(ServerLevel level, List<String> errors) {
+        Block potBlock = blockByName("hopper_pot");
+        BlockPos potPos = new BlockPos(11, 90, 8);
+        level.setBlock(potPos.below(), Blocks.CHEST.defaultBlockState(), 3);
+        level.setBlock(potPos, potBlock.defaultBlockState(), 3);
+        if (!(level.getBlockEntity(potPos) instanceof CompressedPotBlockEntity pot)) {
+            errors.add("hopper pot: no block entity");
+            return;
+        }
+        pot.setSoil(blockByName("1x_dirt").defaultBlockState());
+        pot.setPlant(Blocks.WHEAT.defaultBlockState(), "minecraft:wheat_seeds");
+        for (int i = 0; i < pot.requiredGrowth() + 1; i++) {
+            CompressedPotBlockEntity.serverTick(level, potPos, potBlock.defaultBlockState(), pot);
+        }
+        if (!containerHasItems(level, potPos.below())) {
+            errors.add("hopper pot did not auto-harvest into chest");
+        }
+        if (pot.growthFraction() != 0.0F) {
+            errors.add("hopper pot did not replant after auto-harvest");
+        }
+        level.setBlock(potPos, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(potPos.below(), Blocks.AIR.defaultBlockState(), 3);
+    }
+
+    /** 压缩潜影盒掉落实证：getDrops 应构建恰好 1 个带 2 组内容的盒子（内容不落地）。 */    private static void selfTestShulkerDrop(ServerLevel level, List<String> errors) {
         Block block = blockByName("compressed_shulker_box");
         BlockPos pos = new BlockPos(2, 90, 8);
         level.setBlock(pos, block.defaultBlockState(), 3);

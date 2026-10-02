@@ -1,1 +1,1 @@
-{"model":{"type":"minecraft:model","model":"compressedblocks:item/compressed_shulker_box"}}
+{"model":{"type":"minecraft:special","base":"compressedblocks:item/compressed_shulker_box","model":{"type":"minecraft:shulker_box","texture":"compressedblocks:compressed_shulker_box"}}}

@@ -33,6 +33,8 @@ public class ScrollingContainerMenu extends AbstractContainerMenu {
         super(type, id);
         checkContainerSize(backing, SIZE);
         this.backing0 = backing;
+        // 潜影盒 BE 覆写计数开盖（blockEvent 同步动画）；客户端哑容器为 default 空实现
+        this.backing0.startOpen(inv.player);
         for (int i = 0; i < SIZE; i++) {
             addSlot(new StorageSlot(backing, i, 8 + (i % COLS) * 18, 17 + (i / COLS) * 18, i / COLS));
         }
@@ -98,6 +100,12 @@ public class ScrollingContainerMenu extends AbstractContainerMenu {
             slot.setChanged();
         }
         return original;
+    }
+
+    @Override
+    public void removed(Player player) {
+        super.removed(player);
+        this.backing0.stopOpen(player);
     }
 
     @Override

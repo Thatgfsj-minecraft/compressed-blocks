@@ -1,1 +1,1 @@
-{"parent":"minecraft:block/cube_bottom_top","textures":{"top":"compressedblocks:block/compressed_shulker_box_top","bottom":"compressedblocks:block/compressed_shulker_box_bottom","side":"compressedblocks:block/compressed_shulker_box_side"}}
+{"textures":{"particle":"compressedblocks:block/compressed_shulker_box_side"}}

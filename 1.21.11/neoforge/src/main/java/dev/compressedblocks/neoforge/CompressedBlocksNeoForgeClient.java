@@ -2,6 +2,7 @@ package dev.compressedblocks.neoforge;
 
 import dev.compressedblocks.CompressedBlocks;
 import dev.compressedblocks.CompressedPotRenderer;
+import dev.compressedblocks.CompressedShulkerRenderer;
 import dev.compressedblocks.ScrollingContainerScreen;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
@@ -20,6 +21,7 @@ public class CompressedBlocksNeoForgeClient {
     @SubscribeEvent
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(CompressedBlocks.POT_TYPE, CompressedPotRenderer::new);
+        event.registerBlockEntityRenderer(CompressedBlocks.SHULKER_TYPE, CompressedShulkerRenderer::new);
     }
 
     @SubscribeEvent

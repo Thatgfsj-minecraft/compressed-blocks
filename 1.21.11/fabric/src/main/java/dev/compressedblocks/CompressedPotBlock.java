@@ -46,8 +46,22 @@ public class CompressedPotBlock extends Block implements EntityBlock {
     private record Plantable(BlockState state, int level, String itemId) {
     }
 
+    /** 漏斗盆栽标记。 */
+    private final boolean hopper;
+
     public CompressedPotBlock(Properties props) {
+        this(props, false);
+    }
+
+    /** hopper=true：漏斗盆栽，成熟自动收割入下方容器（原版配色，压缩植物仍在附属 mod）。 */
+    public CompressedPotBlock(Properties props, boolean hopper) {
         super(props);
+        this.hopper = hopper;
+    }
+
+    /** 是否漏斗盆栽（BE 据此自动收割）。 */
+    public boolean isHopper() {
+        return this.hopper;
     }
 
     @Override

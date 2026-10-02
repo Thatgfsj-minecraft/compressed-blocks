@@ -15,6 +15,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -179,7 +180,7 @@ public class CompressedPotBlockEntity extends BlockEntity {
         }
     }
 
-    /** 服务端生长计时：主 mod 盆栽只种植物，成熟后等待玩家右键收割。 */
+    /** 服务端生长计时：普通盆栽成熟等玩家右键收割；漏斗盆栽成熟自动收割入下方容器。 */
     public static void serverTick(Level level, BlockPos pos, BlockState state, CompressedPotBlockEntity be) {
         if (be.plant == null) {
             return;
@@ -188,7 +189,78 @@ public class CompressedPotBlockEntity extends BlockEntity {
         if (be.growth < required) {
             be.growth++;
             be.setChanged();
+            return;
         }
+        if (level instanceof ServerLevel server && be.isHopper() && be.tryAutoHarvest(server)) {
+            be.growth = 0;
+            be.sync();
+        }
+    }
+
+    private boolean isHopper() {
+        return this.getBlockState().getBlock() instanceof CompressedPotBlock pot && pot.isHopper();
+    }
+
+    /** 漏斗盆栽自动收割：产物压入下方容器（原版 Container 或大容量容器钩子，兼容储物抽屉）；
+     *  全部塞入才收割补种；塞不下的部分掉在盆边，盆保持成熟等待容器恢复。 */
+    private boolean tryAutoHarvest(ServerLevel server) {
+        List<ItemStack> drops = drops(server, null);
+        if (insertInto(server, getBlockPos().below(), drops)) {
+            return true;
+        }
+        for (ItemStack rest : drops) {
+            if (!rest.isEmpty()) {
+                Block.popResource(server, getBlockPos(), rest);
+            }
+        }
+        return false;
+    }
+
+    /** 把产物逐叠塞进目标容器：返回是否全部塞入。 */
+    private boolean insertInto(ServerLevel server, BlockPos target, List<ItemStack> drops) {
+        for (ItemStack drop : drops) {
+            if (drop.isEmpty()) {
+                continue;
+            }
+            if (server.getBlockEntity(target) instanceof Container container) {
+                int size = container.getContainerSize();
+                for (int i = 0; i < size && !drop.isEmpty(); i++) {
+                    ItemStack slot = container.getItem(i);
+                    if (slot.isEmpty() || !ItemStack.isSameItemSameComponents(drop, slot)) {
+                        continue;
+                    }
+                    // 大容量容器（储物抽屉等）单格可远超 64：按容器声明的逐物品上限与无参上限取大者
+                    int cap = Math.max(Math.min(slot.getMaxStackSize(), container.getMaxStackSize()),
+                        container.getMaxStackSize(drop));
+                    int room = cap - slot.getCount();
+                    if (room <= 0) {
+                        continue;
+                    }
+                    int move = Math.min(room, drop.getCount());
+                    slot.grow(move);
+                    drop.shrink(move);
+                }
+                for (int i = 0; i < size && !drop.isEmpty(); i++) {
+                    if (container.getItem(i).isEmpty() && container.canPlaceItem(i, drop)) {
+                        container.setItem(i, drop.split(drop.getCount()));
+                    }
+                }
+                if (size > 0) {
+                    container.setChanged();
+                }
+            }
+            if (!drop.isEmpty() && CompressedBlocks.ITEM_SINK != null) {
+                long moved = CompressedBlocks.ITEM_SINK.insert(server, target,
+                    net.minecraft.core.Direction.UP, drop);
+                if (moved > 0) {
+                    drop.shrink((int) Math.min(moved, drop.getCount()));
+                }
+            }
+            if (!drop.isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** 客户端本地推进进度（Botany Pots 同款）：渲染平滑长大，不发包。 */

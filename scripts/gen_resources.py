@@ -281,8 +281,8 @@ def cane_names():
 
 
 def pot_names():
-    # 压缩盆栽/漏斗盆栽拆分到附属 mod（compressedblockspot），主 mod 只保留原版色盆栽
-    return ["pot"]
+    # 主 mod：原版色盆栽 + 漏斗盆栽（自动收割）；压缩盆栽/压缩漏斗盆栽在附属 mod
+    return ["pot", "hopper_pot"]
 
 
 # 刷石机（3 个压缩等级，每秒产出对应等级的原石/压缩原石，压入下方容器）
@@ -407,11 +407,14 @@ def gen_assets(res):
         pot_element([13, 4, 3], [14, 6, 13]),                 # 口沿东
     ]
     for name in pot_names():
+        hopper = name == "hopper_pot"
+        side_tex = f"{NS}:block/pot_hopper_side" if hopper else f"{NS}:block/pot_side"
+        bottom_tex = f"{NS}:block/pot_hopper_bottom" if hopper else f"{NS}:block/pot_bottom"
         model = {
             "gui_light": "side",
             "display": pot_display,
-            "textures": {"particle": f"{NS}:block/pot_side", "side": f"{NS}:block/pot_side",
-                         "top": f"{NS}:block/pot_top", "bottom": f"{NS}:block/pot_bottom"},
+            "textures": {"particle": side_tex, "side": side_tex,
+                         "top": f"{NS}:block/pot_top", "bottom": bottom_tex},
             "elements": pot_elements,
         }
         dump(f"{res}/blockstates/{name}.json",
@@ -435,34 +438,36 @@ def gen_assets(res):
              {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
     # 压缩箱子（带朝向，正面锁扣）：顶/底/正面/侧面；压缩潜影盒（整体方块）top/bottom/side。
     # 物品继承方块模型（3D 图标）
-    storage_models = {
-        "compressed_chest": ("minecraft:block/cube",
-                             {"up": f"{NS}:block/compressed_chest_top",
-                              "down": f"{NS}:block/compressed_chest_bottom",
-                              "north": f"{NS}:block/compressed_chest_front",
-                              "south": f"{NS}:block/compressed_chest_side",
-                              "west": f"{NS}:block/compressed_chest_side",
-                              "east": f"{NS}:block/compressed_chest_side",
-                              "particle": f"{NS}:block/compressed_chest_side"}),
-        "compressed_shulker_box": ("minecraft:block/cube_bottom_top",
-                                   {"top": f"{NS}:block/compressed_shulker_box_top",
-                                    "bottom": f"{NS}:block/compressed_shulker_box_bottom",
-                                    "side": f"{NS}:block/compressed_shulker_box_side"}),
-    }
-    for name, (parent, tex) in storage_models.items():
-        dump(f"{res}/models/block/{name}.json", {"parent": parent, "textures": tex})
-        if name == "compressed_chest":
-            dump(f"{res}/blockstates/{name}.json",
-                 {"variants": {"facing=north": {"model": f"{NS}:block/{name}"},
-                               "facing=east": {"model": f"{NS}:block/{name}", "y": 90},
-                               "facing=south": {"model": f"{NS}:block/{name}", "y": 180},
-                               "facing=west": {"model": f"{NS}:block/{name}", "y": 270}}})
-        else:
-            dump(f"{res}/blockstates/{name}.json",
-                 {"variants": {"": {"model": f"{NS}:block/{name}"}}})
-        dump(f"{res}/models/item/{name}.json", {"parent": f"{NS}:block/{name}"})
-        dump(f"{res}/items/{name}.json",
-             {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
+    # 压缩箱子（带朝向，正面锁扣）
+    dump(f"{res}/models/block/compressed_chest.json",
+         {"parent": "minecraft:block/cube",
+          "textures": {"up": f"{NS}:block/compressed_chest_top",
+                       "down": f"{NS}:block/compressed_chest_bottom",
+                       "north": f"{NS}:block/compressed_chest_front",
+                       "south": f"{NS}:block/compressed_chest_side",
+                       "west": f"{NS}:block/compressed_chest_side",
+                       "east": f"{NS}:block/compressed_chest_side",
+                       "particle": f"{NS}:block/compressed_chest_side"}})
+    dump(f"{res}/blockstates/compressed_chest.json",
+         {"variants": {"facing=north": {"model": f"{NS}:block/compressed_chest"},
+                       "facing=east": {"model": f"{NS}:block/compressed_chest", "y": 90},
+                       "facing=south": {"model": f"{NS}:block/compressed_chest", "y": 180},
+                       "facing=west": {"model": f"{NS}:block/compressed_chest", "y": 270}}})
+    dump(f"{res}/models/item/compressed_chest.json", {"parent": f"{NS}:block/compressed_chest"})
+    dump(f"{res}/items/compressed_chest.json",
+         {"model": {"type": "minecraft:model", "model": f"{NS}:item/compressed_chest"}})
+    # 压缩潜影盒：BER 实体渲染（开盖动画），方块模型只留 particle；
+    # 物品走原版 shulker_box special 渲染（texture 填短 id，mapper 自动加 entity/shulker/ 前缀）
+    dump(f"{res}/models/block/compressed_shulker_box.json",
+         {"textures": {"particle": f"{NS}:block/compressed_shulker_box_side"}})
+    dump(f"{res}/blockstates/compressed_shulker_box.json",
+         {"variants": {"": {"model": f"{NS}:block/compressed_shulker_box"}}})
+    dump(f"{res}/models/item/compressed_shulker_box.json",
+         {"parent": "minecraft:item/template_shulker_box",
+          "textures": {"particle": f"{NS}:block/compressed_shulker_box_side"}})
+    dump(f"{res}/items/compressed_shulker_box.json",
+         {"model": {"type": "minecraft:special", "base": f"{NS}:item/compressed_shulker_box",
+                    "model": {"type": "minecraft:shulker_box", "texture": f"{NS}:compressed_shulker_box"}}})
     # 压缩金属包：cube_all + 压缩环贴图（同储存方块渲染与 3D 物品图标）
     for name in compat_names():
         dump(f"{res}/blockstates/{name}.json",
@@ -569,6 +574,8 @@ def gen_lang(res):
             zh[f"block.{NS}.{name}"] = f"{lv[2]}{cane_zh(mat)}甘蔗"
     en["block." + NS + ".pot"] = "Pot"
     zh["block." + NS + ".pot"] = "盆栽"
+    en["block." + NS + ".hopper_pot"] = "Hopper Pot"
+    zh["block." + NS + ".hopper_pot"] = "漏斗盆栽"
     generator_lang = {"cobblestone_generator": ("Cobblestone Generator", "刷石机"),
                       "2x_cobblestone_generator": ("Double Compressed Cobblestone Generator", "二重压缩刷石机"),
                       "3x_cobblestone_generator": ("Triple Compressed Cobblestone Generator", "三重压缩刷石机")}
@@ -790,6 +797,8 @@ def gen_data(data):
         "minecraft:blackstone", "minecraft:tuff", "minecraft:calcite", "minecraft:dripstone_block",
     ]})
     shaped("pot", ["A A", "AAA"], {"A": "#minecraft:pot_stones"}, f"{NS}:pot")
+    # 漏斗盆栽 = 盆栽 + 漏斗（无序；成熟自动收割入下方容器）
+    shapeless("hopper_pot", [f"{NS}:pot", "minecraft:hopper"], f"{NS}:hopper_pot")
     # ---- 刷石机：红石/铁锭/红石 + 水桶/原石/岩浆桶 + 黑曜石/漏斗/黑曜石；机器可 9↔1 压缩（最多三重）
     shaped("cobblestone_generator",
            ["RIR", "BCL", "OHO"],
@@ -1080,8 +1089,8 @@ def main():
              + ["compressed_chest", "compressed_shulker_box"])
     assert len(storage_names()) == 459, len(storage_names())
     assert len(tool_names()) == 90, len(tool_names())
-    assert len(blocks) == 1314, len(blocks)
-    assert len(items) == 1548, len(items)
+    assert len(blocks) == 1315, len(blocks)
+    assert len(items) == 1549, len(items)
     print(f"blocks={len(blocks)} items={len(items)} (tools={len(tool_names())} armor={len(armor_names())} "
           f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())} "
           f"canes={len(cane_names())})")

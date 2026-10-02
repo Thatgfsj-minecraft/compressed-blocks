@@ -667,6 +667,15 @@ def main():
             pxt[x, y] = (52, 40, 34, 255)
     block_tex["pot_top"] = pot_top
     block_tex["pot_bottom"] = darken(terra, 0.85)
+    # 漏斗盆栽（原版配色）：侧面底部（贴图行 0-3 = 底板+腰身下段）铁色 + 最底 1px 黑线；底面整张铁
+    iron_pot = load_base("block/iron_block")
+    hop = pot_side.copy()
+    hop.paste(iron_pot.crop((0, 0, 16, 4)), (0, 0))
+    pxh = hop.load()
+    for x in range(SIZE):
+        pxh[x, 0] = (10, 10, 10, 255)
+    block_tex["pot_hopper_side"] = hop
+    block_tex["pot_hopper_bottom"] = gen_block_tex(iron_pot.copy(), 1, gray=False)
 
     # 刷石机（3 压缩等级）：整体三层结构——顶面纯木板、底面纯铁；侧面木头(0..5)+
     # 原石红石斑(5..11)+铁(11..16)；压缩等级 ≥2 上下加黑边
@@ -806,9 +815,9 @@ def main():
             gpx[sx + 17, sy + i] = (255, 255, 255, 255)
     gui_tex = {"compressed_container": gui}
 
-    # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 60 作物阶段 + 468 甘蔗 + 3 盆栽贴图
-    # + 9 刷石机（侧/顶/底） + 198 金属 + 4 箱子 + 3 潜影盒 = 1375
-    assert len(block_tex) == 1375, len(block_tex)
+    # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 60 作物阶段 + 468 甘蔗 + 5 盆栽贴图
+    # + 9 刷石机（侧/顶/底） + 198 金属 + 4 箱子 + 3 潜影盒 = 1377
+    assert len(block_tex) == 1377, len(block_tex)
     print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}, armor layers: {len(armor_layer_tex)}")
     for sub in SUBPROJECTS:
         rel = os.path.relpath(sub, ROOT)
