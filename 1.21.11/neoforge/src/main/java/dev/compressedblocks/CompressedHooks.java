@@ -204,14 +204,14 @@ public final class CompressedHooks {
         if (!hintReady(player)) {
             return;
         }
-        String soil = farm ? "Compressed Farmland" : "Compressed Dirt";
-        String found = soilLevel == null ? "not compressed soil" : soilLevel + "x " + soil;
+        String soil = farm ? "压缩耕地" : "压缩泥土";
+        String found = soilLevel == null ? "不是压缩土壤" : soilLevel + " 重 " + soil;
         player.displayClientMessage(Component.empty()
-            .append(Component.literal("[Compressed Blocks] ").withStyle(ChatFormatting.DARK_GRAY))
+            .append(Component.literal("[压缩方块] ").withStyle(ChatFormatting.DARK_GRAY))
             .append(Component.literal(enName).withStyle(ChatFormatting.GOLD))
-            .append(Component.literal(" needs ").withStyle(ChatFormatting.RED))
-            .append(Component.literal(level + "x+ " + soil).withStyle(ChatFormatting.GOLD))
-            .append(Component.literal("! Found: ").withStyle(ChatFormatting.RED))
+            .append(Component.literal(" 需要 ").withStyle(ChatFormatting.RED))
+            .append(Component.literal(level + " 重及以上的" + soil).withStyle(ChatFormatting.GOLD))
+            .append(Component.literal("! 当前：").withStyle(ChatFormatting.RED))
             .append(Component.literal(found).withStyle(ChatFormatting.GRAY)), false);
     }
 
@@ -220,42 +220,41 @@ public final class CompressedHooks {
         if (!hintReady(player)) {
             return;
         }
-        String found = soilLevel < 0 ? "not compressed soil" : soilLevel + "x";
+        String found = soilLevel < 0 ? "不是压缩土壤" : soilLevel + " 重";
         player.displayClientMessage(Component.empty()
-            .append(Component.literal("[Compressed Blocks] ").withStyle(ChatFormatting.DARK_GRAY))
+            .append(Component.literal("[压缩方块] ").withStyle(ChatFormatting.DARK_GRAY))
             .append(Component.literal(enName).withStyle(ChatFormatting.GOLD))
-            .append(Component.literal(" needs ").withStyle(ChatFormatting.RED))
-            .append(Component.literal(level + "x+ Compressed Dirt/Sand").withStyle(ChatFormatting.GOLD))
-            .append(Component.literal("! Found: ").withStyle(ChatFormatting.RED))
+            .append(Component.literal(" 需要 ").withStyle(ChatFormatting.RED))
+            .append(Component.literal(level + " 重及以上的压缩泥土/沙子").withStyle(ChatFormatting.GOLD))
+            .append(Component.literal("! 当前：").withStyle(ChatFormatting.RED))
             .append(Component.literal(found).withStyle(ChatFormatting.GRAY)), false);
     }
 
-    /** 盆栽土壤等级不足（作物/树苗/甘蔗重数 > 土壤重数）。 */
-    public static void sendPotHint(ServerPlayer player, String enName, int level, int soilLevel) {
+    /** 盆栽土壤等级不足（原版系作物也吃提速，等级不足仅发生在压缩土壤过弱时）。 */
+    public static void sendPotHint(ServerPlayer player, int level, int soilLevel) {
         if (!hintReady(player)) {
             return;
         }
         player.displayClientMessage(Component.empty()
-            .append(Component.literal("[Compressed Blocks] ").withStyle(ChatFormatting.DARK_GRAY))
-            .append(Component.literal(enName).withStyle(ChatFormatting.GOLD))
-            .append(Component.literal(" needs ").withStyle(ChatFormatting.RED))
-            .append(Component.literal(level + "x+ Compressed Dirt/Sand in the pot").withStyle(ChatFormatting.GOLD))
-            .append(Component.literal("! Pot soil: ").withStyle(ChatFormatting.RED))
-            .append(Component.literal(soilLevel + "x").withStyle(ChatFormatting.GRAY)), false);
+            .append(Component.literal("[压缩方块] ").withStyle(ChatFormatting.DARK_GRAY))
+            .append(Component.literal("盆内需要 ").withStyle(ChatFormatting.RED))
+            .append(Component.literal(level + " 重及以上的压缩泥土/沙子").withStyle(ChatFormatting.GOLD))
+            .append(Component.literal("! 盆内土壤：").withStyle(ChatFormatting.RED))
+            .append(Component.literal(soilLevel + " 重").withStyle(ChatFormatting.GRAY)), false);
     }
 
     /** 空手右键盆栽：动作栏（上方）显示盆内土壤/作物/生长进度，名字走本地化。 */
     public static void sendPotContents(ServerPlayer player, BlockState soil, ItemStack plant, float growth) {
         if (soil == null && plant.isEmpty()) {
             player.displayClientMessage(Component.empty()
-                .append(Component.literal("[Compressed Blocks] ").withStyle(ChatFormatting.DARK_GRAY))
-                .append(Component.literal("Empty pot").withStyle(ChatFormatting.GRAY)), true);
+                .append(Component.literal("[压缩方块] ").withStyle(ChatFormatting.DARK_GRAY))
+                .append(Component.literal("空盆").withStyle(ChatFormatting.GRAY)), true);
             return;
         }
         Component msg = Component.empty()
-            .append(Component.literal("[Compressed Blocks] ").withStyle(ChatFormatting.DARK_GRAY))
+            .append(Component.literal("[压缩方块] ").withStyle(ChatFormatting.DARK_GRAY))
             .append(soil == null
-                ? Component.literal("No soil").withStyle(ChatFormatting.RED)
+                ? Component.literal("未填土").withStyle(ChatFormatting.RED)
                 : soil.getBlock().getName().copy().withStyle(ChatFormatting.GOLD));
         if (!plant.isEmpty()) {
             msg = msg.copy()
@@ -273,12 +272,12 @@ public final class CompressedHooks {
             return;
         }
         player.displayClientMessage(Component.empty()
-            .append(Component.literal("[Compressed Blocks] ").withStyle(ChatFormatting.DARK_GRAY))
-            .append(Component.literal(dirtLevel + "x Compressed Dirt").withStyle(ChatFormatting.GOLD))
-            .append(Component.literal(" needs a ").withStyle(ChatFormatting.RED))
-            .append(Component.literal(dirtLevel + "x+ Compressed Hoe").withStyle(ChatFormatting.GOLD))
-            .append(Component.literal("! Your hoe: ").withStyle(ChatFormatting.RED))
-            .append(Component.literal(hoeLevel + "x").withStyle(ChatFormatting.GRAY)), false);
+            .append(Component.literal("[压缩方块] ").withStyle(ChatFormatting.DARK_GRAY))
+            .append(Component.literal(dirtLevel + " 重压缩泥土").withStyle(ChatFormatting.GOLD))
+            .append(Component.literal(" 需要 ").withStyle(ChatFormatting.RED))
+            .append(Component.literal(dirtLevel + " 重及以上的压缩锄头").withStyle(ChatFormatting.GOLD))
+            .append(Component.literal("! 你的锄头：").withStyle(ChatFormatting.RED))
+            .append(Component.literal(hoeLevel + " 重").withStyle(ChatFormatting.GRAY)), false);
     }
 
     private CompressedHooks() {

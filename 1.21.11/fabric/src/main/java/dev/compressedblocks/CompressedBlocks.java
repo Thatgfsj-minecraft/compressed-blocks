@@ -26,6 +26,7 @@ import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ShovelItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ToolMaterial;
@@ -303,15 +304,18 @@ public final class CompressedBlocks {
     private static final Map<Block, Integer> SAND_LEVELS = new IdentityHashMap<>();
     private static final Map<Integer, Block> FARMLAND = new IdentityHashMap<>();
 
-    /** 渲染层注册用分组：cross/crop 类植物 → CUTOUT，树叶 → CUTOUT_MIPPED（客户端入口注册）。 */
+    /** 渲染层注册用分组：cross/crop 类植物 → CUTOUT，树叶 → CUTOUT（客户端入口注册）。 */
     public static final List<Block> SAPLING_BLOCKS = new ArrayList<>();
     public static final List<Block> CANE_BLOCKS = new ArrayList<>();
     public static final List<Block> CROP_BLOCKS = new ArrayList<>();
     public static final List<Block> LEAVES_BLOCKS = new ArrayList<>();
+    public static final List<Block> GENERATOR_BLOCKS = new ArrayList<>();
+
+    /** 刷石机（3 压缩等级）与共享方块实体类型（类型由加载器入口构建注入）。 */
+    public static BlockEntityType<CobblestoneGeneratorBlockEntity> GENERATOR_TYPE;
 
     /** 压缩盆栽（普通/漏斗）与共享方块实体类型。 */
     public static CompressedPotBlock POT;
-    public static CompressedPotBlock HOPPER_POT;
     public static BlockEntityType<CompressedPotBlockEntity> POT_TYPE;
 
     public static List<BlockReg> blocks() {
@@ -635,28 +639,42 @@ public final class CompressedBlocks {
                     caneEnName(m.en()) + " Cane");
             }
         }
-        // 5c. 压缩盆栽（普通/漏斗）：盆内存土壤与作物（Botany Pots 机制），漏斗盆栽成熟自动收割进下方容器
-        POT = new CompressedPotBlock(false, BlockBehaviour.Properties.of()
+        // 5c. 盆栽（原版配色，主 mod 版）：只能种原版系作物/甘蔗/树木；压缩植物与漏斗盆栽在附属 mod
+        POT = new CompressedPotBlock(BlockBehaviour.Properties.of()
             .setId(ResourceKey.create(Registries.BLOCK, id("pot")))
             .mapColor(MapColor.TERRACOTTA_ORANGE)
             .strength(1.5F, STORAGE_BLAST)
             .sound(SoundType.STONE)
             .noOcclusion());
-        HOPPER_POT = new CompressedPotBlock(true, BlockBehaviour.Properties.of()
-            .setId(ResourceKey.create(Registries.BLOCK, id("hopper_pot")))
-            .mapColor(MapColor.METAL)
-            .strength(1.5F, STORAGE_BLAST)
-            .sound(SoundType.STONE)
-            .noOcclusion());
         // POT_TYPE 由各加载器入口构建后注入（1.21.11 原版构造器私有，Fabric/NeoForge 各有公开构建路径）
-        for (String name : new String[] {"pot", "hopper_pot"}) {
-            Block block = name.equals("pot") ? POT : HOPPER_POT;
+        for (String name : new String[] {"pot"}) {
+            Block block = POT;
             BlockItem item = new BlockItem(block,
                 new Item.Properties()
                     .setId(ResourceKey.create(Registries.ITEM, id(name)))
                     .useBlockDescriptionPrefix());
             BLOCKS.add(new BlockReg(name, block, name));
             ITEMS.add(new ItemReg(name, item, Tab.POTS, true));
+        }
+        // 5d. 刷石机（3 压缩等级）：每秒产出 1 个对应等级原石/压缩原石，压入下方容器
+        String[] generatorTiers = {"cobblestone_generator", "2x_cobblestone_generator",
+            "3x_cobblestone_generator"};
+        for (int i = 0; i < generatorTiers.length; i++) {
+            String name = generatorTiers[i];
+            CobblestoneGeneratorBlock block = new CobblestoneGeneratorBlock(i + 1,
+                BlockBehaviour.Properties.of()
+                    .setId(ResourceKey.create(Registries.BLOCK, id(name)))
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(3.5F, STORAGE_BLAST)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.STONE));
+            BlockItem item = new BlockItem(block,
+                new Item.Properties()
+                    .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                    .useBlockDescriptionPrefix());
+            BLOCKS.add(new BlockReg(name, block, name));
+            ITEMS.add(new ItemReg(name, item, Tab.BLOCKS, true));
+            GENERATOR_BLOCKS.add(block);
         }
         // 5d. 更多压缩种子（原版其余种子 × 3 级）：盆栽通用兼容可直接种植
         String[][] extraSeeds = {
@@ -933,11 +951,11 @@ public final class CompressedBlocks {
         if (itemCount != expectItems) {
             errors.add("item count " + itemCount + " != " + expectItems);
         }
-        if (BLOCKS.size() != 1112) {
-            errors.add("block registry size " + BLOCKS.size() + " != 1112");
+        if (BLOCKS.size() != 1114) {
+            errors.add("block registry size " + BLOCKS.size() + " != 1114");
         }
-        if (expectItems != 1346) {
-            errors.add("item registry size " + expectItems + " != 1346");
+        if (expectItems != 1348) {
+            errors.add("item registry size " + expectItems + " != 1348");
         }
         // 方块：注册、翻译键、物品映射
         for (BlockReg b : BLOCKS) {
@@ -1097,6 +1115,7 @@ public final class CompressedBlocks {
             errors.add("armor effect ladder wrong");
         }
         selfTestPotFlow(level, errors);
+        selfTestGenerator(level, errors);
         if (errors.isEmpty()) {
             LOGGER.info("SELF-TEST PASS: blocks={} items={} ({} tools, {} armor, {} food)",
                 BLOCKS.size(), ITEMS.size(), TOOL_REGS.size(), ARMOR_REGS.size(), FOOD_REGS.size());
@@ -1106,51 +1125,68 @@ public final class CompressedBlocks {
     }
 
     /**
-     * 盆栽闭环：空服无玩家时区块不计时（边界加载），RCON tick sprint 驱不动方块实体，
-     * 故在自检里直接驱动 serverTick 走完一茬：漏斗盆栽应自动收割（甘蔗 3-5×入箱、小麦走原版
-     * 战利品表入箱）并自动补种（进度清零、作物保留）。
+     * 盆栽闭环（主 mod 只种原版系）：直接驱动 serverTick 走满一茬，验证成熟、
+     * 提速档位（土壤等级每高 1 级 -5% 时长）与补种保留。收割入箱逻辑在附属 mod。
      */
     private static void selfTestPotFlow(ServerLevel level, List<String> errors) {
-        Block hopperPot = blockByName("hopper_pot");
-        if (hopperPot == null) {
-            errors.add("hopper_pot missing");
-            return;
-        }
-        harvestFlow(level, errors, "1x_cane", "1x_cane", "1x_cane", 2);
-        harvestFlow(level, errors, "1x_wheat_plant", "1x_wheat_seeds", "1x_wheat", 1);
+        growFlow(level, errors, Blocks.WHEAT, 1);
+        growFlow(level, errors, Blocks.OAK_SAPLING, 1);
+        growFlow(level, errors, Blocks.WHEAT, 9);
     }
 
-    private static void harvestFlow(ServerLevel level, List<String> errors, String plantName,
-                                    String seedName, String expectItem, int minCount) {
-        Block potBlock = blockByName("hopper_pot");
-        BlockPos potPos = new BlockPos(4 + expectItem.length(), 90, 4);
-        level.setBlock(potPos.below(), Blocks.CHEST.defaultBlockState(), 3);
+    private static void growFlow(ServerLevel level, List<String> errors, Block plant, int soilLevel) {
+        Block potBlock = blockByName("pot");
+        String soilName = (soilLevel == 1 ? "1x" : soilLevel + "x") + "_dirt";
+        BlockPos potPos = new BlockPos(6 + soilLevel, 90, 4);
         level.setBlock(potPos, potBlock.defaultBlockState(), 3);
-        CompressedPotBlockEntity pot = (CompressedPotBlockEntity) ((EntityBlock) potBlock).newBlockEntity(
-            potPos, potBlock.defaultBlockState());
-        pot.setLevel(level);
-        pot.setSoil(blockByName("1x_dirt").defaultBlockState());
-        pot.setPlant(blockByName(plantName).defaultBlockState(), MOD_ID + ":" + seedName);
+        if (!(level.getBlockEntity(potPos) instanceof CompressedPotBlockEntity pot)) {
+            errors.add("pot flow: no block entity");
+            return;
+        }
+        pot.setSoil(blockByName(soilName).defaultBlockState());
+        pot.setPlant(plant.defaultBlockState(), "minecraft:wheat_seeds");
+        int want = Math.round(CompressedPotBlockEntity.GROWTH_TICKS / (1.0F + soilLevel * 0.05F));
+        if (pot.requiredGrowth() != want) {
+            errors.add("pot requiredGrowth " + pot.requiredGrowth() + " != " + want
+                + " (soil " + soilLevel + ")");
+        }
         for (int i = 0; i < pot.requiredGrowth(); i++) {
             CompressedPotBlockEntity.serverTick(level, potPos, potBlock.defaultBlockState(), pot);
         }
-        int got = 0;
-        if (level.getBlockEntity(potPos.below()) instanceof net.minecraft.world.Container chest) {
+        if (!pot.grown() || pot.plant() == null) {
+            errors.add("pot flow not grown (soil " + soilLevel + ")");
+        }
+        level.setBlock(potPos, Blocks.AIR.defaultBlockState(), 3);
+    }
+
+    /** 刷石机：驱动 25 tick 应产出圆石并压入下方箱子。 */
+    private static void selfTestGenerator(ServerLevel level, List<String> errors) {
+        Block gen = blockByName("cobblestone_generator");
+        BlockPos gpos = new BlockPos(9, 90, 4);
+        level.setBlock(gpos.below(), Blocks.CHEST.defaultBlockState(), 3);
+        level.setBlock(gpos, gen.defaultBlockState(), 3);
+        if (!(level.getBlockEntity(gpos) instanceof CobblestoneGeneratorBlockEntity be)) {
+            errors.add("generator flow: no block entity");
+            level.setBlock(gpos, Blocks.AIR.defaultBlockState(), 3);
+            level.setBlock(gpos.below(), Blocks.AIR.defaultBlockState(), 3);
+            return;
+        }
+        for (int i = 0; i < 25; i++) {
+            CobblestoneGeneratorBlockEntity.serverTick(level, gpos, gen.defaultBlockState(), be);
+        }
+        boolean produced = false;
+        if (level.getBlockEntity(gpos.below()) instanceof net.minecraft.world.Container chest) {
             for (int i = 0; i < chest.getContainerSize(); i++) {
-                ItemStack slot = chest.getItem(i);
-                if (slot.is(itemByName(expectItem))) {
-                    got += slot.getCount();
+                if (chest.getItem(i).is(Items.COBBLESTONE)) {
+                    produced = true;
                 }
             }
         }
-        if (got < minCount) {
-            errors.add("pot auto-harvest " + plantName + " -> " + expectItem + " x" + got + " (want >= " + minCount + ")");
+        if (!produced) {
+            errors.add("generator produced no cobblestone");
         }
-        if (pot.plant() == null || pot.growthFraction() != 0.0F) {
-            errors.add("pot did not replant after harvest: " + plantName);
-        }
-        level.setBlock(potPos, Blocks.AIR.defaultBlockState(), 3);
-        level.setBlock(potPos.below(), Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(gpos, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(gpos.below(), Blocks.AIR.defaultBlockState(), 3);
     }
 
     private static double attackDamage(ItemStack stack) {

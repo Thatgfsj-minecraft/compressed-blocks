@@ -15,7 +15,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.ProblemReporter;
-import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -107,10 +106,6 @@ public class CompressedPotBlockEntity extends BlockEntity {
         return this.plant != null && this.growth >= requiredGrowth();
     }
 
-    public boolean isHopperPot() {
-        return getBlockState().getBlock() instanceof CompressedPotBlock pot && pot.hopper();
-    }
-
     public void setSoil(BlockState state) {
         this.soil = state;
         sync();
@@ -152,15 +147,12 @@ public class CompressedPotBlockEntity extends BlockEntity {
         return stack;
     }
 
-    /** 收割并自动补种（作物保留在盆内、进度清零）。 */
+    /** 收割并自动补种（作物保留在盆内、进度清零）；产物掉在盆边，时运用收割者手持物。 */
     public void harvest(Player player) {
         if (!(getLevel() instanceof ServerLevel server) || this.plant == null) {
             return;
         }
         for (ItemStack drop : drops(server, player)) {
-            if (isHopperPot() && insertIntoBelow(drop)) {
-                continue;
-            }
             Block.popResource(server, getBlockPos(), drop);
         }
         this.growth = 0;
@@ -187,7 +179,7 @@ public class CompressedPotBlockEntity extends BlockEntity {
         }
     }
 
-    /** 服务端生长计时：漏斗盆栽仅在下方有容器时自动收割入箱，否则原地等待玩家右键（与普通盆栽一致）。 */
+    /** 服务端生长计时：主 mod 盆栽只种植物，成熟后等待玩家右键收割。 */
     public static void serverTick(Level level, BlockPos pos, BlockState state, CompressedPotBlockEntity be) {
         if (be.plant == null) {
             return;
@@ -197,14 +189,6 @@ public class CompressedPotBlockEntity extends BlockEntity {
             be.growth++;
             be.setChanged();
         }
-        if (be.growth >= required && be.isHopperPot() && be.hasContainerBelow()) {
-            be.harvest(null);
-        }
-    }
-
-    /** 下方方块是否是容器（箱子/木桶/漏斗等）。 */
-    private boolean hasContainerBelow() {
-        return getLevel() != null && getLevel().getBlockEntity(getBlockPos().below()) instanceof Container;
     }
 
     /** 客户端本地推进进度（Botany Pots 同款）：渲染平滑长大，不发包。 */
@@ -265,39 +249,6 @@ public class CompressedPotBlockEntity extends BlockEntity {
             out.add(plant);
         }
         return out;
-    }
-
-    /**
-     * 漏斗盆栽输出：手动把产物合并进下方容器（箱子/木桶/漏斗都实现 Container）：
-     * 先叠加同类槽位，再放空槽；放不下返回 false（改就地掉落）。
-     */
-    private boolean insertIntoBelow(ItemStack stack) {
-        if (getLevel().getBlockEntity(getBlockPos().below()) instanceof Container container) {
-            int size = container.getContainerSize();
-            for (int i = 0; i < size && !stack.isEmpty(); i++) {
-                ItemStack slot = container.getItem(i);
-                if (slot.isEmpty() || !ItemStack.isSameItemSameComponents(stack, slot)) {
-                    continue;
-                }
-                int room = Math.min(slot.getMaxStackSize(), container.getMaxStackSize()) - slot.getCount();
-                if (room <= 0) {
-                    continue;
-                }
-                int move = Math.min(room, stack.getCount());
-                slot.grow(move);
-                stack.shrink(move);
-            }
-            for (int i = 0; i < size && !stack.isEmpty(); i++) {
-                if (container.getItem(i).isEmpty() && container.canPlaceItem(i, stack)) {
-                    container.setItem(i, stack.split(stack.getCount()));
-                }
-            }
-            if (size > 0) {
-                container.setChanged();
-            }
-            return stack.isEmpty();
-        }
-        return false;
     }
 
     private void sync() {

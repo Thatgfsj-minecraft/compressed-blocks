@@ -10,14 +10,12 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
-import net.minecraft.world.level.block.SugarCaneBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -27,28 +25,21 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
- * 压缩盆栽（Botany Pots 机制）：盆内存土壤与作物，作物不是真实方块、盆上方永远为空，
- * 由方块实体渲染器按生长进度绘制。
- * 交互：空盆+压缩泥土/沙子→填土；填土+压缩作物种子/树苗/甘蔗（重数≤土壤重数）→种植；
- * 成熟后右键收割（自动补种，时运用手持物）；潜行空手=取出作物、再取土壤。
- * 漏斗盆栽：成熟自动收割并优先插入下方容器。
+ * 盆栽（主 mod，原版配色）：只能种植**原版系**的作物/甘蔗/树苗（#minecraft:crops、
+ * #minecraft:saplings、原版甘蔗），土壤可用原版泥土系/沙子系或压缩泥土/沙子——
+ * 压缩土壤等级每高 1 级提速 5%。盆内存土壤与作物（Botany Pots 机制），
+ * 成熟后右键收割（自动补种，时运用手持物）；潜行空手取出作物/土壤。
+ * （压缩植物与自动化漏斗盆栽在附属 mod compressedblockspot 中。）
  */
 public class CompressedPotBlock extends Block implements EntityBlock {
     /** 12×12 底面、6px 高、1px 薄壁。 */
     private static final VoxelShape SHAPE = Block.box(2, 0, 2, 14, 6, 14);
-    /** 可种植物品（压缩种子/树苗/甘蔗物品）的运行时描述。 */
-    private record Plantable(BlockState state, int level, String enName, String itemId) {
+    /** 可种植物品（原版系种子/树苗/甘蔗）的运行时描述。 */
+    private record Plantable(BlockState state, int level, String itemId) {
     }
 
-    private final boolean hopper;
-
-    public CompressedPotBlock(boolean hopper, Properties props) {
+    public CompressedPotBlock(Properties props) {
         super(props);
-        this.hopper = hopper;
-    }
-
-    public boolean hopper() {
-        return this.hopper;
     }
 
     @Override
@@ -67,7 +58,7 @@ public class CompressedPotBlock extends Block implements EntityBlock {
         if (type != CompressedBlocks.POT_TYPE) {
             return null;
         }
-        // 双端 ticker（Botany Pots 同款）：客户端本地推进进度让渲染平滑，服务端权威收割
+        // 双端 ticker（Botany Pots 同款）：客户端本地推进进度让渲染平滑，服务端权威计时
         return level.isClientSide()
             ? (BlockEntityTicker<T>) (BlockEntityTicker<CompressedPotBlockEntity>)
                 CompressedPotBlockEntity::clientTick
@@ -87,18 +78,6 @@ public class CompressedPotBlock extends Block implements EntityBlock {
             }
             pot.harvest(player);
             level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.BLOCKS, 1.0F, 1.0F);
-            return InteractionResult.CONSUME;
-        }
-        // 斧头右键：取出作物（树苗/甘蔗），掉在盆边
-        if (stack.getItem() instanceof AxeItem && pot.plant() != null) {
-            if (level.isClientSide()) {
-                return InteractionResult.SUCCESS;
-            }
-            ItemStack taken = pot.takePlant();
-            if (!taken.isEmpty()) {
-                Block.popResource(level, pos, taken);
-                level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.BLOCKS, 1.0F, 1.0F);
-            }
             return InteractionResult.CONSUME;
         }
         if (pot.soil() == null) {
@@ -128,7 +107,7 @@ public class CompressedPotBlock extends Block implements EntityBlock {
                     return InteractionResult.CONSUME;
                 }
                 if (!level.isClientSide() && player instanceof ServerPlayer sp) {
-                    CompressedHooks.sendPotHint(sp, pl.enName(), pl.level(), soilLevel);
+                    CompressedHooks.sendPotHint(sp, pl.level(), soilLevel);
                 }
                 return InteractionResult.CONSUME;
             }
@@ -178,25 +157,13 @@ public class CompressedPotBlock extends Block implements EntityBlock {
         return state.is(BlockTags.DIRT) || state.is(BlockTags.SAND) ? 1 : 0;
     }
 
-    /**
-     * 持有物是否可种植：
-     * 本模组种子/树苗/甘蔗按各自重数；通用兼容——#minecraft:saplings（原版与模组树苗）、
-     * #minecraft:crops（原版与模组作物，含南瓜/西瓜茎/火把花/瓶子草）、原版甘蔗，一律 1 级。
-     */
+    /** 可种植：只收**原版系**作物/树苗/甘蔗（压缩植物请用附属 mod 的压缩盆栽）。 */
     private static Plantable plantableOf(ItemStack stack) {
-        if (stack.getItem() instanceof CompressedSoilItem item) {
-            return new Plantable(item.getBlock().defaultBlockState(), item.level(),
-                item.enName(), itemId(stack));
-        }
-        if (stack.getItem() instanceof CompressedCaneItem item) {
-            return new Plantable(item.getBlock().defaultBlockState(), item.level(),
-                item.enName(), itemId(stack));
-        }
         if (stack.getItem() instanceof BlockItem bi) {
             BlockState def = bi.getBlock().defaultBlockState();
             if (def.is(BlockTags.SAPLINGS) || def.is(BlockTags.CROPS)
-                || bi.getBlock() instanceof SugarCaneBlock) {
-                return new Plantable(def, 1, itemId(stack), itemId(stack));
+                || bi.getBlock() instanceof net.minecraft.world.level.block.SugarCaneBlock) {
+                return new Plantable(def, 0, itemId(stack));
             }
         }
         return null;

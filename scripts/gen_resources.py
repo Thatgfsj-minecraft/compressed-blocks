@@ -281,7 +281,16 @@ def cane_names():
 
 
 def pot_names():
-    return ["pot", "hopper_pot"]
+    # 压缩盆栽/漏斗盆栽拆分到附属 mod（compressedblockspot），主 mod 只保留原版色盆栽
+    return ["pot"]
+
+
+# 刷石机（3 个压缩等级，每秒产出对应等级的原石/压缩原石，压入下方容器）
+GENERATOR_TIERS = ["cobblestone_generator", "2x_cobblestone_generator", "3x_cobblestone_generator"]
+
+
+def generator_names():
+    return GENERATOR_TIERS
 
 
 # ---------------------------------------------------------------- assets
@@ -341,12 +350,10 @@ def gen_assets(res):
                                  "scale": [0.4, 0.4, 0.4]},
     }
     for name in pot_names():
-        hopper = name == "hopper_pot"
-        side = f"{NS}:block/{'hopper_pot_side' if hopper else 'pot_side'}"
         model = {
             "gui_light": "side",
             "display": pot_display,
-            "textures": {"particle": side, "side": side,
+            "textures": {"particle": f"{NS}:block/pot_side", "side": f"{NS}:block/pot_side",
                          "top": f"{NS}:block/pot_top", "bottom": f"{NS}:block/pot_bottom"},
             "elements": [
                 {"from": [2, 0, 2], "to": [14, 6, 3],
@@ -377,6 +384,18 @@ def gen_assets(res):
         dump(f"{res}/models/block/{name}.json", model)
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
+    # 刷石机（3 个压缩等级）：cube_all + 压缩环贴图；物品走 item/generated（贴图同张）
+    for name in generator_names():
+        dump(f"{res}/blockstates/{name}.json",
+             {"variants": {"": {"model": f"{NS}:block/{name}"}}})
+        dump(f"{res}/models/block/{name}.json",
+             {"parent": "minecraft:block/cube_all",
+              "textures": {"all": f"{NS}:block/{name}"}})
+        dump(f"{res}/models/item/{name}.json",
+             {"parent": "minecraft:item/generated",
+              "textures": {"layer0": f"{NS}:block/{name}"}})
+        dump(f"{res}/items/{name}.json",
+             {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
     # 耕地：15/16 模板，无物品
     for name in farmland_names():
         p = name.split("_", 1)[0]
@@ -472,8 +491,15 @@ def gen_lang(res):
             # 重数前缀已含「压缩」：不要重复拼接
             en[f"block.{NS}.{name}"] = f"{lv[1]} {cane_en(mat[1])} Cane"
             zh[f"block.{NS}.{name}"] = f"{lv[2]}{cane_zh(mat)}甘蔗"
-    en["block." + NS + ".pot"] = "Compressed Pot"
-    zh["block." + NS + ".pot"] = "压缩盆栽"
+    en["block." + NS + ".pot"] = "Pot"
+    zh["block." + NS + ".pot"] = "盆栽"
+    generator_lang = {"cobblestone_generator": ("Cobblestone Generator", "刷石机"),
+                      "2x_cobblestone_generator": ("Double Compressed Cobblestone Generator", "二重压缩刷石机"),
+                      "3x_cobblestone_generator": ("Triple Compressed Cobblestone Generator", "三重压缩刷石机")}
+    for name in generator_names():
+        en_name, zh_name = generator_lang[name]
+        en["block." + NS + "." + name] = en_name
+        zh["block." + NS + "." + name] = zh_name
     en["block." + NS + ".hopper_pot"] = "Compressed Hopper Pot"
     zh["block." + NS + ".hopper_pot"] = "压缩漏斗盆栽"
     crop_en = {c[0]: c[1] for c in CROPS}
@@ -671,12 +697,26 @@ def gen_data(data):
             else:
                 compress(cur, f"{NS}:{LV[i - 1]}_{key}_cane")
                 unpack(cur, f"{NS}:{p}_{mat[0]}", count=1)
-    # ---- 压缩盆栽：5× 任意一重压缩方块（船形）；盆栽+漏斗=漏斗盆栽
-    dump(f"{data}/{NS}/tags/item/pot_material.json",
-         {"replace": False, "values": sorted(f"{NS}:1x_{m[0]}" for m in storage_materials())})
-    shaped("pot", ["A A", "AAA"], {"A": f"#{NS}:pot_material"}, f"{NS}:pot")
-    shapeless("hopper_pot", [f"{NS}:pot", "minecraft:hopper"], f"{NS}:hopper_pot",
-              category="misc")
+    # ---- 压缩盆栽：石头类（原石/石头/花岗岩……）船形合成；只能种原版作物/甘蔗/树木（Java 侧限定）
+    dump(f"{data}/minecraft/tags/item/pot_stones.json", {"replace": False, "values": [
+        "minecraft:cobblestone", "minecraft:stone", "minecraft:granite", "minecraft:diorite",
+        "minecraft:andesite", "minecraft:cobbled_deepslate", "minecraft:deepslate",
+        "minecraft:blackstone", "minecraft:tuff", "minecraft:calcite", "minecraft:dripstone_block",
+    ]})
+    shaped("pot", ["A A", "AAA"], {"A": "#minecraft:pot_stones"}, f"{NS}:pot")
+    # ---- 刷石机：红石/铁锭/红石 + 水桶/原石/岩浆桶 + 黑曜石/漏斗/黑曜石；机器可 9↔1 压缩（最多三重）
+    shaped("cobblestone_generator",
+           ["RIR", "BCL", "OHO"],
+           {"R": "minecraft:redstone", "I": "minecraft:iron_ingot",
+            "B": "minecraft:water_bucket", "C": "minecraft:cobblestone",
+            "L": "minecraft:lava_bucket", "O": "minecraft:obsidian",
+            "H": "minecraft:hopper"},
+           f"{NS}:cobblestone_generator")
+    for i, name in enumerate(generator_names()):
+        if i == 0:
+            continue
+        compress(f"{NS}:{name}", f"{NS}:{generator_names()[i - 1]}")
+        unpack(f"{NS}:{name}", f"{NS}:{generator_names()[i - 1]}")
     # ---- 食物：面包=3 压缩小麦（原版 3 麦→面包），牛肉=9 肉，西瓜见上
     shaped("1x_bread", ["WWW"], {"W": f"{NS}:1x_wheat"}, f"{NS}:1x_bread", category="misc")
     for i, p in enumerate(LV[:FOOD_MAX_LEVEL]):
@@ -752,9 +792,13 @@ def gen_data(data):
     # 压缩盆栽：掉落自身（盆内土壤/作物由方块实体 onRemove 补发）
     for name in pot_names():
         dump(f"{data}/{NS}/loot_table/blocks/{name}.json", self_drop(name))
+    # 刷石机：掉落自身
+    for name in generator_names():
+        dump(f"{data}/{NS}/loot_table/blocks/{name}.json", self_drop(name))
     # ---- 方块标签（并入原版命名空间）
     # 所有压缩方块统一镐子采掘；挖掘等级：L1-2 石镐、L3-4 铁镐、L5+ 钻镐封顶
-    pickaxe = [f"{NS}:{n}" for n in storage_names()] + [f"{NS}:{n}" for n in pot_names()]
+    pickaxe = ([f"{NS}:{n}" for n in storage_names()] + [f"{NS}:{n}" for n in pot_names()]
+               + [f"{NS}:{n}" for n in generator_names()])
     stone_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) <= 2]
     iron_tool = [f"{NS}:{n}" for n in storage_names() if 3 <= int(n.split("_", 1)[0][:-1]) <= 4]
     diamond_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) >= 5]
@@ -906,14 +950,14 @@ def main():
     subs = [os.path.join(ROOT, args.target, loader) for loader in ("fabric", "neoforge")]
 
     blocks = (storage_names() + leaves_names() + sapling_names() + farmland_names()
-              + crop_block_names() + cane_names() + pot_names())
+              + crop_block_names() + cane_names() + pot_names() + generator_names())
     items = (storage_names() + leaves_names() + sapling_names() + crop_block_names() + cane_names()
-             + pot_names() + tool_names() + armor_names() + food_names() + crop_produce_names()
-             + stick_names() + extra_seed_names())
+             + pot_names() + generator_names() + tool_names() + armor_names() + food_names()
+             + crop_produce_names() + stick_names() + extra_seed_names())
     assert len(storage_names()) == 459, len(storage_names())
     assert len(tool_names()) == 90, len(tool_names())
-    assert len(blocks) == 1112, len(blocks)
-    assert len(items) == 1346, len(items)
+    assert len(blocks) == 1114, len(blocks)
+    assert len(items) == 1348, len(items)
     print(f"blocks={len(blocks)} items={len(items)} (tools={len(tool_names())} armor={len(armor_names())} "
           f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())} "
           f"canes={len(cane_names())})")

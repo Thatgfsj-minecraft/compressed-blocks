@@ -21,7 +21,8 @@ const STORAGE_MATS = ['cobblestone', 'stone', 'cobbled_deepslate', 'deepslate',
   'moss_block', 'snow', 'blue_ice', 'mud', 'gunpowder'];
 // 甘蔗 = 纯甘蔗 + 每种储存材料一条线（id 材料段去掉 _block 后缀）
 const CANES = ['cane', ...STORAGE_MATS.map((m) => m.replace(/_block$/, '') + '_cane')];
-const POTS = ['pot', 'hopper_pot'];
+const POTS = ['pot'];
+const GENERATORS = ['cobblestone_generator', '2x_cobblestone_generator', '3x_cobblestone_generator'];
 const WOODS = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'mangrove', 'cherry', 'pale_oak'];
 const CROPS = ['wheat', 'carrot', 'potato', 'beetroot'];
 const CROP_LEVELS = LEVELS.slice(0, 3);
@@ -62,8 +63,8 @@ const EXTRA_SEED_ITEMS = EXTRA_SEEDS.flatMap((k) => CROP_LEVELS.map((p) => `${p}
 const CROP_ITEMS = ['wheat', 'beetroot'].flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}_seeds`))
   .concat(['carrot', 'potato'].flatMap((c) => CROP_LEVELS.map((p) => `${p}_${c}`)));
 const ALL_ITEMS = [...STORAGE_BLOCKS, ...LEAVES, ...SAPLINGS, ...CANE_BLOCKS, ...CROP_ITEMS,
-  ...POTS.flatMap((p) => [p]), ...TOOL_IDS, ...ARMOR_IDS, ...FOOD_IDS, ...PRODUCE, ...STICKS,
-  ...EXTRA_SEED_ITEMS];
+  ...POTS.flatMap((p) => [p]), ...GENERATORS, ...TOOL_IDS, ...ARMOR_IDS, ...FOOD_IDS, ...PRODUCE,
+  ...STICKS, ...EXTRA_SEED_ITEMS];
 
 let failures = 0;
 function check(name, ok, detail) {
@@ -74,7 +75,7 @@ function check(name, ok, detail) {
 }
 
 (async () => {
-  if (ALL_ITEMS.length !== 1346) throw new Error(`item list ${ALL_ITEMS.length} != 1346`);
+  if (ALL_ITEMS.length !== 1348) throw new Error(`item list ${ALL_ITEMS.length} != 1349`);
   const rcon = await new Rcon().connect(PORT, '127.0.0.1', 'testpass');
   const cmd = (c) => rcon.command(c);
 
@@ -221,7 +222,7 @@ function check(name, ok, detail) {
 
   // 6) 盆栽：放置 + BE NBT 读写回路。生长→自动收割→补种闭环在 SELF-TEST 内直接驱动
   //    serverTick 验证（1.21.11 空服无玩家时区块为边界加载不计时，RCON tick sprint 驱不动 BE）。
-  await cmd(`setblock 4 -59 20 ${NS}:hopper_pot`);
+  await cmd(`setblock 4 -59 20 ${NS}:pot`);
   const potMerge = await cmd(
     `data merge block 4 -59 20 {Soil:"${NS}:1x_dirt",Plant:"${NS}:1x_cane",Seed:"${NS}:1x_cane",Growth:5}`);
   check('pot BE merge', !/Unknown|Failed|Could not/i.test(potMerge), potMerge.trim());
@@ -245,7 +246,7 @@ function check(name, ok, detail) {
   }
   check('pot break drops soil', await expectDrop('1x_dirt'));
   check('pot break drops plant', await expectDrop('1x_cane'));
-  check('pot break drops pot', await expectDrop('hopper_pot'));
+  check('pot break drops pot', await expectDrop('pot'));
   await cmd('kill @e[type=minecraft:item]');
   await cmd(`setblock 4 -59 20 minecraft:air`);
   await cmd('kill @e[type=minecraft:item]');

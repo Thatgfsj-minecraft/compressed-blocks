@@ -614,15 +614,26 @@ def main():
             pxt[x, y] = (52, 40, 34, 255)
     block_tex["pot_top"] = pot_top
     block_tex["pot_bottom"] = darken(terra, 0.85)
-    hopper_side = block_tex["pot_side"].copy()
-    pxh = hopper_side.load()
-    for y in range(5, 8):
-        for x in range(SIZE):
-            pxh[x, y] = (92, 94, 102, 255)
-    block_tex["hopper_pot_side"] = hopper_side
 
-    # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 60 作物阶段 + 468 甘蔗 + 4 盆栽 = 1162
-    assert len(block_tex) == 1162, len(block_tex)
+    # 刷石机（3 压缩等级）：圆石底 + 红石斑点 + 铁色铆钉 + 压缩环
+    cobble = load_base("block/cobblestone")
+    red = load_base("block/redstone_block")
+    red_avg = avg_color(red)
+    iron = load_base("block/iron_block")
+    for tier in (1, 2, 3):
+        img = cobble.copy()
+        pxi = img.load()
+        for x, y in ((2, 3), (3, 2), (12, 4), (13, 3), (4, 12), (3, 13), (11, 13), (12, 12),
+                     (7, 5), (8, 5), (7, 10), (8, 10), (5, 7), (5, 8), (10, 7), (10, 8)):
+            pxi[x, y] = (int(red_avg[0]), int(red_avg[1]), int(red_avg[2]), 255)
+        for x, y in ((1, 1), (14, 1), (1, 14), (14, 14), (7, 1), (8, 14), (1, 7), (14, 8)):
+            iron_px = iron.getpixel((x % 16, y % 16))
+            pxi[x, y] = (iron_px[0], iron_px[1], iron_px[2], 255)
+        block_tex[f"{['', '2x_', '3x_'][tier - 1]}cobblestone_generator"] = \
+            gen_block_tex(img, tier)
+
+    # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 60 作物阶段 + 468 甘蔗 + 3 盆栽贴图 + 3 刷石机 = 1164
+    assert len(block_tex) == 1164, len(block_tex)
     print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}, armor layers: {len(armor_layer_tex)}")
     for sub in SUBPROJECTS:
         rel = os.path.relpath(sub, ROOT)

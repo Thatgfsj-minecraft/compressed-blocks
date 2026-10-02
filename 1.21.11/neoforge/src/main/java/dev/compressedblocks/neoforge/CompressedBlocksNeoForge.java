@@ -1,5 +1,6 @@
 package dev.compressedblocks.neoforge;
 
+import dev.compressedblocks.CobblestoneGeneratorBlockEntity;
 import dev.compressedblocks.CompressedBlocks;
 import dev.compressedblocks.CompressedHooks;
 import dev.compressedblocks.CompressedPotBlockEntity;
@@ -9,6 +10,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -57,7 +59,9 @@ public class CompressedBlocksNeoForge {
             event.register(Registries.BLOCK_ENTITY_TYPE, helper -> {
                 // 1.21.11 原版构造器私有，NeoForge 提供公开便捷构造
                 CompressedBlocks.POT_TYPE = new BlockEntityType<>(CompressedPotBlockEntity::new,
-                    CompressedBlocks.POT, CompressedBlocks.HOPPER_POT);
+                    CompressedBlocks.POT);
+                CompressedBlocks.GENERATOR_TYPE = new BlockEntityType<>(CobblestoneGeneratorBlockEntity::new,
+                    CompressedBlocks.GENERATOR_BLOCKS.toArray(new Block[0]));
                 helper.register(CompressedBlocks.id("pot"), CompressedBlocks.POT_TYPE);
             });
         } else if (event.getRegistryKey() == Registries.CREATIVE_MODE_TAB) {
