@@ -908,15 +908,8 @@ def gen_data(data):
         dump(f"{data}/{NS}/loot_table/blocks/{name}.json", self_drop(name))
     # 压缩箱子：掉落自身（内容洒出由 BE preRemoveSideEffects 处理）
     dump(f"{data}/{NS}/loot_table/blocks/compressed_chest.json", self_drop("compressed_chest"))
-    # 压缩潜影盒：掉落自身 + 内容随物品保留（copy_components，同原版潜影盒）
-    dump(f"{data}/{NS}/loot_table/blocks/compressed_shulker_box.json", {
-        "type": "minecraft:block", "random_sequence": f"{NS}:blocks/compressed_shulker_box",
-        "pools": [{"rolls": 1.0, "bonus_rolls": 0.0,
-                   "conditions": [{"condition": "minecraft:survives_explosion"}],
-                   "entries": [{"type": "minecraft:item", "name": f"{NS}:compressed_shulker_box",
-                                "functions": [{"function": "minecraft:copy_components",
-                                               "source": "block_entity",
-                                               "components": ["minecraft:container"]}]}]}]})
+    # 压缩潜影盒：掉落自身（内容保留由 CompressedShulkerBlock#getDrops 直接构建，不走战利品表）
+    dump(f"{data}/{NS}/loot_table/blocks/compressed_shulker_box.json", self_drop("compressed_shulker_box"))
     # ---- 方块标签（并入原版命名空间）
     # 所有压缩方块统一镐子采掘；挖掘等级：L1-2 石镐、L3-4 铁镐、L5+ 钻镐封顶
     pickaxe = ([f"{NS}:{n}" for n in storage_names()] + [f"{NS}:{n}" for n in pot_names()]

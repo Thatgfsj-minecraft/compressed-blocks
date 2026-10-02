@@ -34,6 +34,11 @@ public class ScrollingContainerBlockEntity extends BaseContainerBlockEntity {
         return this.keepsContents;
     }
 
+    /** 供掉落构建读取全部 243 格（潜影盒内容随物品保留）。 */
+    public NonNullList<ItemStack> allItems() {
+        return this.items;
+    }
+
     @Override
     public int getContainerSize() {
         return this.items.size();

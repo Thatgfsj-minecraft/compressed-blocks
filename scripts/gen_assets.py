@@ -704,51 +704,70 @@ def main():
             block_tex[f"{prefix}_{key}_block"] = gen_metal_tex(
                 base_rgb, int(prefix[:-1]), seed=hash(key) & 0xFFFF)
 
-    # 压缩箱子：橡木板底 + 深色框 + 铁锁扣（正面）；压缩潜影盒：暗紫 + 盖缝（单一等级）
-    def framed_panel(base):
-        img = base.copy()
-        px = img.load()
-        for i in range(SIZE):
-            px[i, 0] = (72, 48, 24, 255)
-            px[i, 15] = (58, 38, 18, 255)
-            px[0, i] = (66, 43, 21, 255)
-            px[15, i] = (66, 43, 21, 255)
-        return img
+    # 压缩箱子/压缩潜影盒：原版实体贴图（entity/chest、entity/shulker）裁面合成 + 1px 黑边（压缩标识）
+    chest_src = Image.open(os.path.join(ROOT, "_asset-src", "vanilla", "entity", "chest",
+                                        "normal.png")).convert("RGBA")
+    shulker_src = Image.open(os.path.join(ROOT, "_asset-src", "vanilla", "entity", "shulker",
+                                          "shulker.png")).convert("RGBA")
 
-    plank_panel = framed_panel(load_base("block/oak_planks"))
-    chest_front = plank_panel.copy()
-    pxc = chest_front.load()
-    for y in range(4, 8):
-        for x in range(7, 9):
-            pxc[x, y] = (208, 208, 208, 255)  # 铁锁扣
-    block_tex["compressed_chest_front"] = gen_block_tex(chest_front, 1, gray=False)
-    block_tex["compressed_chest_side"] = gen_block_tex(plank_panel.copy(), 1, gray=False)
-    block_tex["compressed_chest_top"] = gen_block_tex(plank_panel.copy(), 1, gray=False)
-    block_tex["compressed_chest_bottom"] = gen_block_tex(darken(plank_panel.copy(), 0.85), 1, gray=False)
+    def stack16(top_img, bottom_img):
+        """上下两段 14 宽贴片拼 16×16：左右扩边、底部不足补最后一行、超出截断。"""
+        out = Image.new("RGBA", (SIZE, SIZE))
+        out.paste(top_img, (1, 0))
+        out.paste(bottom_img, (1, top_img.height))
+        px = out.load()
+        done = top_img.height + bottom_img.height
+        for y in range(SIZE):
+            px[0, y] = px[1, y]
+            px[15, y] = px[14, y]
+            if y >= done:
+                for x in range(SIZE):
+                    px[x, y] = px[x, done - 1]
+        return out
 
-    def purple_panel(seam):
-        img = Image.new("RGBA", (SIZE, SIZE), (88, 54, 122, 255))
-        px = img.load()
+    def flat16(img):
+        """单贴片 → 16×16：居中粘贴 + 边缘像素外扩。"""
+        out = Image.new("RGBA", (SIZE, SIZE))
+        ox = (SIZE - img.width) // 2
+        oy = (SIZE - img.height) // 2
+        out.paste(img, (ox, oy))
+        px = out.load()
         for y in range(SIZE):
             for x in range(SIZE):
-                if (x * 7 + y * 5) % 11 == 0:
-                    px[x, y] = (80, 48, 112, 255)  # 微噪点
-        pxs = img.load()
-        for x in range(SIZE):
-            for y in seam:
-                pxs[x, y] = (52, 30, 76, 255)
-        return img
+                px[x, y] = img.getpixel((min(max(x - ox, 0), img.width - 1),
+                                         min(max(y - oy, 0), img.height - 1)))
+        return out
 
-    block_tex["compressed_shulker_box_side"] = gen_block_tex(
-        purple_panel((4, 13, 14, 15)), 1, gray=False)
-    top = purple_panel(())
-    pxt2 = top.load()
-    for y in range(6, 10):
-        for x in range(6, 10):
-            pxt2[x, y] = (116, 78, 152, 255)  # 顶面把手
-    block_tex["compressed_shulker_box_top"] = gen_block_tex(top, 1, gray=False)
-    block_tex["compressed_shulker_box_bottom"] = gen_block_tex(
-        darken(purple_panel(()).copy(), 0.8), 1, gray=False)
+    def black_edge(img):
+        out = img.copy()
+        px = out.load()
+        for i in range(SIZE):
+            px[i, 0] = (10, 10, 10, 255)
+            px[i, 15] = (10, 10, 10, 255)
+            px[0, i] = (10, 10, 10, 255)
+            px[15, i] = (10, 10, 10, 255)
+        return out
+
+    # 箱子：盖面/盖沿/箱身正面/侧面/内顶（ModelChest UV：盖 (14,0)/(14,14)，箱身 (14,33)/(28,33)/(14,19)）
+    lid_top = chest_src.crop((14, 0, 28, 14))
+    lid_front = chest_src.crop((14, 14, 28, 19))
+    box_front = chest_src.crop((14, 33, 28, 43))
+    box_side = chest_src.crop((28, 33, 42, 43))
+    box_inside = chest_src.crop((14, 19, 28, 33))
+    front = stack16(lid_front, box_front)
+    front.paste(chest_src.crop((1, 1, 3, 5)), (7, 1))  # 锁扣贴回盖缝中央
+    block_tex["compressed_chest_front"] = black_edge(front)
+    block_tex["compressed_chest_side"] = black_edge(stack16(lid_front, box_side))
+    block_tex["compressed_chest_top"] = black_edge(flat16(lid_top))
+    block_tex["compressed_chest_bottom"] = black_edge(darken(flat16(box_inside), 0.8))
+
+    # 潜影盒：像素扫描定位干净区——壳顶 (16,0,30,14)、壳面 (14,16,28,24)、螺旋底 (33,29,41,37)
+    shell_top = shulker_src.crop((16, 0, 30, 14))
+    shell_side = shulker_src.crop((14, 16, 28, 24))
+    spiral = shulker_src.crop((33, 29, 41, 37))
+    block_tex["compressed_shulker_box_side"] = black_edge(stack16(shell_side, darken(shell_side, 0.85)))
+    block_tex["compressed_shulker_box_top"] = black_edge(flat16(shell_top))
+    block_tex["compressed_shulker_box_bottom"] = black_edge(flat16(spiral))
 
     # 滚动容器 GUI：194×222 面板（6 行窗口 + 背包区 + 右侧滚动条轨道）
     gui = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
