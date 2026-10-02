@@ -6,6 +6,7 @@ loom {
     mixin {
         defaultRefmapName = 'compressedblocks.mixins.refmap.json'
     }
+    accessWidenerPath = file('src/main/resources/compressedblocks.accesswidener')
 }
 
 version = '0.3.2'

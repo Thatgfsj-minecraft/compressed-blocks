@@ -21,6 +21,10 @@ java {
 neoForge {
     version = "${project.neoforge_version}"
 
+    accessTransformers {
+        file('src/main/resources/META-INF/accesstransformer.cfg')
+    }
+
     mods {
         compressedblocks {
             sourceSet sourceSets.main

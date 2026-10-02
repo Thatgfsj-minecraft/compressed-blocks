@@ -10,6 +10,7 @@
   "license": "GPL-3.0",
   "environment": "*",
   "icon": "assets/compressedblocks/icon.png",
+  "accessWidener": "compressedblocks.accesswidener",
   "mixins": [
     "compressedblocks.mixins.json"
   ],
