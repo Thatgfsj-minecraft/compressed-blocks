@@ -10,14 +10,22 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 
 /**
  * 滚动容器界面（压缩箱子/压缩潜影盒共用）：每页 6 行 + 右侧滚动条。
+ * 视觉与原版 6 行大箱完全一致：背景直接 blit 原版 generic_54（原版 ContainerScreen
+ * 同款两段式），滚动条用原版创造栏/列表同款精灵图；右侧轨道为原版灰面板延伸。
  * 滚动纯客户端（菜单槽固定映射，滚动只是挪取景窗）：滚轮逐行、点轨道上下翻页、
  * 按住滑块拖动连续跟随，零网络零闪烁。
  */
 public class ScrollingContainerScreen extends AbstractContainerScreen<ScrollingContainerMenu> {
-    private static final Identifier BACKGROUND =
-        Identifier.fromNamespaceAndPath(CompressedBlocks.MOD_ID, "textures/gui/compressed_container.png");
-    private static final int TRACK_X = 174, TRACK_Y = 17, TRACK_W = 12, TRACK_H = 108;
-    private static final int THUMB_H = 24;
+    /** 原版 6 行箱子背景（generic_54：v0..rows*18+17=顶帽+行带，v126 起为背包区）。 */
+    private static final Identifier BACKGROUND = Identifier.withDefaultNamespace("textures/gui/container/generic_54.png");
+    /** 原版创造栏滚动条（12×15）与列表轨道底（1.21.11 同款精灵）。 */
+    private static final Identifier SCROLLER = Identifier.withDefaultNamespace("container/creative_inventory/scroller");
+    private static final Identifier SCROLLER_BG = Identifier.withDefaultNamespace("widget/scroller_background");
+    private static final int PANEL_W = 176;
+    /** 原版灰面板色（198,198,198）。 */
+    private static final int VANILLA_GRAY = 0xFFC6C6C6;
+    private static final int TRACK_X = 178, TRACK_Y = 18, TRACK_W = 12, TRACK_H = 106;
+    private static final int THUMB_H = 15;
     /** 拖动滑块时记录抓取偏移（鼠标y-滑块顶）；-1 = 未在拖动。 */
     private double dragOffset = -1;
 
@@ -36,13 +44,24 @@ public class ScrollingContainerScreen extends AbstractContainerScreen<ScrollingC
 
     @Override
     protected void renderBg(GuiGraphics gfx, float partialTick, int mouseX, int mouseY) {
+        // 原版 ContainerScreen 两段式背景（6 行窗口 + 背包区），像素级与原版大箱一致
         gfx.blit(RenderPipelines.GUI_TEXTURED, BACKGROUND,
-            this.leftPos, this.topPos, 0.0F, 0.0F, this.imageWidth, this.imageHeight, 256, 256);
-        // 滚动条：轨道 + 滑块（按客户端取景窗位置绘制）
-        int tx = this.leftPos + TRACK_X, ty = this.topPos + TRACK_Y;
-        gfx.fill(tx, ty, tx + TRACK_W, ty + TRACK_H, 0xFF8B8B8B);
-        int thumbY = this.thumbTop();
-        gfx.fill(tx + 1, thumbY, tx + TRACK_W - 1, thumbY + THUMB_H, 0xFFF0F0F0);
+            this.leftPos, this.topPos, 0.0F, 0.0F, PANEL_W,
+            ScrollingContainerMenu.VISIBLE_ROWS * 18 + 17, 256, 256);
+        gfx.blit(RenderPipelines.GUI_TEXTURED, BACKGROUND,
+            this.leftPos, this.topPos + ScrollingContainerMenu.VISIBLE_ROWS * 18 + 17,
+            0.0F, 126.0F, PANEL_W, 96, 256, 256);
+        // 右侧轨道面板：原版灰延伸 + 黑外边（顶/右/底）
+        int rx = this.leftPos + PANEL_W;
+        gfx.fill(rx, this.topPos, rx + 17, this.topPos + 1, 0xFF000000);
+        gfx.fill(rx, this.topPos + 1, rx + 17, this.topPos + 221, VANILLA_GRAY);
+        gfx.fill(rx + 16, this.topPos, rx + 17, this.topPos + 222, 0xFF000000);
+        gfx.fill(rx, this.topPos + 221, rx + 17, this.topPos + 222, 0xFF000000);
+        // 滚动条：原版精灵轨道 + 滑块（按客户端取景窗位置绘制）
+        gfx.blitSprite(RenderPipelines.GUI_TEXTURED, SCROLLER_BG,
+            this.leftPos + TRACK_X, this.topPos + TRACK_Y, TRACK_W, TRACK_H);
+        gfx.blitSprite(RenderPipelines.GUI_TEXTURED, SCROLLER,
+            this.leftPos + TRACK_X, this.thumbTop(), TRACK_W, THUMB_H);
     }
 
     private int thumbTop() {

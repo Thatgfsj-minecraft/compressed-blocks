@@ -3,6 +3,8 @@ package dev.compressedblocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.entity.ContainerUser;
@@ -19,8 +21,8 @@ import net.minecraft.world.level.storage.ValueOutput;
 /**
  * 滚动容器方块实体（压缩箱子/压缩潜影盒共用）：27 行×9 列 = 243 格。
  * 箱子破坏时洒出内容；潜影盒破坏时内容随物品保留（getDrops 直接构建）。
- * 潜影盒变体带原版同款开盖动画：openCount 经 blockEvent 同步到客户端，
- * 客户端 ticker 以 10 tick 开/关推进 lidProgress（原版 ShulkerBoxBlockEntity 同款）。
+ * 两种变体都带原版同款开盖动画：openCount 经 blockEvent 同步到客户端，
+ * 客户端 ticker 以 10 tick 开/关推进 lidProgress；箱子另有原版开/关音。
  */
 public class ScrollingContainerBlockEntity extends BaseContainerBlockEntity {
     /** blockEvent 类型：同步 openCount（原版 ShulkerBoxBlockEntity.EVENT_SET_OPEN_COUNT 同款）。 */
@@ -91,7 +93,7 @@ public class ScrollingContainerBlockEntity extends BaseContainerBlockEntity {
         }
     }
 
-    // ---------------------------------------------------------- 开盖动画（仅潜影盒变体）
+    // ---------------------------------------------------------- 开盖动画（箱子/潜影盒共用）
 
     /** 插值后的开盖进度（0=合 1=开），BER 每帧读取。 */
     public float getLidProgress(float partialTick) {
@@ -128,7 +130,7 @@ public class ScrollingContainerBlockEntity extends BaseContainerBlockEntity {
 
     @Override
     public boolean triggerEvent(int type, int data) {
-        if (this.keepsContents && type == EVENT_SET_OPEN_COUNT) {
+        if (type == EVENT_SET_OPEN_COUNT) {
             this.openCount = data;
             this.lidStatus = data == 0 ? LidStatus.CLOSING : LidStatus.OPENING;
             return true;
@@ -136,9 +138,19 @@ public class ScrollingContainerBlockEntity extends BaseContainerBlockEntity {
         return super.triggerEvent(type, data);
     }
 
+    /** 箱子变体的开/关音（原版 ChestBlockEntity 同款音量音高；潜影盒维持原状）。 */
+    private void playChestSound(boolean open) {
+        if (this.keepsContents || !(getLevel() instanceof Level level) || level.isClientSide()) {
+            return;
+        }
+        level.playSound(null, this.worldPosition,
+            open ? SoundEvents.CHEST_OPEN : SoundEvents.CHEST_CLOSE,
+            SoundSource.BLOCKS, 0.5F, level.random.nextFloat() * 0.1F + 0.9F);
+    }
+
     @Override
     public void startOpen(ContainerUser user) {
-        if (!this.keepsContents || this.isRemoved()) {
+        if (this.isRemoved()) {
             return;
         }
         if (user.getLivingEntity() != null && user.getLivingEntity().isSpectator()) {
@@ -148,21 +160,28 @@ public class ScrollingContainerBlockEntity extends BaseContainerBlockEntity {
             this.openCount = 0;
         }
         this.openCount++;
+        boolean first = this.openCount == 1;
         if (this.level != null) {
             this.level.blockEvent(this.worldPosition, this.getBlockState().getBlock(),
                 EVENT_SET_OPEN_COUNT, this.openCount);
+        }
+        if (first) {
+            playChestSound(true);
         }
     }
 
     @Override
     public void stopOpen(ContainerUser user) {
-        if (!this.keepsContents || this.isRemoved()) {
+        if (this.isRemoved()) {
             return;
         }
         this.openCount--;
         if (this.level != null) {
             this.level.blockEvent(this.worldPosition, this.getBlockState().getBlock(),
                 EVENT_SET_OPEN_COUNT, this.openCount);
+        }
+        if (this.openCount == 0) {
+            playChestSound(false);
         }
     }
 

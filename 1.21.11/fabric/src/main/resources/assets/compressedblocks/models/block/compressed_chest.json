@@ -1,1 +1,1 @@
-{"parent":"minecraft:block/cube","textures":{"up":"compressedblocks:block/compressed_chest_top","down":"compressedblocks:block/compressed_chest_bottom","north":"compressedblocks:block/compressed_chest_front","south":"compressedblocks:block/compressed_chest_side","west":"compressedblocks:block/compressed_chest_side","east":"compressedblocks:block/compressed_chest_side","particle":"compressedblocks:block/compressed_chest_side"}}
+{"textures":{"particle":"compressedblocks:block/compressed_chest_side"}}

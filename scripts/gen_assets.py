@@ -778,6 +778,19 @@ def main():
     block_tex["compressed_shulker_box_top"] = black_edge(flat16(shell_top))
     block_tex["compressed_shulker_box_bottom"] = black_edge(flat16(spiral))
 
+    # 压缩箱子实体贴图（开盖 BER 用）：原版 normal.png 整图微暗化 + 盖/身接缝黑线（压缩标识）
+    chest_entity = chest_src.copy()
+    cpx = chest_entity.load()
+    for y in range(chest_entity.height):
+        for x in range(chest_entity.width):
+            r, g, b, a = cpx[x, y]
+            if a:
+                cpx[x, y] = (int(r * 0.88), int(g * 0.88), int(b * 0.88), a)
+    for seam_y in (18, 33):
+        for x in range(0, 56):
+            cpx[x, seam_y] = (10, 10, 10, 255)
+    entity_tex = {"chest/compressed_chest": chest_entity}
+
     # 滚动容器 GUI：194×222 面板（6 行窗口 + 背包区 + 右侧滚动条轨道）
     gui = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
     gpx = gui.load()
@@ -835,6 +848,10 @@ def main():
             img.save(p)
         for name, img in gui_tex.items():
             p = os.path.join(tdir, "gui", name + ".png")
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            img.save(p)
+        for name, img in entity_tex.items():
+            p = os.path.join(tdir, "entity", name + ".png")
             os.makedirs(os.path.dirname(p), exist_ok=True)
             img.save(p)
         for name, img in armor_layer_tex.items():

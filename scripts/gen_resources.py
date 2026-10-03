@@ -436,26 +436,22 @@ def gen_assets(res):
              {"parent": f"{NS}:block/{name}"})
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
-    # 压缩箱子（带朝向，正面锁扣）：顶/底/正面/侧面；压缩潜影盒（整体方块）top/bottom/side。
-    # 物品继承方块模型（3D 图标）
-    # 压缩箱子（带朝向，正面锁扣）
+    # 压缩箱子（带朝向，正面锁扣）：与潜影盒同款 BER 实体渲染（原版开盖动画），
+    # 方块模型只留 particle；物品走原版 chest special 渲染（texture 填短 id，
+    # mapper 自动加 entity/chest/ 前缀），底模用原版 template_chest 平面图标
     dump(f"{res}/models/block/compressed_chest.json",
-         {"parent": "minecraft:block/cube",
-          "textures": {"up": f"{NS}:block/compressed_chest_top",
-                       "down": f"{NS}:block/compressed_chest_bottom",
-                       "north": f"{NS}:block/compressed_chest_front",
-                       "south": f"{NS}:block/compressed_chest_side",
-                       "west": f"{NS}:block/compressed_chest_side",
-                       "east": f"{NS}:block/compressed_chest_side",
-                       "particle": f"{NS}:block/compressed_chest_side"}})
+         {"textures": {"particle": f"{NS}:block/compressed_chest_side"}})
     dump(f"{res}/blockstates/compressed_chest.json",
          {"variants": {"facing=north": {"model": f"{NS}:block/compressed_chest"},
                        "facing=east": {"model": f"{NS}:block/compressed_chest", "y": 90},
                        "facing=south": {"model": f"{NS}:block/compressed_chest", "y": 180},
                        "facing=west": {"model": f"{NS}:block/compressed_chest", "y": 270}}})
-    dump(f"{res}/models/item/compressed_chest.json", {"parent": f"{NS}:block/compressed_chest"})
+    dump(f"{res}/models/item/compressed_chest.json",
+         {"parent": "minecraft:item/template_chest",
+          "textures": {"particle": f"{NS}:block/compressed_chest_side"}})
     dump(f"{res}/items/compressed_chest.json",
-         {"model": {"type": "minecraft:model", "model": f"{NS}:item/compressed_chest"}})
+         {"model": {"type": "minecraft:special", "base": f"{NS}:item/compressed_chest",
+                    "model": {"type": "minecraft:chest", "texture": f"{NS}:compressed_chest"}}})
     # 压缩潜影盒：BER 实体渲染（开盖动画），方块模型只留 particle；
     # 物品走原版 shulker_box special 渲染（texture 填短 id，mapper 自动加 entity/shulker/ 前缀）
     dump(f"{res}/models/block/compressed_shulker_box.json",

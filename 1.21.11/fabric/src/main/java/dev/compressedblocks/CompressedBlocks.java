@@ -1265,6 +1265,51 @@ public final class CompressedBlocks {
         growFlow(level, errors, Blocks.WHEAT, 1);
         growFlow(level, errors, Blocks.OAK_SAPLING, 1);
         growFlow(level, errors, Blocks.WHEAT, 9);
+        cropYieldFlow(level, errors);
+    }
+
+    /** 定稿产量表抽查（原版泥土无翻倍）：土豆 2-4、小麦=麦粒 1-2+种子 0-2；翻倍概率表 1-9 重锚点。 */
+    private static void cropYieldFlow(ServerLevel level, List<String> errors) {
+        float[] wantChance = {0.0F, 0.15F, 0.20F, 0.25F, 0.30F, 0.35F, 0.40F, 0.45F, 0.50F, 0.60F};
+        if (!java.util.Arrays.equals(wantChance, CompressedPotBlockEntity.SOIL_DOUBLE_CHANCE)) {
+            errors.add("soil double chance table drifted");
+        }
+        Block potBlock = blockByName("pot");
+        BlockPos pos = new BlockPos(4, 90, 6);
+        level.setBlock(pos, potBlock.defaultBlockState(), 3);
+        if (level.getBlockEntity(pos) instanceof CompressedPotBlockEntity pot) {
+            // 原版泥土：soilLevel=1 但非压缩 → 不翻倍，产量落在定稿区间
+            pot.setSoil(Blocks.DIRT.defaultBlockState());
+            pot.setPlant(Blocks.POTATOES.defaultBlockState(), "minecraft:potato");
+            for (int round = 0; round < 50; round++) {
+                int total = pot.drops(level, null).stream().mapToInt(ItemStack::getCount).sum();
+                if (total < 2 || total > 4) {
+                    errors.add("potato yield " + total + " not in 2-4");
+                    break;
+                }
+            }
+            pot.takePlant();
+            pot.setPlant(Blocks.WHEAT.defaultBlockState(), "minecraft:wheat_seeds");
+            for (int round = 0; round < 50; round++) {
+                int wheat = 0;
+                int seeds = 0;
+                for (ItemStack s : pot.drops(level, null)) {
+                    if (s.is(net.minecraft.world.item.Items.WHEAT)) {
+                        wheat += s.getCount();
+                    }
+                    if (s.is(net.minecraft.world.item.Items.WHEAT_SEEDS)) {
+                        seeds += s.getCount();
+                    }
+                }
+                if (wheat < 1 || wheat > 2 || seeds > 2) {
+                    errors.add("wheat yield " + wheat + "+" + seeds + " not in 1-2 + 0-2");
+                    break;
+                }
+            }
+        } else {
+            errors.add("crop yield: no block entity");
+        }
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
     }
 
     private static void growFlow(ServerLevel level, List<String> errors, Block plant, int soilLevel) {
@@ -1410,9 +1455,26 @@ public final class CompressedBlocks {
         }
         level.setBlock(potPos, Blocks.AIR.defaultBlockState(), 3);
         level.setBlock(potPos.below(), Blocks.AIR.defaultBlockState(), 3);
+        // 无容器：成熟后驱动 serverTick 必须静默等待（growth 不清零，绝不吞作物）
+        level.setBlock(potPos, potBlock.defaultBlockState(), 3);
+        if (level.getBlockEntity(potPos) instanceof CompressedPotBlockEntity pot2) {
+            pot2.setSoil(blockByName("1x_dirt").defaultBlockState());
+            pot2.setPlant(Blocks.WHEAT.defaultBlockState(), "minecraft:wheat_seeds");
+            for (int i = 0; i < pot2.requiredGrowth() + 60; i++) {
+                CompressedPotBlockEntity.serverTick(level, potPos, potBlock.defaultBlockState(), pot2);
+            }
+            if (!pot2.grown()) {
+                errors.add("hopper pot lost crop without container (must wait for player)");
+            }
+        } else {
+            errors.add("hopper pot no-container: no block entity");
+        }
+        level.setBlock(potPos, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(potPos.below(), Blocks.AIR.defaultBlockState(), 3);
     }
 
-    /** 压缩潜影盒掉落实证：getDrops 应构建恰好 1 个带 2 组内容的盒子（内容不落地）。 */    private static void selfTestShulkerDrop(ServerLevel level, List<String> errors) {
+    /** 压缩潜影盒掉落实证：getDrops 应构建恰好 1 个带 2 组内容的盒子（内容不落地）。 */
+    private static void selfTestShulkerDrop(ServerLevel level, List<String> errors) {
         Block block = blockByName("compressed_shulker_box");
         BlockPos pos = new BlockPos(2, 90, 8);
         level.setBlock(pos, block.defaultBlockState(), 3);

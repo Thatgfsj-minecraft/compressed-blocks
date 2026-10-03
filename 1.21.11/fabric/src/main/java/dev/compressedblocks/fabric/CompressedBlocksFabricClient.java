@@ -1,6 +1,7 @@
 package dev.compressedblocks.fabric;
 
 import dev.compressedblocks.CompressedBlocks;
+import dev.compressedblocks.CompressedChestRenderer;
 import dev.compressedblocks.CompressedPotRenderer;
 import dev.compressedblocks.CompressedShulkerRenderer;
 import dev.compressedblocks.ScrollingContainerScreen;
@@ -11,12 +12,13 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderers;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.world.level.block.Block;
 
-/** 客户端：盆栽 BER + 植物 chunk 渲染层（1.21.11 模型内 render_type 已废弃，须注册）+ 滚动容器界面。 */
+/** 客户端：盆栽/箱子/潜影盒 BER + 植物 chunk 渲染层（1.21.11 模型内 render_type 已废弃，须注册）+ 滚动容器界面。 */
 public class CompressedBlocksFabricClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         BlockEntityRenderers.register(CompressedBlocks.POT_TYPE, CompressedPotRenderer::new);
         BlockEntityRenderers.register(CompressedBlocks.SHULKER_TYPE, CompressedShulkerRenderer::new);
+        BlockEntityRenderers.register(CompressedBlocks.CHEST_TYPE, CompressedChestRenderer::new);
         MenuScreens.register(CompressedBlocks.CHEST_MENU_TYPE, ScrollingContainerScreen::new);
         MenuScreens.register(CompressedBlocks.SHULKER_MENU_TYPE, ScrollingContainerScreen::new);
         for (Block block : CompressedBlocks.SAPLING_BLOCKS) {
