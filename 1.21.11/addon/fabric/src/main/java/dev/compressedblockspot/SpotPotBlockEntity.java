@@ -41,6 +41,8 @@ public class SpotPotBlockEntity extends BlockEntity {
     private BlockState plant;
     private String plantItem;
     private int growth;
+    /** 漏斗盆栽收割重试冷却（失败后 20 tick 再试）。 */
+    private int harvestCooldown;
 
     public SpotPotBlockEntity(BlockPos pos, BlockState state) {
         super(CompressedPotsAddon.POT_TYPE, pos, state);
@@ -159,9 +161,19 @@ public class SpotPotBlockEntity extends BlockEntity {
         if (be.growth < required) {
             be.growth++;
             be.setChanged();
+            return;
         }
-        if (be.growth >= required && be.isHopperPot() && hasContainerBelow(be)) {
-            be.harvest(null);
+        if (be.isHopperPot()) {
+            if (be.harvestCooldown > 0) {
+                be.harvestCooldown--;
+            } else if (level instanceof ServerLevel server) {
+                if (be.tryAutoHarvest(server)) {
+                    be.growth = 0;
+                    be.setChanged();
+                }
+                // 成功防抖；失败 1 秒重试（无容器/塞不下时静默等待，绝不吞作物）
+                be.harvestCooldown = 20;
+            }
         }
     }
 
@@ -177,16 +189,70 @@ public class SpotPotBlockEntity extends BlockEntity {
         dropContents();
     }
 
-    private static boolean hasContainerBelow(SpotPotBlockEntity be) {
-        if (be.getLevel() == null) {
-            return false;
-        }
-        if (be.getLevel().getBlockEntity(be.getBlockPos().below()) instanceof Container) {
+    /** 漏斗盆栽自动收割（与主 mod 同款语义）：下方原版容器全塞得下才收割补种；
+     *  无容器/塞不下静默保持成熟等待（绝不掉落产物）；钩子目标（储物抽屉等）实插、
+     *  余量静默丢弃，完全插不进=无目标同样等待。玩家仍可随时右键收割（掉地上）。 */
+    private boolean tryAutoHarvest(ServerLevel server) {
+        BlockPos below = getBlockPos().below();
+        if (getLevel().getBlockEntity(below) instanceof Container container) {
+            List<ItemStack> drops = drops(server, null);
+            if (!fitsInto(container, drops)) {
+                return false;
+            }
+            for (ItemStack drop : drops) {
+                insertIntoBelow(drop);
+            }
             return true;
         }
-        return CompressedPotsAddon.ITEM_SINK != null
-            && CompressedPotsAddon.ITEM_SINK.accepts(be.getLevel(), be.getBlockPos().below(),
-                net.minecraft.core.Direction.UP);
+        if (CompressedPotsAddon.ITEM_SINK != null) {
+            boolean all = true;
+            for (ItemStack drop : drops(server, null)) {
+                if (!insertIntoBelow(drop)) {
+                    all = false;
+                }
+            }
+            return all;
+        }
+        return false;
+    }
+
+    /** 容量模拟：所有产物都能塞进容器才返回 true（不改容器状态）。 */
+    private static boolean fitsInto(Container container, List<ItemStack> drops) {
+        long[] sim = new long[container.getContainerSize()];
+        for (int i = 0; i < sim.length; i++) {
+            sim[i] = container.getItem(i).getCount();
+        }
+        for (ItemStack drop : drops) {
+            if (drop.isEmpty()) {
+                continue;
+            }
+            int remaining = drop.getCount();
+            for (int i = 0; i < sim.length && remaining > 0; i++) {
+                ItemStack slot = container.getItem(i);
+                if (slot.isEmpty() || !ItemStack.isSameItemSameComponents(drop, slot)) {
+                    continue;
+                }
+                int cap = Math.max(Math.min(slot.getMaxStackSize(), container.getMaxStackSize()),
+                    container.getMaxStackSize(drop));
+                int move = Math.min((int) Math.max(0, cap - sim[i]), remaining);
+                sim[i] += move;
+                remaining -= move;
+            }
+            for (int i = 0; i < sim.length && remaining > 0; i++) {
+                if (!container.getItem(i).isEmpty()) {
+                    continue;
+                }
+                int cap = Math.max(Math.min(drop.getMaxStackSize(), container.getMaxStackSize()),
+                    container.getMaxStackSize(drop));
+                int move = Math.min(cap, remaining);
+                sim[i] += move;
+                remaining -= move;
+            }
+            if (remaining > 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private List<ItemStack> drops(ServerLevel server, Player player) {

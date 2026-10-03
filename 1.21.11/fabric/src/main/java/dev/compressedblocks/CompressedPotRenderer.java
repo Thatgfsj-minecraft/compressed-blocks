@@ -46,37 +46,48 @@ public class CompressedPotRenderer implements BlockEntityRenderer<CompressedPotB
         state.growth = be.growthFraction();
         state.grown = be.grown();
         state.cameraAbove = cameraPos != null && cameraPos.y >= be.getBlockPos().getY();
+        // 原版环境染色（BlockColors）：瓜藤/小麦/甘蔗等灰度贴图按生物群系上色；无染色返回 -1（白）
+        state.tint = -1;
+        if (state.plant != null && be.getLevel() != null) {
+            state.tint = net.minecraft.client.Minecraft.getInstance().getBlockColors()
+                .getColor(state.plant, be.getLevel(), be.getBlockPos(), 0);
+        }
     }
 
     @Override
     public void submit(PotRenderState state, PoseStack pose, SubmitNodeCollector collector,
                        CameraRenderState camera) {
         int light = state.lightCoords;
+        // 环境染色（-1 = 白，保持本色）：瓜藤/小麦等按生物群系变绿
+        float tr = (state.tint >> 16 & 255) / 255.0F;
+        float tg = (state.tint >> 8 & 255) / 255.0F;
+        float tb = (state.tint & 255) / 255.0F;
         // 显式 (1,1,1) 颜色 + 模型直提：绕过 renderSingleBlock 的 null-level 染色解析
-        // （该路径会把贴图染成异常红色），贴图保持本色
+        // （该路径会把贴图染成异常红色），贴图保持本色；染色由上面的 tint 显式施加
         if (state.soil != null && state.cameraAbove) {
             // 10px 见方、2px 高，坐在腰身顶（y=4px）、嵌进口沿内腔（3..13），顶面与盆沿齐平不外漏
             pose.pushPose();
             pose.translate(0.5, 0.25, 0.5);
             pose.scale(0.625F, 0.125F, 0.625F);
             pose.translate(-0.5, 0.0, -0.5);
-            submitModel(state.soil, pose, collector, light);
+            submitModel(state.soil, pose, collector, light, 1.0F, 1.0F, 1.0F);
             pose.popPose();
         }
         if (state.plant != null) {
             float s = 0.4F + 0.6F * state.growth;
             if (state.plant.getBlock() instanceof CocoaBlock cocoa) {
                 // 可可（用户定稿）：微型丛林木主干 + 四面可可豆随生长长大（原版附木生长）
-                submitPlant(Blocks.JUNGLE_LOG.defaultBlockState(), s, light, pose, collector);
+                submitPlant(Blocks.JUNGLE_LOG.defaultBlockState(), s, light, 1.0F, 1.0F, 1.0F,
+                    pose, collector);
                 int age = Math.round(state.growth * 2);
                 for (Direction facing : HORIZONTALS) {
                     submitPlant(cocoa.defaultBlockState()
                         .setValue(CocoaBlock.FACING, facing)
-                        .setValue(CocoaBlock.AGE, age), s, light, pose, collector);
+                        .setValue(CocoaBlock.AGE, age), s, light, 1.0F, 1.0F, 1.0F, pose, collector);
                 }
             } else {
                 submitPlant(advanceVisual(state.plant, state.growth, state.grown),
-                    s, light, pose, collector);
+                    s, light, tr, tg, tb, pose, collector);
             }
         }
     }
@@ -99,21 +110,22 @@ public class CompressedPotRenderer implements BlockEntityRenderer<CompressedPotB
     }
 
     /** 作物/土壤模型提交：基部 y=0.375、随生长 0.40→1.00 缩放。 */
-    private void submitPlant(BlockState st, float s, int light, PoseStack pose,
-                             SubmitNodeCollector collector) {
+    private void submitPlant(BlockState st, float s, int light, float tr, float tg, float tb,
+                             PoseStack pose, SubmitNodeCollector collector) {
         pose.pushPose();
         pose.translate(0.5, 0.375, 0.5);
         pose.scale(s, s, s);
         pose.translate(-0.5, 0.0, -0.5);
-        submitModel(st, pose, collector, light);
+        submitModel(st, pose, collector, light, tr, tg, tb);
         pose.popPose();
     }
 
-    private void submitModel(BlockState st, PoseStack pose, SubmitNodeCollector collector, int light) {
+    private void submitModel(BlockState st, PoseStack pose, SubmitNodeCollector collector, int light,
+                             float tr, float tg, float tb) {
         // overlay 必须传 NO_OVERLAY：传 0 会采样到 overlay 贴图的受伤红闪行，整个模型混入 30% 纯红
         collector.submitBlockModel(pose,
             net.minecraft.client.renderer.ItemBlockRenderTypes.getRenderType(st),
-            this.dispatcher.getBlockModel(st), 1.0F, 1.0F, 1.0F, light,
+            this.dispatcher.getBlockModel(st), tr, tg, tb, light,
             net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, 0);
     }
 
@@ -124,5 +136,7 @@ public class CompressedPotRenderer implements BlockEntityRenderer<CompressedPotB
         public float growth;
         public boolean grown;
         public boolean cameraAbove;
+        /** 原版环境染色（BlockColors），-1 = 无染色保持本色。 */
+        public int tint = -1;
     }
 }
