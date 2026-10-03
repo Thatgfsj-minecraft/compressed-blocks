@@ -16,6 +16,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
@@ -42,9 +43,14 @@ public class CompressedPotBlock extends Block implements EntityBlock {
         Block.box(2, 4, 13, 14, 6, 14),
         Block.box(2, 4, 3, 3, 6, 13),
         Block.box(13, 4, 3, 14, 6, 13));
-    /** 可种植物品（原版系种子/树苗/甘蔗）的运行时描述。 */
-    private record Plantable(BlockState state, int level, String itemId) {
+    /** 可种植物品（原版系种子/树苗/甘蔗等）的运行时描述。soilMask：可填土壤族（位掩码）。 */
+    record Plantable(BlockState state, int level, String itemId, int soilMask) {
     }
+
+    /** 土壤族（位掩码）：泥土系 / 沙子系 / 下界系（下界岩、灵魂沙）。 */
+    static final int SOIL_DIRT = 1;
+    static final int SOIL_SAND = 2;
+    static final int SOIL_NETHER = 4;
 
     /** 漏斗盆栽标记。 */
     private final boolean hopper;
@@ -130,7 +136,8 @@ public class CompressedPotBlock extends Block implements EntityBlock {
             Plantable pl = plantableOf(stack);
             if (pl != null) {
                 int soilLevel = soilLevelOf(pot.soil());
-                if (soilLevel >= pl.level()) {
+                int soilMask = soilMaskOf(pot.soil());
+                if ((soilMask & pl.soilMask()) != 0 && soilLevel >= pl.level()) {
                     if (level.isClientSide()) {
                         return InteractionResult.SUCCESS;
                     }
@@ -141,7 +148,11 @@ public class CompressedPotBlock extends Block implements EntityBlock {
                     return InteractionResult.CONSUME;
                 }
                 if (!level.isClientSide() && player instanceof ServerPlayer sp) {
-                    CompressedHooks.sendPotHint(sp, pl.level(), soilLevel);
+                    if ((soilMask & pl.soilMask()) == 0) {
+                        CompressedHooks.sendPotSoilHint(sp, pl.soilMask(), pot.soil());
+                    } else {
+                        CompressedHooks.sendPotHint(sp, pl.level(), soilLevel);
+                    }
                 }
                 return InteractionResult.CONSUME;
             }
@@ -178,7 +189,8 @@ public class CompressedPotBlock extends Block implements EntityBlock {
         return InteractionResult.CONSUME;
     }
 
-    /** 持有物是否土壤（返回等级，非土壤 = 0）：压缩泥土/沙子带各自重数；原版/mod 泥土系/沙子系 = 1。 */
+    /** 持有物是否土壤（返回等级，非土壤 = 0）：压缩泥土/沙子/下界岩带各自重数；
+     *  原版泥土系/沙子系/下界岩/灵魂沙 = 1。 */
     static int soilLevelOf(BlockState state) {
         Integer dirt = CompressedBlocks.dirtLevel(state);
         if (dirt != null) {
@@ -188,20 +200,60 @@ public class CompressedPotBlock extends Block implements EntityBlock {
         if (sand != null) {
             return sand;
         }
-        return state.is(BlockTags.DIRT) || state.is(BlockTags.SAND) ? 1 : 0;
+        Integer nether = CompressedBlocks.netherSoilLevel(state);
+        if (nether != null) {
+            return nether;
+        }
+        if (state.is(BlockTags.DIRT) || state.is(BlockTags.SAND)
+            || state.is(Blocks.NETHERRACK) || state.is(Blocks.SOUL_SAND)) {
+            return 1;
+        }
+        return 0;
     }
 
-    /** 可种植：只收**原版系**作物/树苗/甘蔗（压缩植物请用附属 mod 的压缩盆栽）。 */
-    private static Plantable plantableOf(ItemStack stack) {
+    /** 土壤族掩码（0 = 非土壤）：泥土系/沙子系/下界系。 */
+    static int soilMaskOf(BlockState state) {
+        if (CompressedBlocks.dirtLevel(state) != null || state.is(BlockTags.DIRT)) {
+            return SOIL_DIRT;
+        }
+        if (CompressedBlocks.sandLevel(state) != null || state.is(BlockTags.SAND)) {
+            return SOIL_SAND;
+        }
+        if (CompressedBlocks.netherSoilLevel(state) != null
+            || state.is(Blocks.NETHERRACK) || state.is(Blocks.SOUL_SAND)) {
+            return SOIL_NETHER;
+        }
+        return 0;
+    }
+
+    /**
+     * 可种植：只收**原版系**（压缩植物请用附属 mod 的压缩盆栽）。土壤族按原版习性绑定：
+     * 作物/树苗/竹子/甜果丛/可可 = 泥土系，甘蔗 = 泥土或沙子，仙人掌 = 沙子系，地狱疣 = 下界系。
+     */
+    static Plantable plantableOf(ItemStack stack) {
         if (stack.getItem() instanceof BlockItem bi) {
             // 压缩作物/树苗也挂在原版 #crops/#saplings 标签里（供附属盆栽识别），这里按命名空间挡掉
             if (!"minecraft".equals(BuiltInRegistries.BLOCK.getKey(bi.getBlock()).getNamespace())) {
                 return null;
             }
-            BlockState def = bi.getBlock().defaultBlockState();
-            if (def.is(BlockTags.SAPLINGS) || def.is(BlockTags.CROPS)
-                || bi.getBlock() instanceof net.minecraft.world.level.block.SugarCaneBlock) {
-                return new Plantable(def, 0, itemId(stack));
+            Block block = bi.getBlock();
+            BlockState def = block.defaultBlockState();
+            if (def.is(BlockTags.SAPLINGS) || def.is(BlockTags.CROPS)) {
+                return new Plantable(def, 0, itemId(stack), SOIL_DIRT);
+            }
+            if (block instanceof net.minecraft.world.level.block.SugarCaneBlock) {
+                return new Plantable(def, 0, itemId(stack), SOIL_DIRT | SOIL_SAND);
+            }
+            if (block instanceof net.minecraft.world.level.block.BambooStalkBlock
+                || block instanceof net.minecraft.world.level.block.SweetBerryBushBlock
+                || block instanceof net.minecraft.world.level.block.CocoaBlock) {
+                return new Plantable(def, 0, itemId(stack), SOIL_DIRT);
+            }
+            if (block instanceof net.minecraft.world.level.block.CactusBlock) {
+                return new Plantable(def, 0, itemId(stack), SOIL_SAND);
+            }
+            if (block instanceof net.minecraft.world.level.block.NetherWartBlock) {
+                return new Plantable(def, 0, itemId(stack), SOIL_NETHER);
             }
         }
         return null;

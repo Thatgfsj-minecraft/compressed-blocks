@@ -17,7 +17,9 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -38,16 +40,15 @@ import net.minecraft.world.phys.Vec3;
  * 无每刻发包）；数据变化（填土/种植/收割/取出）经 getUpdatePacket 全量同步。
  * 成熟后玩家右键收割并自动补种；漏斗盆栽成熟自动收割，产物优先插入下方容器
  * （原版箱子/木桶/漏斗都实现 Container），无容器/塞不下静默保持成熟等待；
- * 收获规则（用户定稿 2026-10-03）：作物走定稿产量表+压缩土壤翻倍概率；
- * 树苗=同重数原木 4-6 根+树苗；甘蔗=2-4×自身。
+ * 收获规则（用户逐项审定 2026-10-03）：作物类走定稿产量表（≈原版 -10%~-30%）+压缩土壤翻倍；
+ * 树苗类=对应原木 3-8 + 树苗 0-3（木头类不翻倍）。
  */
 public class CompressedPotBlockEntity extends BlockEntity {
     /** 基础生长时长：30 秒（最慢档——土壤等级 = 作物等级时）。 */
     public static final int GROWTH_TICKS = 600;
-    /** 树苗盆栽原木数量基准（原版橡树 4-6 根）。 */
-    private static final int SAPLING_LOGS = 4;
-    /** 甘蔗盆栽收获份数下限（原版一株成熟甘蔗约 2 节）。 */
-    private static final int CANE_MIN = 2;
+    /** 树苗盆栽原木数量（用户定稿 3-8，木头类不参与压缩土壤翻倍）。 */
+    private static final int SAPLING_LOGS_MIN = 3;
+    private static final int SAPLING_LOGS_SPAN = 6;
 
     private BlockState soil;
     private BlockState plant;
@@ -327,18 +328,16 @@ public class CompressedPotBlockEntity extends BlockEntity {
     }
 
     /**
-     * 收获掉落：作物走用户定稿产量表（2026-10-03：土豆类 2-4、小麦=麦粒1-2+种子0-2、
-     * 甜菜=根1-2+种子1-2、地狱疣 2-4，其余作物本体 1-2），压缩土壤命中翻倍概率再全部 ×2；
+     * 收获掉落（用户逐项审定 2026-10-03）：作物类走定稿产量表+压缩土壤翻倍；
      * 压缩作物（附属盆栽）仍走方块自身命名空间的战利品表（含时运）；
-     * 压缩树苗=同重数原木×4-6+树苗；通用树苗（#minecraft:saplings）找同命名空间 "{wood}_log"
-     * ×4-6，找不到给木棍；其余（甘蔗等）=2-4×自身；最后一律补发一份作物本体（自动补种不消耗）。
+     * 树苗类（含红树胚/杜鹃/开花杜鹃）= 对应原木 3-8 + 树苗 0-3，木头类**不吃翻倍**。
      */
     List<ItemStack> drops(ServerLevel server, Player player) {
         List<ItemStack> out = new ArrayList<>();
         Block block = this.plant.getBlock();
         Identifier blockId = BuiltInRegistries.BLOCK.getKey(block);
         String name = blockId.getPath();
-        if (block instanceof CompressedCropBlock || this.plant.is(BlockTags.CROPS)) {
+        if (block instanceof CompressedCropBlock || isCropPlant(block)) {
             if (block instanceof CompressedCropBlock crop) {
                 // 压缩作物战利品表带 age 条件：收割走满龄状态
                 ResourceKey<LootTable> key = ResourceKey.create(Registries.LOOT_TABLE,
@@ -357,29 +356,40 @@ public class CompressedPotBlockEntity extends BlockEntity {
             applySoilDoubling(server, out);
             return out;
         }
-        if (block instanceof CompressedSaplingBlock) {
-            String logName = name.substring(0, name.length() - "_sapling".length()) + "_log";
-            var log = BuiltInRegistries.BLOCK.get(CompressedBlocks.id(logName));
-            log.ifPresent(h -> out.add(new ItemStack(h.value().asItem(),
-                SAPLING_LOGS + server.random.nextInt(3))));
-        } else if (this.plant.is(BlockTags.SAPLINGS) && name.endsWith("_sapling")) {
-            String wood = name.substring(0, name.length() - "_sapling".length());
-            var log = BuiltInRegistries.BLOCK.get(
-                Identifier.fromNamespaceAndPath(blockId.getNamespace(), wood + "_log"));
-            int count = SAPLING_LOGS + server.random.nextInt(3);
+        if (block instanceof CompressedSaplingBlock || this.plant.is(BlockTags.SAPLINGS)) {
+            // 树苗待遇（含红树胚/杜鹃，用户定稿）：对应原木 3-8 + 树苗 0-3，木头类不吃翻倍
+            Identifier logId = block instanceof CompressedSaplingBlock
+                ? CompressedBlocks.id(name.substring(0, name.length() - "_sapling".length()) + "_log")
+                : Identifier.fromNamespaceAndPath(blockId.getNamespace(), woodOf(name) + "_log");
+            var log = BuiltInRegistries.BLOCK.get(logId);
+            int logs = SAPLING_LOGS_MIN + server.random.nextInt(SAPLING_LOGS_SPAN);
             out.add(log.filter(h -> h.value().asItem() != net.minecraft.world.item.Items.AIR)
-                .map(h -> new ItemStack(h.value().asItem(), count))
-                .orElse(new ItemStack(net.minecraft.world.item.Items.STICK, count)));
-        } else {
-            ItemStack cane = itemStack(this.plantItem);
-            cane.setCount(CANE_MIN + server.random.nextInt(3));
-            out.add(cane);
+                .map(h -> new ItemStack(h.value().asItem(), logs))
+                .orElse(new ItemStack(net.minecraft.world.item.Items.STICK, logs)));
+            ItemStack self = itemStack(this.plantItem);
+            int saplings = server.random.nextInt(4);
+            if (saplings > 0 && !self.isEmpty()) {
+                out.add(new ItemStack(self.getItem(), saplings));
+            }
+            return out;
         }
-        ItemStack plant = itemStack(this.plantItem);
-        if (!plant.isEmpty()) {
-            out.add(plant);
+        // 兜底（白名单全覆盖，不应到达）：自身一份
+        ItemStack self = itemStack(this.plantItem);
+        if (!self.isEmpty()) {
+            out.add(self);
         }
         return out;
+    }
+
+    /** 树苗 → 原木名：*_sapling 去后缀；红树胚 → mangrove；杜鹃/开花杜鹃长成橡木树。 */
+    private static String woodOf(String name) {
+        if (name.endsWith("_sapling")) {
+            return name.substring(0, name.length() - "_sapling".length());
+        }
+        if (name.equals("mangrove_propagule")) {
+            return "mangrove";
+        }
+        return "oak";
     }
 
     /** 压缩土壤翻倍概率（用户定稿 2026-10-03）：1-9 重 = 15/20/25/30/35/40/45/50/60%，索引=重数。 */
@@ -388,23 +398,46 @@ public class CompressedPotBlockEntity extends BlockEntity {
     };
 
     /**
-     * 原版作物定稿产量：土豆/胡萝卜/地狱疣 2-4；小麦=麦粒 1-2+种子 0-2；甜菜=根 1-2+种子 1-2；
-     * 其余 #crops（花茎类等）= 本体 1-2。
+     * 作物定稿产量（用户逐项审定 2026-10-03，基准 = 原版一次收获 -10%~-30%）：
+     * 土豆/胡萝卜 2-4；小麦=麦粒1-2+种子0-2；甜菜=根1-2+种子1-2；地狱疣 2-3；
+     * 西瓜=片3-5；南瓜=1个80%/2个15%/3个5%；火把花=花1+种子0-1；瓶子草=荚1-2；
+     * 甜浆果 1-3；可可豆 2-3；仙人掌 2-3；竹子 4-8；甘蔗 2-3；其余作物本体 1-2。
      */
     private void cropYields(ServerLevel server, List<ItemStack> out) {
         Block block = this.plant.getBlock();
         if (block == Blocks.WHEAT) {
-            addRange(out, net.minecraft.world.item.Items.WHEAT, 1, 2, server);
-            addRange(out, net.minecraft.world.item.Items.WHEAT_SEEDS, 0, 2, server);
+            addRange(out, Items.WHEAT, 1, 2, server);
+            addRange(out, Items.WHEAT_SEEDS, 0, 2, server);
         } else if (block == Blocks.BEETROOTS) {
-            addRange(out, net.minecraft.world.item.Items.BEETROOT, 1, 2, server);
-            addRange(out, net.minecraft.world.item.Items.BEETROOT_SEEDS, 1, 2, server);
+            addRange(out, Items.BEETROOT, 1, 2, server);
+            addRange(out, Items.BEETROOT_SEEDS, 1, 2, server);
         } else if (block == Blocks.POTATOES) {
-            addRange(out, net.minecraft.world.item.Items.POTATO, 2, 4, server);
+            addRange(out, Items.POTATO, 2, 4, server);
         } else if (block == Blocks.CARROTS) {
-            addRange(out, net.minecraft.world.item.Items.CARROT, 2, 4, server);
+            addRange(out, Items.CARROT, 2, 4, server);
+        } else if (block == Blocks.MELON_STEM) {
+            addRange(out, Items.MELON_SLICE, 3, 5, server);
+        } else if (block == Blocks.PUMPKIN_STEM) {
+            // 南瓜（用户定稿）：80% 1 个 / 15% 2 个 / 5% 3 个，与压缩土壤翻倍正常叠加
+            int roll = server.random.nextInt(100);
+            out.add(new ItemStack(Items.PUMPKIN, roll < 80 ? 1 : roll < 95 ? 2 : 3));
+        } else if (block == Blocks.TORCHFLOWER_CROP) {
+            out.add(new ItemStack(Items.TORCHFLOWER));
+            addRange(out, Items.TORCHFLOWER_SEEDS, 0, 1, server);
+        } else if (block == Blocks.PITCHER_CROP) {
+            addRange(out, Items.PITCHER_POD, 1, 2, server);
+        } else if (block == Blocks.SWEET_BERRY_BUSH) {
+            addRange(out, Items.SWEET_BERRIES, 1, 3, server);
         } else if (block == Blocks.NETHER_WART) {
-            addRange(out, net.minecraft.world.item.Items.NETHER_WART, 2, 4, server);
+            addRange(out, Items.NETHER_WART, 2, 3, server);
+        } else if (block == Blocks.COCOA) {
+            addRange(out, Items.COCOA_BEANS, 2, 3, server);
+        } else if (block == Blocks.CACTUS) {
+            addRange(out, Items.CACTUS, 2, 3, server);
+        } else if (block == Blocks.BAMBOO) {
+            addRange(out, Items.BAMBOO, 4, 8, server);
+        } else if (block == Blocks.SUGAR_CANE) {
+            addRange(out, Items.SUGAR_CANE, 2, 3, server);
         } else {
             ItemStack self = itemStack(this.plantItem);
             if (!self.isEmpty()) {
@@ -413,8 +446,19 @@ public class CompressedPotBlockEntity extends BlockEntity {
         }
     }
 
+    /** 作物类（吃压缩土壤翻倍）：#crops + 竹子/甜果丛/可可/仙人掌/地狱疣/甘蔗。 */
+    private boolean isCropPlant(Block block) {
+        return this.plant.is(BlockTags.CROPS)
+            || block instanceof net.minecraft.world.level.block.SugarCaneBlock
+            || block instanceof net.minecraft.world.level.block.BambooStalkBlock
+            || block instanceof net.minecraft.world.level.block.SweetBerryBushBlock
+            || block instanceof net.minecraft.world.level.block.CocoaBlock
+            || block instanceof net.minecraft.world.level.block.CactusBlock
+            || block instanceof net.minecraft.world.level.block.NetherWartBlock;
+    }
+
     /** 产量区间 [min,max] 均匀取整（min=0 时可不出）。 */
-    private static void addRange(List<ItemStack> out, net.minecraft.world.item.Item item,
+    private static void addRange(List<ItemStack> out, Item item,
                                  int min, int max, ServerLevel server) {
         int count = min + server.random.nextInt(max - min + 1);
         if (count > 0) {
@@ -423,7 +467,7 @@ public class CompressedPotBlockEntity extends BlockEntity {
     }
 
     /** 压缩土壤加成：按土壤重数掷翻倍概率，命中则本茬全部产物数量 ×2。
-     *  只认压缩泥土/沙子（原版泥土/沙子无加成）。 */
+     *  只认压缩泥土/沙子/下界岩（原版土壤无加成；树苗/木头类不走此方法）。 */
     private void applySoilDoubling(ServerLevel server, List<ItemStack> out) {
         if (this.soil == null || out.isEmpty()) {
             return;
@@ -431,6 +475,9 @@ public class CompressedPotBlockEntity extends BlockEntity {
         Integer tier = CompressedBlocks.dirtLevel(this.soil);
         if (tier == null) {
             tier = CompressedBlocks.sandLevel(this.soil);
+        }
+        if (tier == null) {
+            tier = CompressedBlocks.netherSoilLevel(this.soil);
         }
         if (tier != null && tier >= 1 && tier < SOIL_DOUBLE_CHANCE.length
             && server.random.nextFloat() < SOIL_DOUBLE_CHANCE[tier]) {

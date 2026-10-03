@@ -309,6 +309,7 @@ public final class CompressedBlocks {
     private static final Map<Item, int[]> ARMOR_INDEX = new IdentityHashMap<>();
     private static final Map<Block, Integer> DIRT_LEVELS = new IdentityHashMap<>();
     private static final Map<Block, Integer> SAND_LEVELS = new IdentityHashMap<>();
+    private static final Map<Block, Integer> NETHER_SOIL_LEVELS = new IdentityHashMap<>();
     private static final Map<Integer, Block> FARMLAND = new IdentityHashMap<>();
 
     /** 渲染层注册用分组：cross/crop 类植物 → CUTOUT，树叶 → CUTOUT（客户端入口注册）。 */
@@ -433,6 +434,11 @@ public final class CompressedBlocks {
     /** 沙子等级查询：压缩沙子方块 → 1-9，其他 null。 */
     public static Integer sandLevel(BlockState state) {
         return SAND_LEVELS.get(state.getBlock());
+    }
+
+    /** 下界土壤等级查询：压缩下界岩 → 1-9，其他 null（原版下界岩/灵魂沙在 soilLevelOf 记 1）。 */
+    public static Integer netherSoilLevel(BlockState state) {
+        return NETHER_SOIL_LEVELS.get(state.getBlock());
     }
 
     /** 耕地等级查询：压缩耕地 → 1-9，其他 null。 */
@@ -629,6 +635,9 @@ public final class CompressedBlocks {
                 }
                 if (m.key().equals("sand")) {
                     SAND_LEVELS.put(block, level);
+                }
+                if (m.key().equals("netherrack")) {
+                    NETHER_SOIL_LEVELS.put(block, level);
                 }
             }
         }
@@ -1266,6 +1275,101 @@ public final class CompressedBlocks {
         growFlow(level, errors, Blocks.OAK_SAPLING, 1);
         growFlow(level, errors, Blocks.WHEAT, 9);
         cropYieldFlow(level, errors);
+        selfTestPlantAudit(level, errors);
+    }
+
+    /** 可种白名单审计（用户逐项定稿 2026-10-03）：全部可种、产量非空；竹 4-8/南瓜 1-3/
+     *  红树胚原木 3-8 且不吃翻倍；土壤族门（灵魂沙=下界 1 级、9 重下界岩=9 级）。 */
+    private static void selfTestPlantAudit(ServerLevel level, List<String> errors) {
+        Block potBlock = blockByName("pot");
+        BlockPos pos = new BlockPos(15, 90, 6);
+        level.setBlock(pos, potBlock.defaultBlockState(), 3);
+        if (!(level.getBlockEntity(pos) instanceof CompressedPotBlockEntity pot)) {
+            errors.add("plant audit: no block entity");
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+            return;
+        }
+        BlockState soulSand = net.minecraft.world.level.block.Blocks.SOUL_SAND.defaultBlockState();
+        if (CompressedPotBlock.soilMaskOf(soulSand) != CompressedPotBlock.SOIL_NETHER
+            || CompressedPotBlock.soilLevelOf(soulSand) != 1) {
+            errors.add("soul sand should be NETHER soil level 1");
+        }
+        if (CompressedPotBlock.soilLevelOf(blockByName("9x_netherrack").defaultBlockState()) != 9) {
+            errors.add("9x netherrack level should be 9");
+        }
+        String[] items = {
+            "minecraft:wheat_seeds", "minecraft:carrot", "minecraft:potato",
+            "minecraft:beetroot_seeds", "minecraft:pumpkin_seeds", "minecraft:melon_seeds",
+            "minecraft:torchflower_seeds", "minecraft:pitcher_pod", "minecraft:sweet_berries",
+            "minecraft:nether_wart", "minecraft:cocoa_beans", "minecraft:bamboo",
+            "minecraft:cactus", "minecraft:sugar_cane", "minecraft:oak_sapling",
+            "minecraft:mangrove_propagule", "minecraft:azalea"};
+        for (String itemId : items) {
+            var held = BuiltInRegistries.ITEM.get(Identifier.tryParse(itemId));
+            if (held.isEmpty() || !(held.get().value() instanceof net.minecraft.world.item.BlockItem bi)) {
+                errors.add("audit item missing: " + itemId);
+                continue;
+            }
+            CompressedPotBlock.Plantable pl = CompressedPotBlock.plantableOf(new ItemStack(bi));
+            if (pl == null) {
+                errors.add("not plantable: " + itemId);
+                continue;
+            }
+            int mask = pl.soilMask();
+            BlockState soil = (mask & CompressedPotBlock.SOIL_NETHER) != 0 ? soulSand
+                : (mask & CompressedPotBlock.SOIL_SAND) != 0 && (mask & CompressedPotBlock.SOIL_DIRT) == 0
+                    ? net.minecraft.world.level.block.Blocks.SAND.defaultBlockState()
+                    : net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState();
+            pot.takePlant();
+            pot.setSoil(soil);
+            pot.setPlant(pl.state(), pl.itemId());
+            if (pot.drops(level, null).isEmpty()) {
+                errors.add("no drops for: " + itemId);
+            }
+        }
+        // 竹子 4-8（原版泥土无翻倍）
+        pot.setSoil(Blocks.DIRT.defaultBlockState());
+        pot.takePlant();
+        pot.setPlant(Blocks.BAMBOO.defaultBlockState(), "minecraft:bamboo");
+        for (int round = 0; round < 50; round++) {
+            int total = pot.drops(level, null).stream().mapToInt(ItemStack::getCount).sum();
+            if (total < 4 || total > 8) {
+                errors.add("bamboo yield " + total + " not in 4-8");
+                break;
+            }
+        }
+        // 南瓜 1-3（80/15/5 分布）
+        pot.takePlant();
+        pot.setPlant(Blocks.PUMPKIN_STEM.defaultBlockState(), "minecraft:pumpkin_seeds");
+        for (int round = 0; round < 50; round++) {
+            int total = pot.drops(level, null).stream().mapToInt(ItemStack::getCount).sum();
+            if (total < 1 || total > 3) {
+                errors.add("pumpkin yield " + total + " not in 1-3");
+                break;
+            }
+        }
+        // 红树胚：原木 3-8 + 树苗 0-3，且 9 重泥土也不翻倍（木头类豁免）
+        pot.setSoil(blockByName("9x_dirt").defaultBlockState());
+        pot.takePlant();
+        pot.setPlant(Blocks.MANGROVE_PROPAGULE.defaultBlockState(), "minecraft:mangrove_propagule");
+        for (int round = 0; round < 30; round++) {
+            int logs = 0;
+            int other = 0;
+            for (ItemStack s : pot.drops(level, null)) {
+                if (s.is(net.minecraft.world.item.Items.MANGROVE_LOG)) {
+                    logs += s.getCount();
+                } else {
+                    other += s.getCount();
+                }
+            }
+            if (logs < 3 || logs > 8 || other > 3) {
+                errors.add("mangrove drops logs=" + logs + " other=" + other
+                    + " (want 3-8 logs, 0-3 sapling, no doubling)");
+                break;
+            }
+        }
+        pot.takePlant();
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
     }
 
     /** 定稿产量表抽查（原版泥土无翻倍）：土豆 2-4、小麦=麦粒 1-2+种子 0-2；翻倍概率表 1-9 重锚点。 */

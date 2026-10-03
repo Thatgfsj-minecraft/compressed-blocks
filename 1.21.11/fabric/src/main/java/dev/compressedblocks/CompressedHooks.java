@@ -243,6 +243,31 @@ public final class CompressedHooks {
             .append(Component.literal(soilLevel + " 重").withStyle(ChatFormatting.GRAY)), false);
     }
 
+    /** 盆栽土壤族不符（作物=泥土系、甘蔗=泥土/沙子、仙人掌=沙子系、地狱疣=下界岩/灵魂沙）。 */
+    public static void sendPotSoilHint(ServerPlayer player, int needMask, BlockState soil) {
+        if (!hintReady(player)) {
+            return;
+        }
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        if ((needMask & 1) != 0) {
+            parts.add("泥土系");
+        }
+        if ((needMask & 2) != 0) {
+            parts.add("沙子系");
+        }
+        if ((needMask & 4) != 0) {
+            parts.add("下界岩/灵魂沙");
+        }
+        player.displayClientMessage(Component.empty()
+            .append(Component.literal("[压缩方块] ").withStyle(ChatFormatting.DARK_GRAY))
+            .append(Component.literal("这种植物需要 ").withStyle(ChatFormatting.RED))
+            .append(Component.literal(String.join("或", parts)).withStyle(ChatFormatting.GOLD))
+            .append(Component.literal("土壤! 盆内：").withStyle(ChatFormatting.RED))
+            .append(soil == null
+                ? Component.literal("无").withStyle(ChatFormatting.GRAY)
+                : soil.getBlock().getName().copy().withStyle(ChatFormatting.GRAY)), false);
+    }
+
     /** 空手右键盆栽：动作栏（上方）显示盆内土壤/作物/生长进度，名字走本地化。 */
     public static void sendPotContents(ServerPlayer player, BlockState soil, ItemStack plant, float growth) {
         if (soil == null && plant.isEmpty()) {
