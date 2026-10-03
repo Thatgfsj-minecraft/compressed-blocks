@@ -940,8 +940,12 @@ def gen_data(data):
                         ("logs", logs), ("logs_that_burn", logs),
                         ("leaves", [f"{NS}:{n}" for n in leaves_names()]),
                         ("saplings", [f"{NS}:{n}" for n in sapling_names()]),
-                        ("crops", [f"{NS}:{n}" for n in crop_block_names()])]:
+                        ("crops", [f"{NS}:{n}" for n in crop_block_names()]),
+                        ("shulker_boxes", [f"{NS}:compressed_shulker_box"])]:
         dump(f"{data}/minecraft/tags/block/{tag}.json", {"replace": False, "values": sorted(values)})
+    # 压缩潜影盒进原版 shulker_boxes 物品标签（原版/mod 按 item 标签识别潜影盒）
+    dump(f"{data}/minecraft/tags/item/shulker_boxes.json",
+         {"replace": False, "values": [f"{NS}:compressed_shulker_box"]})
     # 基础工具/盔甲标签覆盖：进原版 #pickaxes…/#enchantable/*，附魔修复自动生效
     tool_tag_values = {
         "pickaxes": [f"{NS}:{n}" for n in tool_names() if n.endswith("_pickaxe")],
