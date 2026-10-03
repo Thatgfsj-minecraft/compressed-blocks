@@ -201,19 +201,65 @@ public class CompressedPotBlockEntity extends BlockEntity {
         return this.getBlockState().getBlock() instanceof CompressedPotBlock pot && pot.isHopper();
     }
 
-    /** 漏斗盆栽自动收割：产物压入下方容器（原版 Container 或大容量容器钩子，兼容储物抽屉）；
-     *  全部塞入才收割补种；塞不下的部分掉在盆边，盆保持成熟等待容器恢复。 */
+    /** 漏斗盆栽自动收割：下方容器塞得下才收割补种；无容器/塞不下时保持成熟并静默等待
+     *  （绝不掉落产物——否则成熟状态每 tick 重跑战利品表会无限弹物品）。 */
     private boolean tryAutoHarvest(ServerLevel server) {
+        BlockPos below = getBlockPos().below();
+        boolean hasContainer = server.getBlockEntity(below) instanceof Container;
+        boolean hasSink = CompressedBlocks.ITEM_SINK != null;
+        if (!hasContainer && !hasSink) {
+            return false;
+        }
         List<ItemStack> drops = drops(server, null);
-        if (insertInto(server, getBlockPos().below(), drops)) {
+        if (hasContainer && fitsInto((Container) server.getBlockEntity(below), drops)) {
+            insertInto(server, below, drops);
             return true;
         }
-        for (ItemStack rest : drops) {
-            if (!rest.isEmpty()) {
-                Block.popResource(server, getBlockPos(), rest);
-            }
+        if (hasSink) {
+            // 钩子目标（储物抽屉等）：容量近乎无限，直接实插，余量静默丢弃
+            insertInto(server, below, drops);
+            return true;
         }
         return false;
+    }
+
+    /** 容量模拟：所有产物都能塞进容器才返回 true（不改容器状态）。 */
+    private static boolean fitsInto(Container container, List<ItemStack> drops) {
+        long[] sim = new long[container.getContainerSize()];
+        for (int i = 0; i < sim.length; i++) {
+            sim[i] = container.getItem(i).getCount();
+        }
+        for (ItemStack drop : drops) {
+            if (drop.isEmpty()) {
+                continue;
+            }
+            int remaining = drop.getCount();
+            for (int i = 0; i < sim.length && remaining > 0; i++) {
+                ItemStack slot = container.getItem(i);
+                if (slot.isEmpty() || !ItemStack.isSameItemSameComponents(drop, slot)) {
+                    continue;
+                }
+                int cap = Math.max(Math.min(slot.getMaxStackSize(), container.getMaxStackSize()),
+                    container.getMaxStackSize(drop));
+                int move = Math.min((int) Math.max(0, cap - sim[i]), remaining);
+                sim[i] += move;
+                remaining -= move;
+            }
+            for (int i = 0; i < sim.length && remaining > 0; i++) {
+                if (!container.getItem(i).isEmpty()) {
+                    continue;
+                }
+                int cap = Math.max(Math.min(drop.getMaxStackSize(), container.getMaxStackSize()),
+                    container.getMaxStackSize(drop));
+                int move = Math.min(cap, remaining);
+                sim[i] += move;
+                remaining -= move;
+            }
+            if (remaining > 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** 把产物逐叠塞进目标容器：返回是否全部塞入。 */
