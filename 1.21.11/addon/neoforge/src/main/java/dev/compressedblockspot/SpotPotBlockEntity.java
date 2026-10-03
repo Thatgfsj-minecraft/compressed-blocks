@@ -130,8 +130,11 @@ public class SpotPotBlockEntity extends BlockEntity {
             return;
         }
         for (ItemStack drop : drops(server, player)) {
-            if (isHopperPot() && insertIntoBelow(drop)) {
-                continue;
+            if (isHopperPot() && !drop.isEmpty()) {
+                int before = drop.getCount();
+                if (insertIntoBelow(drop) >= before) {
+                    continue;
+                }
             }
             Block.popResource(server, getBlockPos(), drop);
         }
@@ -153,6 +156,12 @@ public class SpotPotBlockEntity extends BlockEntity {
         }
     }
 
+    /** 盆被替换/破坏（1.21.11 移除路径）：掉落土壤与作物。 */
+    @Override
+    public void preRemoveSideEffects(BlockPos pos, BlockState state) {
+        dropContents();
+    }
+
     public static void serverTick(Level level, BlockPos pos, BlockState state, SpotPotBlockEntity be) {
         if (be.plant == null) {
             return;
@@ -160,7 +169,10 @@ public class SpotPotBlockEntity extends BlockEntity {
         int required = be.requiredGrowth();
         if (be.growth < required) {
             be.growth++;
-            be.setChanged();
+            // 每 20 tick 落一次存盘标记即可（渲染进度由客户端本地推进，不依赖每刻存盘）
+            if (be.growth % 20 == 0) {
+                be.setChanged();
+            }
             return;
         }
         if (be.isHopperPot()) {
@@ -199,13 +211,14 @@ public class SpotPotBlockEntity extends BlockEntity {
             return true;
         }
         if (CompressedPotsAddon.ITEM_SINK != null) {
-            boolean all = true;
+            // 部分插入也算成功（剩余静默丢弃）；全没插进 = 无目标/目标满，静默保持成熟
+            boolean anyMoved = false;
             for (ItemStack drop : drops(server, null)) {
-                if (!insertIntoBelow(drop)) {
-                    all = false;
+                if (insertIntoBelow(drop) > 0) {
+                    anyMoved = true;
                 }
             }
-            return all;
+            return anyMoved;
         }
         return false;
     }
@@ -256,11 +269,17 @@ public class SpotPotBlockEntity extends BlockEntity {
         String name = blockId.getPath();
         RandomSource random = server.random;
         if (this.plant.is(BlockTags.CROPS)) {
+            // 战利品表带 age 条件：收割按满龄状态结算（盆内存的是 age=0 默认态，
+            // 不推满龄则成熟收割永远只掉种子——夜间审批 P1-2）
+            BlockState lootState = this.plant;
+            if (this.plant.getBlock() instanceof net.minecraft.world.level.block.CropBlock crop) {
+                lootState = crop.getStateForAge(crop.getMaxAge());
+            }
             ResourceKey<LootTable> key = ResourceKey.create(Registries.LOOT_TABLE,
                 blockId.withPrefix("blocks/"));
             LootParams params = new LootParams.Builder(server)
                 .withParameter(LootContextParams.ORIGIN, Vec3.atCenterOf(getBlockPos()))
-                .withParameter(LootContextParams.BLOCK_STATE, this.plant)
+                .withParameter(LootContextParams.BLOCK_STATE, lootState)
                 .withParameter(LootContextParams.TOOL,
                     player == null ? ItemStack.EMPTY : player.getMainHandItem())
                 .create(LootContextParamSets.BLOCK);
@@ -289,8 +308,9 @@ public class SpotPotBlockEntity extends BlockEntity {
         return out;
     }
 
-    /** hopper 输出：产物合并进下方容器（原版 Container 或大容量容器钩子），放不下返回 false（就地掉落）。 */
-    private boolean insertIntoBelow(ItemStack stack) {
+    /** hopper 输出：产物合并进下方容器（原版 Container 或大容量容器钩子），返回插入数量。 */
+    private int insertIntoBelow(ItemStack stack) {
+        int moved = 0;
         if (getLevel().getBlockEntity(getBlockPos().below()) instanceof Container container) {
             int size = container.getContainerSize();
             for (int i = 0; i < size && !stack.isEmpty(); i++) {
@@ -308,10 +328,13 @@ public class SpotPotBlockEntity extends BlockEntity {
                 int move = Math.min(room, stack.getCount());
                 slot.grow(move);
                 stack.shrink(move);
+                moved += move;
             }
             for (int i = 0; i < size && !stack.isEmpty(); i++) {
                 if (container.getItem(i).isEmpty() && container.canPlaceItem(i, stack)) {
-                    container.setItem(i, stack.split(stack.getCount()));
+                    int n = stack.getCount();
+                    container.setItem(i, stack.split(n));
+                    moved += n;
                 }
             }
             if (size > 0) {
@@ -320,13 +343,15 @@ public class SpotPotBlockEntity extends BlockEntity {
         }
         // 非原版 Container / 大容量余量：走加载器注入的插入钩子（储物抽屉等）
         if (!stack.isEmpty() && CompressedPotsAddon.ITEM_SINK != null) {
-            long moved = CompressedPotsAddon.ITEM_SINK.insert(getLevel(), getBlockPos().below(),
+            long sunk = CompressedPotsAddon.ITEM_SINK.insert(getLevel(), getBlockPos().below(),
                 net.minecraft.core.Direction.UP, stack);
-            if (moved > 0) {
-                stack.shrink((int) Math.min(moved, stack.getCount()));
+            if (sunk > 0) {
+                int n = (int) Math.min(sunk, stack.getCount());
+                stack.shrink(n);
+                moved += n;
             }
         }
-        return stack.isEmpty();
+        return moved;
     }
 
     private static ItemStack itemStack(String id) {

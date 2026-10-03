@@ -183,7 +183,7 @@ function check(name, ok, detail) {
   await cmd('kill @e[type=minecraft:item]');
   await cmd('setblock 2 -60 20 minecraft:air');
 
-  // 4) 全矩阵物品：盔甲架主手换装 + 读 id 断言（711 个）。
+  // 4) 全矩阵物品：盔甲架主手换装 + 读 id 断言（全部 1549 个物品）。
   //    组件数值（耐久 9ⁿ / unbreakable / 速度阶梯 / 护甲防御 / 食物数值）已由服务端
   //    SELF-TEST 权威覆盖，这里验证"物品存在 + 可装备 + 组件补丁可写"。
   await cmd('kill @e[type=minecraft:armor_stand]');

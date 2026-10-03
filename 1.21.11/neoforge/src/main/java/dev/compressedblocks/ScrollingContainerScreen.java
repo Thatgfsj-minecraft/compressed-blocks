@@ -95,6 +95,11 @@ public class ScrollingContainerScreen extends AbstractContainerScreen<ScrollingC
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        // 仅在界面面板区域内滚动翻页（悬停在界面外/热栏时不误翻）
+        if (mouseX < this.leftPos || mouseX >= this.leftPos + this.imageWidth
+            || mouseY < this.topPos || mouseY >= this.topPos + this.imageHeight) {
+            return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        }
         this.menu.setScrollRowLocal(this.menu.getScrollRow() + (scrollY > 0 ? -1 : 1));
         return true;
     }
@@ -111,7 +116,8 @@ public class ScrollingContainerScreen extends AbstractContainerScreen<ScrollingC
                     + (mouseY < thumb ? -ScrollingContainerMenu.VISIBLE_ROWS
                                       : ScrollingContainerMenu.VISIBLE_ROWS));
             }
-            this.dragOffset = mouseY - this.thumbTop();
+            // 点击轨道翻页后把抓取偏移夹进滑块内，避免随后一次拖动跳变
+            this.dragOffset = Math.max(0, Math.min(THUMB_H, mouseY - this.thumbTop()));
             return true;
         }
         return super.mouseClicked(event, doubled);

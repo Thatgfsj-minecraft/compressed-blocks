@@ -607,7 +607,7 @@ public final class CompressedBlocks {
     // ------------------------------------------------------------------ 构建
 
     static {
-        // 1. 储存方块（43 材料 × 9 重）：统一硬度公式 + 1200 爆炸抗性
+        // 1. 储存方块（51 材料 × 9 重）：统一硬度公式 + 1200 爆炸抗性
         for (StorageMat m : STORAGE) {
             for (int level = 1; level <= LEVELS; level++) {
                 String name = LEVEL_PREFIX[level - 1] + "_" + m.key();
@@ -1547,7 +1547,7 @@ public final class CompressedBlocks {
         }
         pot.setSoil(blockByName("1x_dirt").defaultBlockState());
         pot.setPlant(Blocks.WHEAT.defaultBlockState(), "minecraft:wheat_seeds");
-        // 自动收割落在 gameTime%20==0 的 tick：驱动到箱子收到产物或超时（2 秒窗口）
+        // 自动收割有 1 秒重试冷却（BE 内计数，与 gameTime 无关）：驱动到箱子收到产物或超时
         for (int i = 0; i <= pot.requiredGrowth() + 40 && !containerHasItems(level, potPos.below()); i++) {
             CompressedPotBlockEntity.serverTick(level, potPos, potBlock.defaultBlockState(), pot);
         }

@@ -193,7 +193,10 @@ public class CompressedPotBlockEntity extends BlockEntity {
         int required = be.requiredGrowth();
         if (be.growth < required) {
             be.growth++;
-            be.setChanged();
+            // 每 20 tick 落一次存盘标记即可（渲染进度由客户端本地推进，不依赖每刻存盘）
+            if (be.growth % 20 == 0) {
+                be.setChanged();
+            }
             return;
         }
         if (be.isHopper()) {
@@ -273,8 +276,11 @@ public class CompressedPotBlockEntity extends BlockEntity {
         return true;
     }
 
-    /** 把产物逐叠塞进目标容器：返回是否全部塞入。 */
+    /** 把产物逐叠塞进目标容器：返回本轮是否插入过任何物品（部分插入也算成功——剩余静默
+     *  丢弃，与抽屉场景"容量近乎无限"语义一致；全没插进 = false 保持成熟，避免部分失败后
+     *  重掷产量表造成重复产出——夜间审批 P2-1）。 */
     private boolean insertInto(ServerLevel server, BlockPos target, List<ItemStack> drops) {
+        boolean movedAny = false;
         for (ItemStack drop : drops) {
             if (drop.isEmpty()) {
                 continue;
@@ -296,10 +302,12 @@ public class CompressedPotBlockEntity extends BlockEntity {
                     int move = Math.min(room, drop.getCount());
                     slot.grow(move);
                     drop.shrink(move);
+                    movedAny = true;
                 }
                 for (int i = 0; i < size && !drop.isEmpty(); i++) {
                     if (container.getItem(i).isEmpty() && container.canPlaceItem(i, drop)) {
                         container.setItem(i, drop.split(drop.getCount()));
+                        movedAny = true;
                     }
                 }
                 if (size > 0) {
@@ -311,13 +319,11 @@ public class CompressedPotBlockEntity extends BlockEntity {
                     net.minecraft.core.Direction.UP, drop);
                 if (moved > 0) {
                     drop.shrink((int) Math.min(moved, drop.getCount()));
+                    movedAny = true;
                 }
             }
-            if (!drop.isEmpty()) {
-                return false;
-            }
         }
-        return true;
+        return movedAny;
     }
 
     /** 客户端本地推进进度（Botany Pots 同款）：渲染平滑长大，不发包。 */

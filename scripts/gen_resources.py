@@ -828,6 +828,9 @@ def gen_data(data):
     dump(f"{data}/c/tags/item/storage_blocks.json", {"replace": False, "values": [
         f"#c:storage_blocks/{key}" for key, _, _, _, _ in COMPAT_METALS
     ] + ["#c:storage_blocks/compressedblocks"]})
+    # 子标签实体（夜间审批 P3 修复：父标签引用了它却从未生成，导致悬空引用启动警告）
+    dump(f"{data}/c/tags/item/storage_blocks/compressedblocks.json",
+         {"replace": False, "values": [f"{NS}:{name}" for name in storage_names()]})
     for key, _, _, _, _ in COMPAT_METALS:
         dump(f"{data}/c/tags/item/storage_blocks/{key}.json",
              {"replace": False, "values": [f"{NS}:1x_{key}_block"]})
@@ -905,7 +908,7 @@ def gen_data(data):
             "pools": [{"rolls": 1.0, "bonus_rolls": 0.0,
                        "entries": [{"type": "minecraft:item", "name": f"{NS}:{name}"}],
                        "conditions": [{"condition": "minecraft:survives_explosion"}]}]})
-    # 压缩盆栽：掉落自身（盆内土壤/作物由方块实体 onRemove 补发）
+    # 压缩盆栽：掉落自身（盆内土壤/作物由方块实体 preRemoveSideEffects 补发）
     for name in pot_names():
         dump(f"{data}/{NS}/loot_table/blocks/{name}.json", self_drop(name))
     # 刷石机：掉落自身

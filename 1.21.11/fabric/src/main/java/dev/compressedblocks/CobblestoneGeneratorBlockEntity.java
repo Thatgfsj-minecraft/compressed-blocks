@@ -53,7 +53,7 @@ public class CobblestoneGeneratorBlockEntity extends BlockEntity {
         return item == null ? new ItemStack(Items.COBBLESTONE) : new ItemStack(item);
     }
 
-    /** 邻居方块更新时重扫：六向按优先级取第一个容器。 */
+    /** 邻居方块更新时重扫：六向按优先级取第一个容器（与放置顺序无关，下方始终优先上方）。 */
     public void rescanOutput() {
         for (Direction d : SCAN_ORDER) {
             if (isOutputTarget(getBlockPos().relative(d), d)) {
