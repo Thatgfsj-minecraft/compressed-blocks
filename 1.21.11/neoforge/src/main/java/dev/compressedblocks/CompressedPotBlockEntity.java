@@ -52,6 +52,8 @@ public class CompressedPotBlockEntity extends BlockEntity {
     private BlockState plant;
     private String plantItem;
     private int growth;
+    /** 漏斗盆栽收割重试冷却（失败后 20 tick 再试）。 */
+    private int harvestCooldown;
 
     public CompressedPotBlockEntity(BlockPos pos, BlockState state) {
         super(CompressedBlocks.POT_TYPE, pos, state);
@@ -180,7 +182,8 @@ public class CompressedPotBlockEntity extends BlockEntity {
         }
     }
 
-    /** 服务端生长计时：普通盆栽成熟等玩家右键收割；漏斗盆栽成熟自动收割入下方容器。 */
+    /** 服务端生长计时：普通盆栽成熟等玩家右键收割；漏斗盆栽自动收割入下方容器，
+     *  无容器时静默等待（1 秒重试一次），玩家仍可随时右键收割（掉地上）。 */
     public static void serverTick(Level level, BlockPos pos, BlockState state, CompressedPotBlockEntity be) {
         if (be.plant == null) {
             return;
@@ -191,9 +194,14 @@ public class CompressedPotBlockEntity extends BlockEntity {
             be.setChanged();
             return;
         }
-        if (level instanceof ServerLevel server && be.isHopper() && be.tryAutoHarvest(server)) {
-            be.growth = 0;
-            be.sync();
+        if (be.isHopper()) {
+            if (be.harvestCooldown > 0) {
+                be.harvestCooldown--;
+            } else if (level instanceof ServerLevel server && be.tryAutoHarvest(server)) {
+                be.growth = 0;
+                be.sync();
+                be.harvestCooldown = 20;
+            }
         }
     }
 

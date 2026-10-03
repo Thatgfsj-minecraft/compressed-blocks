@@ -1398,7 +1398,8 @@ public final class CompressedBlocks {
         }
         pot.setSoil(blockByName("1x_dirt").defaultBlockState());
         pot.setPlant(Blocks.WHEAT.defaultBlockState(), "minecraft:wheat_seeds");
-        for (int i = 0; i < pot.requiredGrowth() + 1; i++) {
+        // 自动收割落在 gameTime%20==0 的 tick：驱动到箱子收到产物或超时（2 秒窗口）
+        for (int i = 0; i <= pot.requiredGrowth() + 40 && !containerHasItems(level, potPos.below()); i++) {
             CompressedPotBlockEntity.serverTick(level, potPos, potBlock.defaultBlockState(), pot);
         }
         if (!containerHasItems(level, potPos.below())) {
