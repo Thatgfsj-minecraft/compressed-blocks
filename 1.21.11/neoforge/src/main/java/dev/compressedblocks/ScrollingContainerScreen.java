@@ -64,6 +64,24 @@ public class ScrollingContainerScreen extends AbstractContainerScreen<ScrollingC
             this.leftPos + TRACK_X, this.thumbTop(), TRACK_W, THUMB_H);
     }
 
+    @Override
+    protected void init() {
+        super.init();
+        // 与 Item Scroller 的"悬停槽位+滚轮=搬移物品"冲突：本界面滚轮专职翻页，
+        // 自动把本屏类名加入其 GUI 黑名单（幂等，未装该 mod 时静默跳过）。
+        // 想恢复其滚轮搬移：从 itemscroller 配置的 guiBlacklist 移除本类名即可。
+        try {
+            Class<?> configs = Class.forName("fi.dy.masa.itemscroller.config.Configs");
+            @SuppressWarnings("unchecked")
+            java.util.Set<String> blacklist = (java.util.Set<String>)
+                configs.getField("GUI_BLACKLIST").get(null);
+            blacklist.add("dev.compressedblocks.ScrollingContainerScreen");
+        } catch (ClassNotFoundException | NoSuchFieldException
+                 | IllegalAccessException | ClassCastException ignored) {
+            // 未安装 Item Scroller：无事发生
+        }
+    }
+
     private int thumbTop() {
         return this.topPos + TRACK_Y
             + this.menu.getScrollRow() * (TRACK_H - THUMB_H) / ScrollingContainerMenu.MAX_ROW;
