@@ -1,0 +1,1677 @@
+package dev.compressedblocks;
+
+import com.mojang.logging.LogUtils;
+import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.ItemContainerContents;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.Unit;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.flag.FeatureFlags;
+import net.minecraft.world.food.FoodProperties;
+import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ToolMaterial;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.component.Tool;
+import net.minecraft.world.item.enchantment.Enchantable;
+import net.minecraft.world.item.equipment.ArmorMaterial;
+import net.minecraft.world.item.equipment.ArmorType;
+import net.minecraft.world.item.equipment.EquipmentAssets;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.grower.TreeGrower;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.Feature;
+import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.material.PushReaction;
+import net.minecraft.util.random.Weighted;
+import net.minecraft.util.random.WeightedList;
+import org.slf4j.Logger;
+
+/**
+ * 压缩方块核心：纯数据驱动。方块/物品实例在此集中构建，注册动作由各加载器入口完成；
+ * 本类不 import 任何加载器类（组织约定：core 每版本双加载器逐字节一致）。
+ *
+ * 0.3.0：储存方块统一硬度 50×1.2^(重-1)、全部 1200 爆炸抗性；新增压缩护甲（九重满套免疫一切伤害
+ * 且饱食度常满，溢出防御转抗性提升）、24 种建材、耕地/作物/树苗/树叶农业系统、压缩食物。
+ */
+public final class CompressedBlocks {
+    public static final String MOD_ID = "compressedblocks";
+    public static final Logger LOGGER = LogUtils.getLogger();
+
+    public static final int LEVELS = 9;
+    /** 六重及以上工具/护甲：不可破坏（原版 unbreakable 组件）。 */
+    public static final int UNBREAKABLE_FROM = 6;
+    /** 作物/食物封顶 3 级。 */
+    public static final int CROP_MAX_LEVEL = 3;
+    public static final int FOOD_MAX_LEVEL = 3;
+
+    private static final String[] LEVEL_PREFIX = {
+        "1x", "2x", "3x", "4x", "5x", "6x", "7x", "8x", "9x"
+    };
+    private static final String[] LEVEL_EN_PREFIX = {
+        "Compressed", "Double Compressed", "Triple Compressed", "Quadruple Compressed", "Quintuple Compressed",
+        "Sextuple Compressed", "Septuple Compressed", "Octuple Compressed", "Nonuple Compressed"
+    };
+
+    /** 挖掘速度阶梯：一重=铁 6.0、二重=钻 8.0、三重=金 12.0，四重起 ×1.5 逐级连乘。 */
+    private static final float[] SPEED = {6.0F, 8.0F, 12.0F, 18.0F, 27.0F, 40.5F, 60.75F, 91.125F, 136.6875F};
+
+    // ------------------------------------------------------------------ 储存方块
+
+    /** 压缩方块硬度：黑曜石级 50 起步，每重 ×1.2（所需挖掘速度逐层上浮）。 */
+    public static final float STORAGE_HARDNESS_BASE = 50.0F;
+    public static final double STORAGE_HARDNESS_STEP = 1.2;
+    /** 全部压缩方块炸不毁（黑曜石级爆炸抗性）。 */
+    public static final float STORAGE_BLAST = 1200.0F;
+
+    /** 压缩硬度：L1 = 原版该方块硬度，线性升到 L9 目标（黑曜石类 200、硬类 150、软类 100）。 */
+    public static float hardnessFor(StorageMat m, int level) {
+        float vh = m.vh();
+        float target = m.key().equals("obsidian") ? 200.0F : (vh >= 1.5F ? 150.0F : 100.0F);
+        return vh + (target - vh) * (level - 1) / 8.0F;
+    }
+
+    private static StorageMat storageMatOf(String blockName) {
+        String mat = blockName.substring(blockName.indexOf('_') + 1);
+        for (StorageMat m : STORAGE) {
+            if (m.key().equals(mat)) {
+                return m;
+            }
+        }
+        throw new IllegalStateException("no StorageMat for " + blockName);
+    }
+
+    public enum ToolKind { STONE, WOOD }
+
+    /** 创造物品栏落位。 */
+    public enum Tab { BLOCKS, TOOLS, INGREDIENTS, FOOD, POTS }
+
+    /**
+     * 储存方块材料（key/英文名/声音/地图色/是否需要正确工具/发光/原版硬度）。
+     * 51 材料：19 旧材料 + 8 矿物块 + 24 建材（含火药块——原版无方块形态）。
+     * 硬度与爆炸抗性统一走公式；英文名供压缩甘蔗提示拼接（lang 由生成器产出）。
+     */
+    private record StorageMat(String key, String en, SoundType sound, MapColor color,
+                              boolean requiresTool, int light, float vh) {
+    }
+
+    private static final List<StorageMat> STORAGE = List.of(
+        new StorageMat("cobblestone", "Cobblestone", SoundType.STONE, MapColor.STONE, true, 0, 2F),
+        new StorageMat("stone", "Stone", SoundType.STONE, MapColor.STONE, true, 0, 1.5F),
+        new StorageMat("cobbled_deepslate", "Cobbled Deepslate", SoundType.DEEPSLATE, MapColor.DEEPSLATE, true, 0, 3.5F),
+        new StorageMat("deepslate", "Deepslate", SoundType.DEEPSLATE, MapColor.DEEPSLATE, true, 0, 3F),
+        new StorageMat("oak_log", "Oak Log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("spruce_log", "Spruce Log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("birch_log", "Birch Log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("jungle_log", "Jungle Log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("acacia_log", "Acacia Log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("dark_oak_log", "Dark Oak Log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("mangrove_log", "Mangrove Log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("cherry_log", "Cherry Log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("pale_oak_log", "Pale Oak Log", SoundType.WOOD, MapColor.WOOD, false, 0, 2F),
+        new StorageMat("dirt", "Dirt", SoundType.GRAVEL, MapColor.DIRT, false, 0, 0.5F),
+        new StorageMat("sand", "Sand", SoundType.SAND, MapColor.SAND, false, 0, 0.5F),
+        new StorageMat("gravel", "Gravel", SoundType.GRAVEL, MapColor.STONE, false, 0, 0.6F),
+        new StorageMat("netherrack", "Netherrack", SoundType.NETHERRACK, MapColor.NETHER, true, 0, 0.4F),
+        new StorageMat("end_stone", "End Stone", SoundType.STONE, MapColor.SAND, true, 0, 3F),
+        new StorageMat("obsidian", "Obsidian", SoundType.STONE, MapColor.COLOR_BLACK, true, 0, 50F),
+        new StorageMat("coal_block", "Block of Coal", SoundType.STONE, MapColor.COLOR_BLACK, true, 0, 5F),
+        new StorageMat("copper_block", "Block of Copper", SoundType.COPPER, MapColor.COLOR_ORANGE, true, 0, 3F),
+        new StorageMat("iron_block", "Block of Iron", SoundType.METAL, MapColor.METAL, true, 0, 5F),
+        new StorageMat("lapis_block", "Lapis Lazuli Block", SoundType.STONE, MapColor.LAPIS, true, 0, 3F),
+        new StorageMat("gold_block", "Block of Gold", SoundType.METAL, MapColor.GOLD, true, 0, 3F),
+        new StorageMat("redstone_block", "Block of Redstone", SoundType.STONE, MapColor.COLOR_RED, true, 0, 5F),
+        new StorageMat("emerald_block", "Block of Emerald", SoundType.METAL, MapColor.EMERALD, true, 0, 5F),
+        new StorageMat("diamond_block", "Block of Diamond", SoundType.METAL, MapColor.DIAMOND, true, 0, 5F),
+        new StorageMat("granite", "Granite", SoundType.STONE, MapColor.COLOR_ORANGE, true, 0, 1.5F),
+        new StorageMat("diorite", "Diorite", SoundType.STONE, MapColor.QUARTZ, true, 0, 1.5F),
+        new StorageMat("andesite", "Andesite", SoundType.STONE, MapColor.STONE, true, 0, 1.5F),
+        new StorageMat("calcite", "Calcite", SoundType.CALCITE, MapColor.QUARTZ, true, 0, 0.75F),
+        new StorageMat("tuff", "Tuff", SoundType.TUFF, MapColor.COLOR_GRAY, true, 0, 1.5F),
+        new StorageMat("sandstone", "Sandstone", SoundType.STONE, MapColor.SAND, true, 0, 0.8F),
+        new StorageMat("red_sandstone", "Red Sandstone", SoundType.STONE, MapColor.COLOR_ORANGE, true, 0, 0.8F),
+        new StorageMat("basalt", "Basalt", SoundType.BASALT, MapColor.COLOR_GRAY, true, 0, 1.25F),
+        new StorageMat("blackstone", "Blackstone", SoundType.STONE, MapColor.COLOR_BLACK, true, 0, 1.5F),
+        new StorageMat("dripstone_block", "Dripstone Block", SoundType.DRIPSTONE_BLOCK, MapColor.COLOR_BROWN, true, 0, 1.5F),
+        new StorageMat("terracotta", "Terracotta", SoundType.STONE, MapColor.COLOR_ORANGE, true, 0, 1.25F),
+        new StorageMat("quartz_block", "Quartz Block", SoundType.STONE, MapColor.QUARTZ, true, 0, 0.8F),
+        new StorageMat("purpur_block", "Purpur Block", SoundType.STONE, MapColor.COLOR_MAGENTA, true, 0, 1.5F),
+        new StorageMat("prismarine", "Prismarine", SoundType.STONE, MapColor.COLOR_CYAN, true, 0, 1.5F),
+        new StorageMat("amethyst_block", "Amethyst Block", SoundType.AMETHYST, MapColor.COLOR_PURPLE, true, 0, 1.5F),
+        new StorageMat("glowstone", "Glowstone", SoundType.GLASS, MapColor.SAND, false, 15, 0.3F),
+        new StorageMat("clay", "Clay", SoundType.GRAVEL, MapColor.COLOR_LIGHT_GRAY, false, 0, 0.6F),
+        new StorageMat("hay_block", "Hay Bale", SoundType.GRASS, MapColor.COLOR_YELLOW, false, 0, 0.5F),
+        new StorageMat("bone_block", "Bone Block", SoundType.STONE, MapColor.SAND, true, 0, 2F),
+        new StorageMat("moss_block", "Moss Block", SoundType.MOSS, MapColor.COLOR_GREEN, false, 0, 0.1F),
+        new StorageMat("snow", "Snow Block", SoundType.SNOW, MapColor.SNOW, false, 0, 0.2F),
+        new StorageMat("blue_ice", "Blue Ice", SoundType.GLASS, MapColor.COLOR_LIGHT_BLUE, false, 0, 2.8F),
+        new StorageMat("mud", "Mud", SoundType.MUD, MapColor.COLOR_GRAY, false, 0, 0.5F),
+        new StorageMat("gunpowder", "Block of Gunpowder", SoundType.SAND, MapColor.COLOR_GRAY, false, 0, 0.5F)
+    );
+
+    /** 甘蔗 id 的材料段：去掉 "_block" 后缀（diamond_block → diamond），与生成器 cane_key 一致。 */
+    static String caneKey(String matKey) {
+        return matKey.endsWith("_block") ? matKey.substring(0, matKey.length() - 6) : matKey;
+    }
+
+    /** 甘蔗英文显示名：材料名去掉 "Block of " 前缀 / " Block" / " Bale" 后缀，与生成器 cane_en 一致。 */
+    static String caneEnName(String matEn) {
+        if (matEn.startsWith("Block of ")) {
+            return matEn.substring("Block of ".length());
+        }
+        if (matEn.endsWith(" Block")) {
+            return matEn.substring(0, matEn.length() - " Block".length());
+        }
+        if (matEn.endsWith(" Bale")) {
+            return matEn.substring(0, matEn.length() - " Bale".length());
+        }
+        return matEn;
+    }
+
+    // ------------------------------------------------------------------ 树 / 作物 / 食物
+
+    private record WoodDef(String key, String en, String zh) {
+    }
+
+    private static final List<WoodDef> WOODS = List.of(
+        new WoodDef("oak", "Oak", "橡树"),
+        new WoodDef("spruce", "Spruce", "云杉"),
+        new WoodDef("birch", "Birch", "白桦"),
+        new WoodDef("jungle", "Jungle", "丛林"),
+        new WoodDef("acacia", "Acacia", "金合欢"),
+        new WoodDef("dark_oak", "Dark Oak", "深色橡树"),
+        new WoodDef("mangrove", "Mangrove", "红树"),
+        new WoodDef("cherry", "Cherry", "樱花"),
+        new WoodDef("pale_oak", "Pale Oak", "苍白橡树")
+    );
+
+    private record CropDef(String key, String en, boolean hasSeeds) {
+    }
+
+    private static final List<CropDef> CROPS = List.of(
+        new CropDef("wheat", "Wheat", true),
+        new CropDef("carrot", "Carrot", false),
+        new CropDef("potato", "Potato", false),
+        new CropDef("beetroot", "Beetroot", true)
+    );
+
+    private record FoodDef(String key, String en, float nutrition, float saturation) {
+    }
+
+    /** 原版数值（名称与生/熟数值全部对齐原版）；N 级压缩 = ×9^N。 */
+    private static final List<FoodDef> FOODS = List.of(
+        new FoodDef("bread", "Bread", 5.0F, 6.0F),
+        new FoodDef("beef", "Raw Beef", 3.0F, 1.8F),
+        new FoodDef("cooked_beef", "Steak", 8.0F, 12.8F),
+        new FoodDef("porkchop", "Raw Porkchop", 3.0F, 1.8F),
+        new FoodDef("cooked_porkchop", "Cooked Porkchop", 8.0F, 12.8F),
+        new FoodDef("mutton", "Raw Mutton", 2.0F, 1.2F),
+        new FoodDef("cooked_mutton", "Cooked Mutton", 6.0F, 9.6F),
+        new FoodDef("chicken", "Raw Chicken", 2.0F, 1.2F),
+        new FoodDef("cooked_chicken", "Cooked Chicken", 6.0F, 7.2F),
+        new FoodDef("rabbit", "Raw Rabbit", 3.0F, 1.8F),
+        new FoodDef("cooked_rabbit", "Cooked Rabbit", 5.0F, 6.0F),
+        new FoodDef("cod", "Raw Cod", 2.0F, 0.4F),
+        new FoodDef("cooked_cod", "Cooked Cod", 5.0F, 6.0F),
+        new FoodDef("salmon", "Raw Salmon", 2.0F, 0.4F),
+        new FoodDef("cooked_salmon", "Cooked Salmon", 6.0F, 9.6F),
+        new FoodDef("melon", "Watermelon", 2.0F, 1.2F),
+        new FoodDef("rotten_flesh", "Rotten Flesh", 4.0F, 0.8F),
+        new FoodDef("baked_potato", "Baked Potato", 5.0F, 6.0F)
+    );
+
+    // ------------------------------------------------------------------ 护甲
+
+    public static final ArmorType[] ARMOR_TYPES = {ArmorType.HELMET, ArmorType.CHESTPLATE, ArmorType.LEGGINGS, ArmorType.BOOTS};
+    /** 石制护甲基准=铁级：头 2 / 胸 6 / 腿 5 / 靴 2。 */
+    public static final int[] ARMOR_BASE_DEFENSE = {2, 6, 5, 2};
+    private static final int[] ARMOR_DURABILITY_BASE = {11, 16, 15, 13};
+    private static final int ARMOR_ENCHANTABILITY = 9;
+
+    /** 每重每件 +1，单件封顶 10。 */
+    public static int armorDefense(int level, int piece) {
+        return Math.min(ARMOR_BASE_DEFENSE[piece] + level - 1, 10);
+    }
+
+    /** 超过 10 的部分转为抗性提升（等级=穿戴件溢出总和）。 */
+    public static int armorOverflow(int level, int piece) {
+        return Math.max(0, ARMOR_BASE_DEFENSE[piece] + level - 1 - 10);
+    }
+
+    /** 耐久 = 9^重 × 铁甲基准；六重起不可破坏（给不溢出的最大乘数，配合 unbreakable 组件）。 */
+    public static int armorDurability(int level, int piece) {
+        long mult = level >= UNBREAKABLE_FROM ? Integer.MAX_VALUE / 16L : pow9(level);
+        return (int) (ARMOR_DURABILITY_BASE[piece] * mult);
+    }
+
+    private static long pow9(int level) {
+        long value = 1;
+        for (int i = 0; i < level; i++) {
+            value *= 9;
+        }
+        return value;
+    }
+
+    // ------------------------------------------------------------------ 注册表
+
+    /** @param itemName null = 无物品（压缩耕地）。 */
+    public record BlockReg(String name, Block block, String itemName) {
+    }
+
+    /** @param blockKey true = 翻译键用 block. 前缀（方块物品同 id），false = item. 前缀。 */
+    public record ItemReg(String name, Item item, Tab tab, boolean blockKey) {
+    }
+
+    record ToolReg(String name, Item item, int durability, float speed, boolean unbreakable, double damage) {
+    }
+
+    record ArmorReg(String name, Item item, int piece, int level) {
+    }
+
+    record FoodReg(String name, Item item, int nutrition, float saturation) {
+    }
+
+    private static final List<BlockReg> BLOCKS = new ArrayList<>();
+    private static final List<ItemReg> ITEMS = new ArrayList<>();
+    private static final List<BlockReg> STORAGE_BLOCKS = new ArrayList<>();
+    private static final List<ToolReg> TOOL_REGS = new ArrayList<>();
+    private static final List<ArmorReg> ARMOR_REGS = new ArrayList<>();
+    private static final List<FoodReg> FOOD_REGS = new ArrayList<>();
+    private static final Map<Item, int[]> ARMOR_INDEX = new IdentityHashMap<>();
+    private static final Map<Block, Integer> DIRT_LEVELS = new IdentityHashMap<>();
+    private static final Map<Block, Integer> SAND_LEVELS = new IdentityHashMap<>();
+    private static final Map<Block, Integer> NETHER_SOIL_LEVELS = new IdentityHashMap<>();
+    private static final Map<Integer, Block> FARMLAND = new IdentityHashMap<>();
+
+    /** 渲染层注册用分组：cross/crop 类植物 → CUTOUT，树叶 → CUTOUT（客户端入口注册）。 */
+    public static final List<Block> SAPLING_BLOCKS = new ArrayList<>();
+    public static final List<Block> CANE_BLOCKS = new ArrayList<>();
+    public static final List<Block> CROP_BLOCKS = new ArrayList<>();
+    public static final List<Block> LEAVES_BLOCKS = new ArrayList<>();
+    public static final List<Block> GENERATOR_BLOCKS = new ArrayList<>();
+
+    /** 刷石机（3 压缩等级）与共享方块实体类型（类型由加载器入口构建注入）。 */
+    public static BlockEntityType<CobblestoneGeneratorBlockEntity> GENERATOR_TYPE;
+
+    /** 大容量容器插入钩子（加载器入口注入：Fabric=Transfer API、NeoForge=IItemHandler），
+     *  兼容储物抽屉等不按原版 Container 64 上限计算的 mod。 */
+    public interface ItemSink {
+        /** 目标位置从给定面是否可接收物品。 */
+        boolean accepts(Level level, BlockPos pos, Direction side);
+
+        /** 尝试插入，返回移动数量。 */
+        long insert(Level level, BlockPos pos, Direction side, ItemStack stack);
+    }
+
+    public static ItemSink ITEM_SINK;
+
+    // 压缩箱子/压缩潜影盒（单一等级，243 格滚动存储）
+    public static CompressedChestBlock COMPRESSED_CHEST;
+    public static CompressedShulkerBlock COMPRESSED_SHULKER;
+    /** 方块实体类型由加载器入口构建注入。 */
+    public static BlockEntityType<ScrollingContainerBlockEntity> CHEST_TYPE;
+    public static BlockEntityType<ScrollingContainerBlockEntity> SHULKER_TYPE;
+    /** 菜单类型（原版公开构造；客户端工厂用哑容器，槽位按索引同步内容）。 */
+    public static final MenuType<ScrollingContainerMenu> CHEST_MENU_TYPE = new MenuType<>(
+        (id, inv) -> new ScrollingContainerMenu(
+            CompressedBlocks.CHEST_MENU_TYPE, id, inv, new SimpleContainer(ScrollingContainerMenu.SIZE)),
+        FeatureFlags.VANILLA_SET);
+    public static final MenuType<ScrollingContainerMenu> SHULKER_MENU_TYPE = new MenuType<>(
+        (id, inv) -> new ScrollingContainerMenu(
+            CompressedBlocks.SHULKER_MENU_TYPE, id, inv, new SimpleContainer(ScrollingContainerMenu.SIZE)),
+        FeatureFlags.VANILLA_SET);
+
+    /** 压缩金属包（科技/魔法 mod 经典材质；合成走 #c:*_ingots 通用标签）。(key, 挖掘档 0-2, 发光) */
+    private record CompatMetal(String key, int tier, int light) {
+    }
+
+    private static final List<CompatMetal> COMPAT_METALS = List.of(
+        new CompatMetal("tin", 0, 0),
+        new CompatMetal("lead", 0, 0),
+        new CompatMetal("zinc", 0, 0),
+        new CompatMetal("plastic", 0, 0),
+        new CompatMetal("silver", 1, 0),
+        new CompatMetal("nickel", 1, 0),
+        new CompatMetal("bronze", 1, 0),
+        new CompatMetal("brass", 1, 0),
+        new CompatMetal("electrum", 1, 0),
+        new CompatMetal("invar", 1, 0),
+        new CompatMetal("constantan", 1, 0),
+        new CompatMetal("steel", 1, 0),
+        new CompatMetal("manasteel", 1, 0),
+        new CompatMetal("uranium", 2, 0),
+        new CompatMetal("osmium", 2, 0),
+        new CompatMetal("signalum", 2, 0),
+        new CompatMetal("enderium", 2, 0),
+        new CompatMetal("refined_obsidian", 2, 0),
+        new CompatMetal("refined_glowstone", 2, 15),
+        new CompatMetal("lumium", 2, 12),
+        new CompatMetal("terrasteel", 2, 0),
+        new CompatMetal("elementium", 2, 0)
+    );
+
+    /** 注册压缩金属包：22 材质 × 9 级；挖掘档 stone/iron/diamond；发光金属带光。 */
+    private static void buildCompatMetals() {
+        for (CompatMetal m : COMPAT_METALS) {
+            for (int level = 1; level <= LEVELS; level++) {
+                String name = LEVEL_PREFIX[level - 1] + "_" + m.key() + "_block";
+                BlockBehaviour.Properties props = BlockBehaviour.Properties.of()
+                    .setId(ResourceKey.create(Registries.BLOCK, id(name)))
+                    .mapColor(MapColor.METAL)
+                    .strength(5.0F, STORAGE_BLAST)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL);
+                if (m.light() > 0) {
+                    props = props.lightLevel(state -> m.light());
+                }
+                Block block = new Block(props);
+                BlockItem item = new BlockItem(block,
+                    new Item.Properties()
+                        .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                        .useBlockDescriptionPrefix());
+                BLOCKS.add(new BlockReg(name, block, name));
+                ITEMS.add(new ItemReg(name, item, Tab.BLOCKS, true));
+            }
+        }
+    }
+
+    private static int compatCount() {
+        return COMPAT_METALS.size() * LEVELS;
+    }
+
+
+    /** 压缩盆栽（普通/漏斗）与共享方块实体类型。 */
+    public static CompressedPotBlock POT;
+    public static CompressedPotBlock HOPPER_POT;
+    public static BlockEntityType<CompressedPotBlockEntity> POT_TYPE;
+
+    public static List<BlockReg> blocks() {
+        return BLOCKS;
+    }
+
+    public static List<ItemReg> items() {
+        return ITEMS;
+    }
+
+    public static Identifier id(String path) {
+        return Identifier.fromNamespaceAndPath(MOD_ID, path);
+    }
+
+    /** 泥土等级查询：压缩泥土方块 → 1-9，其他 null。 */
+    public static Integer dirtLevel(BlockState state) {
+        return DIRT_LEVELS.get(state.getBlock());
+    }
+
+    /** 沙子等级查询：压缩沙子方块 → 1-9，其他 null。 */
+    public static Integer sandLevel(BlockState state) {
+        return SAND_LEVELS.get(state.getBlock());
+    }
+
+    /** 下界土壤等级查询：压缩下界岩 → 1-9，其他 null（原版下界岩/灵魂沙在 soilLevelOf 记 1）。 */
+    public static Integer netherSoilLevel(BlockState state) {
+        return NETHER_SOIL_LEVELS.get(state.getBlock());
+    }
+
+    /** 耕地等级查询：压缩耕地 → 1-9，其他 null。 */
+    public static Integer farmlandLevel(BlockState state) {
+        return state.getBlock() instanceof CompressedFarmBlock farm ? farm.level() : null;
+    }
+
+    public static Block farmland(int level) {
+        return FARMLAND.get(level);
+    }
+
+    /** 按注册名查物品；无则 null（压缩耕地没有物品）。 */
+    public static Item itemByName(String name) {
+        for (ItemReg e : ITEMS) {
+            if (e.name().equals(name)) {
+                return e.item();
+            }
+        }
+        return null;
+    }
+
+    // ------------------------------------------------------------------ 工具
+
+    private static final String[] TOOLS = {"pickaxe", "axe", "shovel", "hoe", "sword"};
+
+    /** 原版石级工具 {attackDamage, attackSpeed}。 */
+    private static final float[][] STONE_TOOL_STATS = {
+        {1.0F, -2.8F}, {7.0F, -3.2F}, {1.5F, -3.0F}, {-1.0F, -2.0F}, {3.0F, -2.4F}
+    };
+
+    /** 原版木级工具 {attackDamage, attackSpeed}。 */
+    private static final float[][] WOOD_TOOL_STATS = {
+        {1.0F, -2.8F}, {6.0F, -3.2F}, {1.5F, -3.0F}, {0.0F, -3.0F}, {3.0F, -2.4F}
+    };
+
+    /** 工具只有两条线：圆石线（圆石+深板岩圆石混用）、木线（9 原木混用）。 */
+    private record ToolLine(String key, ToolKind kind, float[][] stats, float damageBonus, int enchantability) {
+    }
+
+    private static final List<ToolLine> TOOL_LINES = List.of(
+        new ToolLine("cobblestone", ToolKind.STONE, STONE_TOOL_STATS, 1.0F, 5),
+        new ToolLine("wood", ToolKind.WOOD, WOOD_TOOL_STATS, 0.0F, 15)
+    );
+
+    /** 第 n 重耐久：9ⁿ × 基础；六重起不可破坏。 */
+    public static int durabilityFor(int level, ToolKind kind) {
+        if (level >= UNBREAKABLE_FROM) {
+            return Integer.MAX_VALUE;
+        }
+        long base = kind == ToolKind.STONE ? 131 : 59;
+        return (int) (base * pow9(level));
+    }
+
+    /** 挖掘等级阶梯：7 重=铁、8 重=钻石、9 重=下界合金；其余保持原版石级/木级。 */
+    private static TagKey<Block> incorrectTagFor(int level, boolean stone) {
+        if (level >= 9) {
+            return BlockTags.INCORRECT_FOR_NETHERITE_TOOL;
+        }
+        if (level == 8) {
+            return BlockTags.INCORRECT_FOR_DIAMOND_TOOL;
+        }
+        if (level == 7) {
+            return BlockTags.INCORRECT_FOR_IRON_TOOL;
+        }
+        return stone ? BlockTags.INCORRECT_FOR_STONE_TOOL : BlockTags.INCORRECT_FOR_WOODEN_TOOL;
+    }
+
+    private static Item buildTool(ToolLine line, int level, int toolIndex, String name) {
+        boolean stone = line.kind() == ToolKind.STONE;
+        float[] stats = line.stats()[toolIndex];
+        // 全部工具：总伤害（含玩家基础 1 点）= 对应原版工具 × 1.6^重（×2 太夸张，用户定档 1.6）
+        float bonus = (1.0F + stats[0] + line.damageBonus()) * (float) Math.pow(1.6, level)
+            - 1.0F - stats[0];
+        ToolMaterial material = new ToolMaterial(
+            incorrectTagFor(level, stone),
+            durabilityFor(level, line.kind()),
+            SPEED[level - 1],
+            bonus,
+            line.enchantability(),
+            TagKey.create(Registries.ITEM, id("repair_" + line.key() + "_tool_" + LEVEL_PREFIX[level - 1]))
+        );
+        Item.Properties props = new Item.Properties()
+            .setId(ResourceKey.create(Registries.ITEM, id(name)));
+        if (level >= UNBREAKABLE_FROM) {
+            props = props.component(DataComponents.UNBREAKABLE, Unit.INSTANCE);
+        }
+        boolean unbreakable = level >= UNBREAKABLE_FROM;
+        Item item = switch (TOOLS[toolIndex]) {
+            // 26.3：AxeItem/ShovelItem/HoeItem 等具体工具类已删除，全部走 Item.Properties 工厂
+            case "pickaxe" -> new Item(props.pickaxe(material, stats[0], stats[1]));
+            case "sword" -> new Item(props.sword(material, stats[0], stats[1]));
+            case "axe" -> new Item(props.axe(material, stats[0], stats[1]));
+            case "shovel" -> new Item(props.shovel(material, stats[0], stats[1]));
+            case "hoe" -> new CompressedHoeItem(level, props.hoe(material, stats[0], stats[1]));
+            default -> throw new IllegalStateException("unknown tool: " + TOOLS[toolIndex]);
+        };
+        if (level == LEVELS) {
+            CompressedHooks.registerLevel9Tool(item);
+        }
+        double damage = stats[0] + bonus;
+        TOOL_REGS.add(new ToolReg(name, item, durabilityFor(level, line.kind()), SPEED[level - 1], unbreakable, damage));
+        return item;
+    }
+
+    // ------------------------------------------------------------------ 树苗
+
+    /** 26.3：树特征直接挂 Feature 注册表（原 configured_feature 注册表并入其中）。 */
+    private static ResourceKey<Feature> featureKey(String feature, String prefix) {
+        return ResourceKey.create(Registries.FEATURE, id(feature + "_" + prefix));
+    }
+
+    /** 主树权重 10、副树权重按出现概率折算（1.21.11 的 secondaryChance 语义平移到加权列表）。 */
+    private static WeightedList<ResourceKey<Feature>> treeOf(ResourceKey<Feature> main,
+                                                             ResourceKey<Feature> secondary,
+                                                             float secondaryChance) {
+        return WeightedList.of(
+            new Weighted<>(main, 10),
+            new Weighted<>(secondary, Math.max(1, Math.round(secondaryChance * 10.0F))));
+    }
+
+    /** 树苗生长器：引用数据包里的压缩树特征（原版形状 + 同重数压缩原木/树叶）。
+     *  26.3 TreeGrower 改为三张加权列表（树/巨型树/花树）+ 必填最小型树键。 */
+    private static TreeGrower grower(String wood, int level) {
+        String name = MOD_ID + ":" + wood + "_" + level;
+        String p = LEVEL_PREFIX[level - 1];
+        WeightedList<ResourceKey<Feature>> mega = WeightedList.of();
+        WeightedList<ResourceKey<Feature>> tree = WeightedList.of();
+        float secondaryChance = 0.0F;
+        switch (wood) {
+            case "oak" -> {
+                secondaryChance = 0.1F;
+                tree = treeOf(featureKey("oak", p), featureKey("fancy_oak", p), secondaryChance);
+            }
+            case "spruce" -> {
+                secondaryChance = 0.5F;
+                mega = treeOf(featureKey("mega_spruce", p), featureKey("mega_pine", p), secondaryChance);
+                tree = WeightedList.of(featureKey("spruce", p));
+            }
+            case "jungle" -> {
+                mega = WeightedList.of(featureKey("mega_jungle", p));
+                tree = WeightedList.of(featureKey("jungle", p));
+            }
+            case "mangrove" -> {
+                secondaryChance = 0.85F;
+                tree = treeOf(featureKey("mangrove", p), featureKey("tall_mangrove", p), secondaryChance);
+            }
+            case "dark_oak" -> mega = WeightedList.of(featureKey("dark_oak", p));
+            case "pale_oak" -> mega = WeightedList.of(featureKey("pale_oak", p));
+            default -> tree = WeightedList.of(featureKey(wood, p));
+        }
+        // 最小型树（2×2 种植/无普通树时的兜底）：普通树优先，只有巨型树（深色/苍白橡木）取巨型
+        ResourceKey<Feature> shortest = tree.isEmpty() ? mega.unwrap().get(0).value() : tree.unwrap().get(0).value();
+        return new TreeGrower(name, tree, mega, WeightedList.of(), shortest);
+    }
+
+    private static void registerCane(String name, int level, String enName) {
+        Block block = new CompressedCaneBlock(level, BlockBehaviour.Properties.of()
+            .setId(ResourceKey.create(Registries.BLOCK, id(name)))
+            .mapColor(MapColor.PLANT)
+            .noCollision()
+            .randomTicks()
+            .instabreak()
+            .sound(SoundType.GRASS)
+            .pushReaction(PushReaction.POPPED)); // 26.3：原 DESTROY 改名 POPPED
+        Item item = new CompressedCaneItem(block,
+            new Item.Properties().setId(ResourceKey.create(Registries.ITEM, id(name)))
+                .useBlockDescriptionPrefix(),
+            level, LEVEL_EN_PREFIX[level - 1] + " " + enName);
+        BLOCKS.add(new BlockReg(name, block, name));
+        ITEMS.add(new ItemReg(name, item, Tab.POTS, true));
+        CANE_BLOCKS.add(block);
+    }
+
+    // ------------------------------------------------------------------ 构建
+
+    static {
+        // 1. 储存方块（51 材料 × 9 重）：统一硬度公式 + 1200 爆炸抗性
+        for (StorageMat m : STORAGE) {
+            for (int level = 1; level <= LEVELS; level++) {
+                String name = LEVEL_PREFIX[level - 1] + "_" + m.key();
+                BlockBehaviour.Properties props = BlockBehaviour.Properties.of()
+                    .setId(ResourceKey.create(Registries.BLOCK, id(name)))
+                    .mapColor(m.color())
+                    .sound(m.sound())
+                    .strength(hardnessFor(m, level), STORAGE_BLAST);
+                if (m.requiresTool()) {
+                    props = props.requiresCorrectToolForDrops();
+                }
+                if (m.light() > 0) {
+                    props = props.lightLevel(state -> m.light());
+                }
+                Block block = new Block(props);
+                BlockItem item = new BlockItem(block,
+                    new Item.Properties()
+                        .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                        .useBlockDescriptionPrefix());
+                BLOCKS.add(new BlockReg(name, block, name));
+                ITEMS.add(new ItemReg(name, item, Tab.BLOCKS, true));
+                STORAGE_BLOCKS.add(BLOCKS.get(BLOCKS.size() - 1));
+                if (m.key().equals("dirt")) {
+                    DIRT_LEVELS.put(block, level);
+                }
+                if (m.key().equals("sand")) {
+                    SAND_LEVELS.put(block, level);
+                }
+                if (m.key().equals("netherrack")) {
+                    NETHER_SOIL_LEVELS.put(block, level);
+                }
+            }
+        }
+        // 2. 树叶（9 木 × 9 重）：原版凋落算法
+        for (WoodDef w : WOODS) {
+            for (int level = 1; level <= LEVELS; level++) {
+                String name = LEVEL_PREFIX[level - 1] + "_" + w.key() + "_leaves";
+                Block block = new CompressedLeavesBlock(BlockBehaviour.Properties.of()
+                    .setId(ResourceKey.create(Registries.BLOCK, id(name)))
+                    .mapColor(MapColor.PLANT)
+                    .strength(0.2F, STORAGE_BLAST)
+                    .randomTicks()
+                    .sound(SoundType.GRASS)
+                    .noOcclusion());
+                LEAVES_BLOCKS.add(block);
+                BlockItem item = new BlockItem(block,
+                    new Item.Properties()
+                        .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                        .useBlockDescriptionPrefix());
+                BLOCKS.add(new BlockReg(name, block, name));
+                ITEMS.add(new ItemReg(name, item, Tab.BLOCKS, true));
+            }
+        }
+        // 3. 树苗（9 木 × 9 重）：只能种在等级足够的压缩泥土上
+        for (WoodDef w : WOODS) {
+            for (int level = 1; level <= LEVELS; level++) {
+                String name = LEVEL_PREFIX[level - 1] + "_" + w.key() + "_sapling";
+                Block block = new CompressedSaplingBlock(grower(w.key(), level), level,
+                    BlockBehaviour.Properties.of()
+                        .setId(ResourceKey.create(Registries.BLOCK, id(name)))
+                        .mapColor(MapColor.PLANT)
+                        .strength(0.0F, STORAGE_BLAST)
+                        .noCollision()
+                        .randomTicks()
+                        .sound(SoundType.GRASS));
+                String enName = LEVEL_EN_PREFIX[level - 1] + " Compressed " + w.en() + " Sapling";
+                Item item = new CompressedSoilItem(block,
+                    new Item.Properties()
+                        .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                        .useBlockDescriptionPrefix(),
+                    level, false, enName);
+                BLOCKS.add(new BlockReg(name, block, name));
+                ITEMS.add(new ItemReg(name, item, Tab.POTS, true));
+                SAPLING_BLOCKS.add(block);
+            }
+        }
+        // 4. 压缩耕地（9 级）：无物品；锄 N 级压缩泥土需 N 级+锄头
+        for (int level = 1; level <= LEVELS; level++) {
+            String name = LEVEL_PREFIX[level - 1] + "_farmland";
+            Block block = new CompressedFarmBlock(level, BlockBehaviour.Properties.of()
+                .setId(ResourceKey.create(Registries.BLOCK, id(name)))
+                .mapColor(MapColor.DIRT)
+                .strength(0.6F, STORAGE_BLAST)
+                .sound(SoundType.GRAVEL));
+            BLOCKS.add(new BlockReg(name, block, null));
+            FARMLAND.put(level, block);
+        }
+        // 5. 作物（4 种 × 3 级）：只能种在等级足够的压缩耕地上
+        for (CropDef c : CROPS) {
+            for (int level = 1; level <= CROP_MAX_LEVEL; level++) {
+                String p = LEVEL_PREFIX[level - 1];
+                String blockName = p + "_" + c.key() + "_plant";
+                String seedItem = c.hasSeeds() ? p + "_" + c.key() + "_seeds" : p + "_" + c.key();
+                String enFood = LEVEL_EN_PREFIX[level - 1] + " Compressed " + c.en();
+                Block block = new CompressedCropBlock(level, seedItem, BlockBehaviour.Properties.of()
+                    .setId(ResourceKey.create(Registries.BLOCK, id(blockName)))
+                    .mapColor(MapColor.PLANT)
+                    .strength(0.0F, STORAGE_BLAST)
+                    .noCollision()
+                    .randomTicks()
+                    .sound(SoundType.CROP));
+                CROP_BLOCKS.add(block);
+                String enName = c.hasSeeds() ? enFood + " Seeds" : enFood;
+                // 压缩胡萝卜/土豆同时是压缩食物：随时可吃 + 溢出转回升（数值 = 原版 × 9^重）
+                int foodN = c.hasSeeds() ? 0
+                    : (int) ((c.key().equals("carrot") ? 3 : 1) * pow9(level));
+                float foodS = c.hasSeeds() ? 0.0F
+                    : (c.key().equals("carrot") ? 1.8F : 0.3F) * pow9(level);
+                Item.Properties props = new Item.Properties().setId(ResourceKey.create(Registries.ITEM, id(seedItem)));
+                if (foodN > 0) {
+                    props = props.food(new FoodProperties(foodN, foodS, true));
+                }
+                Item item = new CompressedSoilItem(block, props, level, true, enName, foodN);
+                BLOCKS.add(new BlockReg(blockName, block, seedItem));
+                ITEMS.add(new ItemReg(seedItem, item, Tab.FOOD, false));
+                if (foodN > 0) {
+                    FOOD_REGS.add(new FoodReg(seedItem, item, foodN, foodS));
+                }
+                if (c.hasSeeds()) {
+                    // 产物：压缩小麦 / 压缩甜菜根（不可种植的纯物品）
+                    String produce = p + "_" + c.key();
+                    Item produceItem = new Item(new Item.Properties()
+                        .setId(ResourceKey.create(Registries.ITEM, id(produce))));
+                    ITEMS.add(new ItemReg(produce, produceItem, Tab.FOOD, false));
+                }
+            }
+        }
+        // 5b. 压缩甘蔗（纯甘蔗 + 51 材料各一条 × 9 重）：只能种在 N 重以上压缩泥土/沙子，生长同原版
+        for (int level = 1; level <= LEVELS; level++) {
+            registerCane(LEVEL_PREFIX[level - 1] + "_cane", level, "Sugar Cane");
+        }
+        for (StorageMat m : STORAGE) {
+            String key = caneKey(m.key());
+            for (int level = 1; level <= LEVELS; level++) {
+                registerCane(LEVEL_PREFIX[level - 1] + "_" + key + "_cane", level,
+                    caneEnName(m.en()) + " Cane");
+            }
+        }
+        // 5c. 盆栽 + 漏斗盆栽（原版配色，主 mod 版）：只能种原版系作物/甘蔗/树木；
+        // 漏斗盆栽成熟自动收割入下方容器（兼容储物抽屉）；压缩植物/压缩盆栽在附属 mod
+        POT = new CompressedPotBlock(BlockBehaviour.Properties.of()
+            .setId(ResourceKey.create(Registries.BLOCK, id("pot")))
+            .mapColor(MapColor.TERRACOTTA_ORANGE)
+            .strength(1.5F, STORAGE_BLAST)
+            .sound(SoundType.STONE)
+            .noOcclusion());
+        HOPPER_POT = new CompressedPotBlock(BlockBehaviour.Properties.of()
+            .setId(ResourceKey.create(Registries.BLOCK, id("hopper_pot")))
+            .mapColor(MapColor.TERRACOTTA_ORANGE)
+            .strength(1.5F, STORAGE_BLAST)
+            .sound(SoundType.STONE)
+            .noOcclusion(), true);
+        // POT_TYPE 由各加载器入口构建后注入（1.21.11 原版构造器私有，Fabric/NeoForge 各有公开构建路径）
+        // 普通盆栽与漏斗盆栽放压缩工具栏（压缩盆栽创造栏由附属 mod 独有）
+        for (String name : new String[] {"pot", "hopper_pot"}) {
+            Block block = name.equals("pot") ? POT : HOPPER_POT;
+            BlockItem item = new BlockItem(block,
+                new Item.Properties()
+                    .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                    .useBlockDescriptionPrefix());
+            BLOCKS.add(new BlockReg(name, block, name));
+            ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
+        }
+        // 5d. 刷石机（3 压缩等级）：每秒产出 1 个对应等级原石/压缩原石，压入下方容器
+        String[] generatorTiers = {"cobblestone_generator", "2x_cobblestone_generator",
+            "3x_cobblestone_generator"};
+        for (int i = 0; i < generatorTiers.length; i++) {
+            String name = generatorTiers[i];
+            CobblestoneGeneratorBlock block = new CobblestoneGeneratorBlock(i + 1,
+                BlockBehaviour.Properties.of()
+                    .setId(ResourceKey.create(Registries.BLOCK, id(name)))
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(3.5F, STORAGE_BLAST)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.STONE)
+                    .noOcclusion());
+            BlockItem item = new BlockItem(block,
+                new Item.Properties()
+                    .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                    .useBlockDescriptionPrefix());
+            BLOCKS.add(new BlockReg(name, block, name));
+            ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
+            GENERATOR_BLOCKS.add(block);
+        }
+        // 5e. 压缩箱子/压缩潜影盒（单一等级）：243 格滚动存储，压缩工具栏；
+        // 箱子破坏洒出内容，潜影盒破坏内容随物品保留；不能拼大箱子（右键各开各的菜单）
+        COMPRESSED_CHEST = new CompressedChestBlock(BlockBehaviour.Properties.of()
+            .setId(ResourceKey.create(Registries.BLOCK, id("compressed_chest")))
+            .mapColor(MapColor.WOOD)
+            .strength(2.5F, STORAGE_BLAST)
+            .sound(SoundType.WOOD)
+            .noOcclusion());
+        BlockItem chestItem = new BlockItem(COMPRESSED_CHEST, new Item.Properties()
+            .setId(ResourceKey.create(Registries.ITEM, id("compressed_chest")))
+            .useBlockDescriptionPrefix());
+        BLOCKS.add(new BlockReg("compressed_chest", COMPRESSED_CHEST, "compressed_chest"));
+        ITEMS.add(new ItemReg("compressed_chest", chestItem, Tab.TOOLS, true));
+        COMPRESSED_SHULKER = new CompressedShulkerBlock(BlockBehaviour.Properties.of()
+            .setId(ResourceKey.create(Registries.BLOCK, id("compressed_shulker_box")))
+            .mapColor(MapColor.COLOR_PURPLE)
+            .strength(2.5F, STORAGE_BLAST)
+            .sound(SoundType.STONE)
+            .noOcclusion());
+        BlockItem shulkerItem = new BlockItem(COMPRESSED_SHULKER, new Item.Properties()
+            .setId(ResourceKey.create(Registries.ITEM, id("compressed_shulker_box")))
+            .useBlockDescriptionPrefix());
+        BLOCKS.add(new BlockReg("compressed_shulker_box", COMPRESSED_SHULKER, "compressed_shulker_box"));
+        ITEMS.add(new ItemReg("compressed_shulker_box", shulkerItem, Tab.TOOLS, true));
+        buildCompatMetals();
+        // 5d. 更多压缩种子（原版其余种子 × 3 级）：盆栽通用兼容可直接种植
+        String[][] extraSeeds = {
+            {"pumpkin_seeds", "Pumpkin Seeds"},
+            {"melon_seeds", "Melon Seeds"},
+            {"torchflower_seeds", "Torchflower Seeds"},
+            {"pitcher_pod", "Pitcher Pod"}
+        };
+        for (String[] s : extraSeeds) {
+            for (int level = 1; level <= CROP_MAX_LEVEL; level++) {
+                String name = LEVEL_PREFIX[level - 1] + "_" + s[0];
+                Item item = new Item(new Item.Properties()
+                    .setId(ResourceKey.create(Registries.ITEM, id(name))));
+                ITEMS.add(new ItemReg(name, item, Tab.FOOD, false));
+            }
+        }
+        // 6. 压缩食物（3 种 × 3 级）：canAlwaysEat，溢出转回升
+        for (FoodDef f : FOODS) {
+            for (int level = 1; level <= FOOD_MAX_LEVEL; level++) {
+                String name = LEVEL_PREFIX[level - 1] + "_" + f.key();
+                int nutrition = (int) (f.nutrition() * pow9(level));
+                float saturation = f.saturation() * pow9(level);
+                Item item = new CompressedFoodItem(
+                    new Item.Properties()
+                        .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                        .food(new FoodProperties(nutrition, saturation, true)),
+                    level, nutrition);
+                ITEMS.add(new ItemReg(name, item, Tab.FOOD, false));
+                FOOD_REGS.add(new FoodReg(name, item, nutrition, saturation));
+            }
+        }
+        // 7. 压缩护甲（4 件 × 9 级）：石制，铁级基准；九重满套免疫一切伤害
+        for (int level = 1; level <= LEVELS; level++) {
+            String p = LEVEL_PREFIX[level - 1];
+            long mult = level >= UNBREAKABLE_FROM ? Integer.MAX_VALUE / 16L : pow9(level);
+            Map<ArmorType, Integer> defense = Map.of(
+                ArmorType.HELMET, armorDefense(level, 0),
+                ArmorType.CHESTPLATE, armorDefense(level, 1),
+                ArmorType.LEGGINGS, armorDefense(level, 2),
+                ArmorType.BOOTS, armorDefense(level, 3));
+            ArmorMaterial material = new ArmorMaterial(
+                (int) mult,
+                defense,
+                ARMOR_ENCHANTABILITY,
+                SoundEvents.ARMOR_EQUIP_IRON,
+                0.0F,
+                0.0F,
+                TagKey.create(Registries.ITEM, id("repair_stone_armor_" + p)),
+                ResourceKey.create(EquipmentAssets.ROOT_ID, id("stone_" + p))
+            );
+            for (int piece = 0; piece < 4; piece++) {
+                String name = p + "_stone_" + switch (piece) {
+                    case 0 -> "helmet";
+                    case 1 -> "chestplate";
+                    case 2 -> "leggings";
+                    default -> "boots";
+                };
+                Item.Properties props = new Item.Properties()
+                    .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                    .humanoidArmor(material, ARMOR_TYPES[piece]);
+                if (level >= UNBREAKABLE_FROM) {
+                    props = props.component(DataComponents.UNBREAKABLE, Unit.INSTANCE);
+                }
+                Item item = new Item(props);
+                ITEMS.add(new ItemReg(name, item, Tab.TOOLS, false));
+                ArmorReg reg = new ArmorReg(name, item, piece, level);
+                ARMOR_REGS.add(reg);
+                ARMOR_INDEX.put(item, new int[]{piece, level});
+            }
+        }
+        // 7b. 压缩木质盔甲（4 件 × 9 重）：防御/耐久与石甲相同；效果按有效重数（重数-1）结算；
+        //     不毁仍从 6 重开始；9 重木甲有效 8 重（头盔水下呼吸+夜视、护腿抗性3、胸甲飞行），无 9 重石甲的不死/急迫档
+        for (int level = 1; level <= LEVELS; level++) {
+            String p = LEVEL_PREFIX[level - 1];
+            long mult = level >= UNBREAKABLE_FROM ? Integer.MAX_VALUE / 16L : pow9(level);
+            Map<ArmorType, Integer> defense = Map.of(
+                ArmorType.HELMET, armorDefense(level, 0),
+                ArmorType.CHESTPLATE, armorDefense(level, 1),
+                ArmorType.LEGGINGS, armorDefense(level, 2),
+                ArmorType.BOOTS, armorDefense(level, 3));
+            ArmorMaterial woodMaterial = new ArmorMaterial(
+                (int) mult,
+                defense,
+                ARMOR_ENCHANTABILITY,
+                SoundEvents.ARMOR_EQUIP_LEATHER,
+                0.0F,
+                0.0F,
+                TagKey.create(Registries.ITEM, id("repair_wood_armor_" + p)),
+                ResourceKey.create(EquipmentAssets.ROOT_ID, id("wood_" + p))
+            );
+            for (int piece = 0; piece < 4; piece++) {
+                String name = p + "_wood_" + switch (piece) {
+                    case 0 -> "helmet";
+                    case 1 -> "chestplate";
+                    case 2 -> "leggings";
+                    default -> "boots";
+                };
+                Item.Properties props = new Item.Properties()
+                    .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                    .humanoidArmor(woodMaterial, ARMOR_TYPES[piece]);
+                if (level >= UNBREAKABLE_FROM) {
+                    props = props.component(DataComponents.UNBREAKABLE, Unit.INSTANCE);
+                }
+                Item item = new Item(props);
+                ITEMS.add(new ItemReg(name, item, Tab.TOOLS, false));
+                ArmorReg reg = new ArmorReg(name, item, piece, level);
+                ARMOR_REGS.add(reg);
+                ARMOR_INDEX.put(item, new int[]{piece, Math.max(1, level - 1)});
+            }
+        }
+        // 8. 工具（2 线 × 5 类 × 9 重）
+        for (ToolLine line : TOOL_LINES) {
+            for (int t = 0; t < TOOLS.length; t++) {
+                for (int level = 1; level <= LEVELS; level++) {
+                    String name = LEVEL_PREFIX[level - 1] + "_" + line.key() + "_" + TOOLS[t];
+                    Item item = buildTool(line, level, t, name);
+                    ITEMS.add(new ItemReg(name, item, Tab.TOOLS, false));
+                }
+            }
+        }
+        // 9. 压缩木棍
+        for (int level = 1; level <= LEVELS; level++) {
+            String name = LEVEL_PREFIX[level - 1] + "_stick";
+            ITEMS.add(new ItemReg(name,
+                new Item(new Item.Properties()
+                    .setId(ResourceKey.create(Registries.ITEM, id(name)))),
+                Tab.INGREDIENTS, false));
+        }
+    }
+
+    // ------------------------------------------------------------------ 穿戴查询
+
+    private static final EquipmentSlot[] ARMOR_SLOTS = {
+        EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
+    };
+
+    /** 当前穿戴件溢出防御总和（转抗性提升等级）。 */
+    public static int wornOverflow(Player player) {
+        int sum = 0;
+        for (EquipmentSlot slot : ARMOR_SLOTS) {
+            int[] info = ARMOR_INDEX.get(player.getItemBySlot(slot).getItem());
+            if (info != null) {
+                sum += armorOverflow(info[1], info[0]);
+            }
+        }
+        return sum;
+    }
+
+    /** 四件全九重 = 免疫一切伤害（含 /kill）+ 饱食度常满。 */
+    /** 当前穿戴件的最高重数（无穿戴 = 0）。 */
+    public static int wornMaxLevel(Player player) {
+        int max = 0;
+        for (EquipmentSlot slot : ARMOR_SLOTS) {
+            int[] info = ARMOR_INDEX.get(player.getItemBySlot(slot).getItem());
+            if (info != null) {
+                max = Math.max(max, info[1]);
+            }
+        }
+        return max;
+    }
+
+    /** 四件全穿且每件重数 ≥ minLevel。 */
+    public static boolean fullSetAtLeast(Player player, int minLevel) {
+        for (EquipmentSlot slot : ARMOR_SLOTS) {
+            int[] info = ARMOR_INDEX.get(player.getItemBySlot(slot).getItem());
+            if (info == null || info[1] < minLevel) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static boolean hasFullLevel9Armor(Player player) {
+        return fullSetAtLeast(player, LEVELS);
+    }
+
+    /** 穿戴重数对应的抗性提升等级（0 基）：7 重=1、8 重=2、9 重=3；7 重以下 = -1（无效果）。 */
+    public static int resistanceAmplifier(int level) {
+        if (level >= LEVELS) {
+            return 2;
+        }
+        return level >= 7 ? level - 7 : -1;
+    }
+
+    /** 穿戴件信息 {部位 0-3, 有效重数}；非本模组护甲 = null（木质盔甲记有效重数 = 重数-1）。 */
+    public static int[] armorInfoOf(ItemStack stack) {
+        return ARMOR_INDEX.get(stack.getItem());
+    }
+
+    // ------------------------------------------------------------------ 创造栏
+
+    private static ItemStack icon(String name) {
+        for (ItemReg e : ITEMS) {
+            if (e.name().equals(name)) {
+                return new ItemStack(e.item());
+            }
+        }
+        return ItemStack.EMPTY;
+    }
+
+    private static void acceptItems(CreativeModeTab.Output output, Tab tab) {
+        for (ItemReg e : ITEMS) {
+            if (e.tab() == tab) {
+                output.accept(e.item());
+            }
+        }
+    }
+
+    public static final CreativeModeTab TAB_BLOCKS = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
+        .title(Component.translatable("itemGroup.compressedblocks.blocks"))
+        .icon(() -> icon("1x_cobblestone"))
+        .displayItems((parameters, output) -> acceptItems(output, Tab.BLOCKS))
+        .build();
+
+    public static final CreativeModeTab TAB_TOOLS = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 1)
+        .title(Component.translatable("itemGroup.compressedblocks.tools"))
+        .icon(() -> icon("9x_wood_pickaxe"))
+        .displayItems((parameters, output) -> {
+            acceptItems(output, Tab.TOOLS);
+            acceptItems(output, Tab.INGREDIENTS);
+        })
+        .build();
+
+    public static final CreativeModeTab TAB_FOOD = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 2)
+        .title(Component.translatable("itemGroup.compressedblocks.food"))
+        .icon(() -> icon("3x_beef"))
+        .displayItems((parameters, output) -> acceptItems(output, Tab.FOOD))
+        .build();
+
+    // "压缩盆栽"创造栏由附属 mod compressedblockspot 独有（含压缩甘蔗/树苗的扫描展示），
+    // 主 mod 不再注册 TAB_POTS；Tab.POTS 项仅作归档，附属在场时由附属栏呈现。
+
+    // ------------------------------------------------------------------ 自检
+
+    private static final BlockPos CHECK_POS = new BlockPos(0, 100, 0);
+
+    private static TagKey<Item> vanillaItemTag(String path) {
+        return TagKey.create(Registries.ITEM, Identifier.withDefaultNamespace(path));
+    }
+
+    private static void assertTier(List<String> errors, String name, Block state, boolean expectHarvest) {
+        Item found = null;
+        for (ItemReg e : ITEMS) {
+            if (e.name().equals(name)) {
+                found = e.item();
+                break;
+            }
+        }
+        if (found == null) {
+            errors.add("missing item for tier check: " + name);
+            return;
+        }
+        boolean got = new ItemStack(found).isCorrectToolForDrops(state.defaultBlockState());
+        if (got != expectHarvest) {
+            errors.add(name + " harvest " + state + " = " + got + ", want " + expectHarvest);
+        }
+    }
+
+    /**
+     * 启动自检：注册计数、翻译键、硬度/爆炸抗性公式、护甲防御/溢出/耐久/附魔、工具耐久/速度/伤害、
+     * 食物数值、标签族（#logs/#leaves/enchantable）。任何版本升级/映射变化都会在这里第一时间爆掉。
+     */
+    public static void selfTest(ServerLevel level) {
+        List<String> errors = new ArrayList<>();
+        long blockCount = BuiltInRegistries.BLOCK.keySet().stream().filter(i -> i.getNamespace().equals(MOD_ID)).count();
+        long itemCount = BuiltInRegistries.ITEM.keySet().stream().filter(i -> i.getNamespace().equals(MOD_ID)).count();
+        int expectItems = ITEMS.size();
+        if (blockCount != BLOCKS.size()) {
+            errors.add("block count " + blockCount + " != " + BLOCKS.size());
+        }
+        if (itemCount != expectItems) {
+            errors.add("item count " + itemCount + " != " + expectItems);
+        }
+        if (BLOCKS.size() != 1315) {
+            errors.add("block registry size " + BLOCKS.size() + " != 1315");
+        }
+        if (expectItems != 1549) {
+            errors.add("item registry size " + expectItems + " != 1549");
+        }
+        // 方块：注册、翻译键、物品映射
+        for (BlockReg b : BLOCKS) {
+            if (BuiltInRegistries.BLOCK.get(id(b.name())).map(h -> h.value() != b.block()).orElse(true)) {
+                errors.add("block not registered: " + b.name());
+            }
+            if (b.itemName() == null) {
+                if (BuiltInRegistries.ITEM.get(id(b.name())).isPresent()) {
+                    errors.add("farmland should have no item: " + b.name());
+                }
+                continue;
+            }
+            boolean itemMismatch = BuiltInRegistries.ITEM.get(id(b.itemName()))
+                .map(h -> !(h.value() instanceof BlockItem bi) || bi.getBlock() != b.block())
+                .orElse(true);
+            if (itemMismatch) {
+                errors.add("block item mismatch: " + b.name());
+            }
+            // 作物等方块物品 id 与方块 id 不同，走 item. 前缀；其余方块物品随方块走 block. 前缀
+            String wantKey = b.itemName().equals(b.name())
+                ? "block." + MOD_ID + "." + b.name()
+                : "item." + MOD_ID + "." + b.itemName();
+            String key = BuiltInRegistries.ITEM.get(id(b.itemName())).map(h -> h.value().getDescriptionId()).orElse("");
+            if (!key.equals(wantKey)) {
+                errors.add("block item translation key mismatch: " + b.name() + " -> " + key);
+            }
+        }
+        // 储存方块：硬度公式 + 爆炸抗性 + 荧石发光
+        for (BlockReg b : STORAGE_BLOCKS) {
+            float hardness = b.block().defaultBlockState().getDestroySpeed(level, CHECK_POS);
+            float want = hardnessFor(storageMatOf(b.name()), levelOfName(b.name()));
+            if (Math.abs(hardness - want) > 0.01F) {
+                errors.add(b.name() + " hardness " + hardness + " != " + want);
+            }
+            if (Math.abs(b.block().getExplosionResistance() - STORAGE_BLAST) > 0.01F) {
+                errors.add(b.name() + " blast " + b.block().getExplosionResistance() + " != " + STORAGE_BLAST);
+            }
+        }
+        Block glowstone = blockByName("9x_glowstone");
+        if (glowstone != null && glowstone.defaultBlockState().getLightEmission() != 15) {
+            errors.add("glowstone light != 15");
+        }
+        // 标签族：树叶凋落/工具材料混用/附魔的前提
+        Block oakLog = blockByName("1x_oak_log");
+        Block oakLeaves = blockByName("1x_oak_leaves");
+        if (oakLog == null || !oakLog.defaultBlockState().is(BlockTags.LOGS)) {
+            errors.add("compressed log not in #minecraft:logs");
+        }
+        if (oakLeaves == null || !oakLeaves.defaultBlockState().is(BlockTags.LEAVES)) {
+            errors.add("compressed leaves not in #minecraft:leaves");
+        }
+        // 物品：注册、翻译键、耐久/速度/伤害（工具）、护甲属性、食物数值、附魔标签
+        TagKey<Item> enchantableArmor = vanillaItemTag("enchantable/armor");
+        TagKey<Item> durability = vanillaItemTag("enchantable/durability");
+        TagKey<Item> mining = vanillaItemTag("enchantable/mining");
+        TagKey<Item> sharpWeapon = vanillaItemTag("enchantable/sharp_weapon");
+        for (ItemReg e : ITEMS) {
+            if (BuiltInRegistries.ITEM.get(id(e.name())).map(h -> h.value() != e.item()).orElse(true)) {
+                errors.add("item not registered: " + e.name());
+            }
+            String wantKey = (e.blockKey() ? "block." : "item.") + MOD_ID + "." + e.name();
+            if (!e.item().getDescriptionId().equals(wantKey)) {
+                errors.add("item translation key mismatch: " + e.name() + " -> " + e.item().getDescriptionId());
+            }
+        }
+        for (ToolReg t : TOOL_REGS) {
+            ItemStack stack = new ItemStack(t.item());
+            if (stack.getMaxDamage() != t.durability()) {
+                errors.add(t.name() + " durability " + stack.getMaxDamage() + " != " + t.durability());
+            }
+            boolean unbreakable = stack.get(DataComponents.UNBREAKABLE) != null;
+            if (unbreakable != t.unbreakable()) {
+                errors.add(t.name() + " unbreakable " + unbreakable + " != " + t.unbreakable());
+            }
+            Tool tool = stack.get(DataComponents.TOOL);
+            if (tool == null) {
+                errors.add(t.name() + " missing TOOL component");
+            } else {
+                float speed = Float.NaN;
+                for (Tool.Rule rule : tool.rules()) {
+                    if (rule.speed().isPresent()) {
+                        speed = rule.speed().get();
+                    }
+                }
+                float wantSpeed = t.name().endsWith("_sword") ? 1.5F : t.speed();
+                if (Math.abs(speed - wantSpeed) > 0.001F) {
+                    errors.add(t.name() + " speed " + speed + " != " + wantSpeed);
+                }
+            }
+            if (Math.abs(attackDamage(stack) - t.damage()) > 0.001) {
+                errors.add(t.name() + " attack damage " + attackDamage(stack) + " != " + t.damage());
+            }
+            if (!stack.is(durability)) {
+                errors.add(t.name() + " not in #enchantable/durability");
+            }
+            if (t.name().endsWith("_pickaxe") && !stack.is(mining)) {
+                errors.add(t.name() + " not in #enchantable/mining");
+            }
+            if ((t.name().endsWith("_sword") || t.name().endsWith("_axe")) && !stack.is(sharpWeapon)) {
+                errors.add(t.name() + " not in #enchantable/sharp_weapon");
+            }
+        }
+        for (ArmorReg a : ARMOR_REGS) {
+            ItemStack stack = new ItemStack(a.item());
+            if (stack.getMaxDamage() != armorDurability(a.level(), a.piece())) {
+                errors.add(a.name() + " durability " + stack.getMaxDamage() + " != " + armorDurability(a.level(), a.piece()));
+            }
+            float armor = Float.NaN;
+            ItemAttributeModifiers mods = stack.get(DataComponents.ATTRIBUTE_MODIFIERS);
+            if (mods != null) {
+                for (ItemAttributeModifiers.Entry entry : mods.modifiers()) {
+                    if (entry.attribute().is(Attributes.ARMOR)) {
+                        armor = (float) entry.modifier().amount();
+                    }
+                }
+            }
+            float want = armorDefense(a.level(), a.piece());
+            if (Math.abs(armor - want) > 0.001F) {
+                errors.add(a.name() + " defense " + armor + " != " + want);
+            }
+            Enchantable ench = stack.get(DataComponents.ENCHANTABLE);
+            if (ench == null || ench.value() != ARMOR_ENCHANTABILITY) {
+                errors.add(a.name() + " enchantability != " + ARMOR_ENCHANTABILITY);
+            }
+            if (!stack.is(enchantableArmor)) {
+                errors.add(a.name() + " not in #enchantable/armor");
+            }
+            boolean unbreakable = stack.get(DataComponents.UNBREAKABLE) != null;
+            if (unbreakable != (a.level() >= UNBREAKABLE_FROM)) {
+                errors.add(a.name() + " unbreakable mismatch");
+            }
+        }
+        for (FoodReg f : FOOD_REGS) {
+            FoodProperties food = new ItemStack(f.item()).get(DataComponents.FOOD);
+            if (food == null) {
+                errors.add(f.name() + " missing FOOD component");
+                continue;
+            }
+            if (food.nutrition() != f.nutrition() || !food.canAlwaysEat()) {
+                errors.add(f.name() + " food " + food.nutrition() + "/" + food.saturation() + " != " + f.nutrition());
+            }
+            if (Math.abs(food.saturation() - f.saturation()) > 0.01F) {
+                errors.add(f.name() + " saturation " + food.saturation() + " != " + f.saturation());
+            }
+        }
+        // 挖掘等级阶梯：6x 仍为石级，7x=铁，8x/9x=钻石级及以上
+        assertTier(errors, "1x_cobblestone_pickaxe", Blocks.DIAMOND_ORE, false);
+        assertTier(errors, "6x_cobblestone_pickaxe", Blocks.DIAMOND_ORE, false);
+        assertTier(errors, "7x_cobblestone_pickaxe", Blocks.DIAMOND_ORE, true);
+        assertTier(errors, "7x_cobblestone_pickaxe", Blocks.OBSIDIAN, false);
+        assertTier(errors, "8x_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
+        assertTier(errors, "9x_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
+        // 效果阶梯抽查：7/8/9 重 → 护腿抗性 1/2/3 级，6 重及以下无效果
+        if (resistanceAmplifier(7) != 0 || resistanceAmplifier(8) != 1
+            || resistanceAmplifier(9) != 2
+            || resistanceAmplifier(6) != -1 || resistanceAmplifier(5) != -1) {
+            errors.add("armor effect ladder wrong");
+        }
+        selfTestPotFlow(level, errors);
+        selfTestHopperPot(level, errors);
+        selfTestGenerator(level, errors);
+        selfTestStorage(level, errors);
+        selfTestShulkerDrop(level, errors);
+        selfTestCompat(errors);
+        if (errors.isEmpty()) {
+            LOGGER.info("SELF-TEST PASS: blocks={} items={} ({} tools, {} armor, {} food)",
+                BLOCKS.size(), ITEMS.size(), TOOL_REGS.size(), ARMOR_REGS.size(), FOOD_REGS.size());
+        } else {
+            throw new IllegalStateException("SELF-TEST FAILED: " + String.join("; ", errors));
+        }
+    }
+
+    /**
+     * 盆栽闭环（主 mod 只种原版系）：直接驱动 serverTick 走满一茬，验证成熟、
+     * 提速档位（土壤等级每高 1 级 -5% 时长）与补种保留。收割入箱逻辑在附属 mod。
+     */
+    private static void selfTestPotFlow(ServerLevel level, List<String> errors) {
+        growFlow(level, errors, Blocks.WHEAT, 1);
+        growFlow(level, errors, Blocks.OAK_SAPLING, 1);
+        growFlow(level, errors, Blocks.WHEAT, 9);
+        cropYieldFlow(level, errors);
+        selfTestPlantAudit(level, errors);
+    }
+
+    /** 可种白名单审计（用户逐项定稿 2026-10-03）：全部可种、产量非空；竹 4-8/南瓜 1-3/
+     *  红树胚原木 3-8 且不吃翻倍；土壤族门（灵魂沙=下界 1 级、9 重下界岩=9 级）。 */
+    private static void selfTestPlantAudit(ServerLevel level, List<String> errors) {
+        Block potBlock = blockByName("pot");
+        BlockPos pos = new BlockPos(15, 90, 6);
+        level.setBlock(pos, potBlock.defaultBlockState(), 3);
+        if (!(level.getBlockEntity(pos) instanceof CompressedPotBlockEntity pot)) {
+            errors.add("plant audit: no block entity");
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+            return;
+        }
+        BlockState soulSand = net.minecraft.world.level.block.Blocks.SOUL_SAND.defaultBlockState();
+        if (CompressedPotBlock.soilMaskOf(soulSand) != CompressedPotBlock.SOIL_NETHER
+            || CompressedPotBlock.soilLevelOf(soulSand) != 1) {
+            errors.add("soul sand should be NETHER soil level 1");
+        }
+        if (CompressedPotBlock.soilLevelOf(blockByName("9x_netherrack").defaultBlockState()) != 9) {
+            errors.add("9x netherrack level should be 9");
+        }
+        String[] items = {
+            "minecraft:wheat_seeds", "minecraft:carrot", "minecraft:potato",
+            "minecraft:beetroot_seeds", "minecraft:pumpkin_seeds", "minecraft:melon_seeds",
+            "minecraft:torchflower_seeds", "minecraft:pitcher_pod", "minecraft:sweet_berries",
+            "minecraft:nether_wart", "minecraft:cocoa_beans", "minecraft:bamboo",
+            "minecraft:cactus", "minecraft:sugar_cane", "minecraft:oak_sapling",
+            "minecraft:mangrove_propagule", "minecraft:azalea"};
+        for (String itemId : items) {
+            var held = BuiltInRegistries.ITEM.get(Identifier.tryParse(itemId));
+            if (held.isEmpty() || !(held.get().value() instanceof net.minecraft.world.item.BlockItem bi)) {
+                errors.add("audit item missing: " + itemId);
+                continue;
+            }
+            CompressedPotBlock.Plantable pl = CompressedPotBlock.plantableOf(new ItemStack(bi));
+            if (pl == null) {
+                errors.add("not plantable: " + itemId);
+                continue;
+            }
+            int mask = pl.soilMask();
+            BlockState soil = (mask & CompressedPotBlock.SOIL_NETHER) != 0 ? soulSand
+                : (mask & CompressedPotBlock.SOIL_SAND) != 0 && (mask & CompressedPotBlock.SOIL_DIRT) == 0
+                    ? net.minecraft.world.level.block.Blocks.SAND.defaultBlockState()
+                    : net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState();
+            pot.takePlant();
+            pot.setSoil(soil);
+            pot.setPlant(pl.state(), pl.itemId());
+            if (pot.drops(level, null).isEmpty()) {
+                errors.add("no drops for: " + itemId);
+            }
+        }
+        // 竹子 4-8（原版泥土无翻倍）
+        pot.setSoil(Blocks.DIRT.defaultBlockState());
+        pot.takePlant();
+        pot.setPlant(Blocks.BAMBOO.defaultBlockState(), "minecraft:bamboo");
+        for (int round = 0; round < 50; round++) {
+            int total = pot.drops(level, null).stream().mapToInt(ItemStack::getCount).sum();
+            if (total < 4 || total > 8) {
+                errors.add("bamboo yield " + total + " not in 4-8");
+                break;
+            }
+        }
+        // 南瓜 1-3（80/15/5 分布）
+        pot.takePlant();
+        pot.setPlant(Blocks.PUMPKIN_STEM.defaultBlockState(), "minecraft:pumpkin_seeds");
+        for (int round = 0; round < 50; round++) {
+            int total = pot.drops(level, null).stream().mapToInt(ItemStack::getCount).sum();
+            if (total < 1 || total > 3) {
+                errors.add("pumpkin yield " + total + " not in 1-3");
+                break;
+            }
+        }
+        // 红树胚：原木 3-8 + 树苗 0-3，且 9 重泥土也不翻倍（木头类豁免）
+        pot.setSoil(blockByName("9x_dirt").defaultBlockState());
+        pot.takePlant();
+        pot.setPlant(Blocks.MANGROVE_PROPAGULE.defaultBlockState(), "minecraft:mangrove_propagule");
+        for (int round = 0; round < 30; round++) {
+            int logs = 0;
+            int other = 0;
+            for (ItemStack s : pot.drops(level, null)) {
+                if (s.is(net.minecraft.world.item.Items.MANGROVE_LOG)) {
+                    logs += s.getCount();
+                } else {
+                    other += s.getCount();
+                }
+            }
+            if (logs < 3 || logs > 8 || other > 3) {
+                errors.add("mangrove drops logs=" + logs + " other=" + other
+                    + " (want 3-8 logs, 0-3 sapling, no doubling)");
+                break;
+            }
+        }
+        pot.takePlant();
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+    }
+
+    /** 定稿产量表抽查（原版泥土无翻倍）：土豆 2-4、小麦=麦粒 1-2+种子 0-2；翻倍概率表 1-9 重锚点。 */
+    private static void cropYieldFlow(ServerLevel level, List<String> errors) {
+        float[] wantChance = {0.0F, 0.15F, 0.20F, 0.25F, 0.30F, 0.35F, 0.40F, 0.45F, 0.50F, 0.60F};
+        if (!java.util.Arrays.equals(wantChance, CompressedPotBlockEntity.SOIL_DOUBLE_CHANCE)) {
+            errors.add("soil double chance table drifted");
+        }
+        Block potBlock = blockByName("pot");
+        BlockPos pos = new BlockPos(4, 90, 6);
+        level.setBlock(pos, potBlock.defaultBlockState(), 3);
+        if (level.getBlockEntity(pos) instanceof CompressedPotBlockEntity pot) {
+            // 原版泥土：soilLevel=1 但非压缩 → 不翻倍，产量落在定稿区间
+            pot.setSoil(Blocks.DIRT.defaultBlockState());
+            pot.setPlant(Blocks.POTATOES.defaultBlockState(), "minecraft:potato");
+            for (int round = 0; round < 50; round++) {
+                int total = pot.drops(level, null).stream().mapToInt(ItemStack::getCount).sum();
+                if (total < 2 || total > 4) {
+                    errors.add("potato yield " + total + " not in 2-4");
+                    break;
+                }
+            }
+            pot.takePlant();
+            pot.setPlant(Blocks.WHEAT.defaultBlockState(), "minecraft:wheat_seeds");
+            for (int round = 0; round < 50; round++) {
+                int wheat = 0;
+                int seeds = 0;
+                for (ItemStack s : pot.drops(level, null)) {
+                    if (s.is(net.minecraft.world.item.Items.WHEAT)) {
+                        wheat += s.getCount();
+                    }
+                    if (s.is(net.minecraft.world.item.Items.WHEAT_SEEDS)) {
+                        seeds += s.getCount();
+                    }
+                }
+                if (wheat < 1 || wheat > 2 || seeds > 2) {
+                    errors.add("wheat yield " + wheat + "+" + seeds + " not in 1-2 + 0-2");
+                    break;
+                }
+            }
+        } else {
+            errors.add("crop yield: no block entity");
+        }
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+    }
+
+    private static void growFlow(ServerLevel level, List<String> errors, Block plant, int soilLevel) {
+        Block potBlock = blockByName("pot");
+        String soilName = (soilLevel == 1 ? "1x" : soilLevel + "x") + "_dirt";
+        BlockPos potPos = new BlockPos(6 + soilLevel, 90, 4);
+        level.setBlock(potPos, potBlock.defaultBlockState(), 3);
+        if (!(level.getBlockEntity(potPos) instanceof CompressedPotBlockEntity pot)) {
+            errors.add("pot flow: no block entity");
+            return;
+        }
+        pot.setSoil(blockByName(soilName).defaultBlockState());
+        pot.setPlant(plant.defaultBlockState(), "minecraft:wheat_seeds");
+        int want = Math.round(CompressedPotBlockEntity.GROWTH_TICKS / (1.0F + soilLevel * 0.05F));
+        if (pot.requiredGrowth() != want) {
+            errors.add("pot requiredGrowth " + pot.requiredGrowth() + " != " + want
+                + " (soil " + soilLevel + ")");
+        }
+        for (int i = 0; i < pot.requiredGrowth(); i++) {
+            CompressedPotBlockEntity.serverTick(level, potPos, potBlock.defaultBlockState(), pot);
+        }
+        if (!pot.grown() || pot.plant() == null) {
+            errors.add("pot flow not grown (soil " + soilLevel + ")");
+        }
+        level.setBlock(potPos, Blocks.AIR.defaultBlockState(), 3);
+    }
+
+    /** 刷石机：驱动 25 tick 应产出圆石并压入下方箱子。 */
+    private static void selfTestGenerator(ServerLevel level, List<String> errors) {
+        Block gen = blockByName("cobblestone_generator");
+        BlockPos gpos = new BlockPos(9, 90, 4);
+        level.setBlock(gpos.below(), Blocks.CHEST.defaultBlockState(), 3);
+        level.setBlock(gpos, gen.defaultBlockState(), 3);
+        if (!(level.getBlockEntity(gpos) instanceof CobblestoneGeneratorBlockEntity be)) {
+            errors.add("generator flow: no block entity");
+            level.setBlock(gpos, Blocks.AIR.defaultBlockState(), 3);
+            level.setBlock(gpos.below(), Blocks.AIR.defaultBlockState(), 3);
+            return;
+        }
+        for (int i = 0; i < 25; i++) {
+            CobblestoneGeneratorBlockEntity.serverTick(level, gpos, gen.defaultBlockState(), be);
+        }
+        boolean produced = false;
+        if (level.getBlockEntity(gpos.below()) instanceof net.minecraft.world.Container chest) {
+            for (int i = 0; i < chest.getContainerSize(); i++) {
+                if (chest.getItem(i).is(Items.COBBLESTONE)) {
+                    produced = true;
+                }
+            }
+        }
+        if (!produced) {
+            errors.add("generator produced no cobblestone");
+        }
+        level.setBlock(gpos, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(gpos.below(), Blocks.AIR.defaultBlockState(), 3);
+        // 六向优先级：先放上方箱子、再放下方箱子 → 应切到下方（下 > 上，与放置顺序无关）
+        BlockPos gpos2 = new BlockPos(13, 90, 4);
+        level.setBlock(gpos2, gen.defaultBlockState(), 3);
+        level.setBlock(gpos2.above(), Blocks.CHEST.defaultBlockState(), 3);
+        level.setBlock(gpos2.below(), Blocks.CHEST.defaultBlockState(), 3);
+        if (!(level.getBlockEntity(gpos2) instanceof CobblestoneGeneratorBlockEntity be2)) {
+            errors.add("generator six-way: no block entity");
+        } else {
+            for (int i = 0; i < 25; i++) {
+                CobblestoneGeneratorBlockEntity.serverTick(level, gpos2, gen.defaultBlockState(), be2);
+            }
+            boolean upGot = containerHasItems(level, gpos2.above());
+            boolean downGot = containerHasItems(level, gpos2.below());
+            if (!downGot) {
+                errors.add("generator did not prefer below container (down > up)");
+            }
+            if (upGot) {
+                errors.add("generator fed above container despite below priority");
+            }
+        }
+        level.setBlock(gpos2, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(gpos2.above(), Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(gpos2.below(), Blocks.AIR.defaultBlockState(), 3);
+    }
+
+    private static boolean containerHasItems(ServerLevel level, BlockPos pos) {
+        if (level.getBlockEntity(pos) instanceof net.minecraft.world.Container container) {
+            for (int i = 0; i < container.getContainerSize(); i++) {
+                if (!container.getItem(i).isEmpty()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** 压缩箱子/潜影盒：243 格容量 + 容器读写 + 菜单类型已注册。 */
+    private static void selfTestStorage(ServerLevel level, List<String> errors) {
+        for (String name : new String[] {"compressed_chest", "compressed_shulker_box"}) {
+            Block block = blockByName(name);
+            if (block == null) {
+                errors.add(name + " missing");
+                continue;
+            }
+            BlockPos pos = new BlockPos(12 + name.length(), 90, 4);
+            level.setBlock(pos, block.defaultBlockState(), 3);
+            if (!(level.getBlockEntity(pos) instanceof ScrollingContainerBlockEntity be)) {
+                errors.add(name + ": no block entity");
+            } else {
+                if (be.getContainerSize() != ScrollingContainerMenu.SIZE) {
+                    errors.add(name + " container size " + be.getContainerSize());
+                }
+                be.setItem(ScrollingContainerMenu.SIZE - 1, new ItemStack(Items.DIAMOND, 7));
+                if (be.getItem(ScrollingContainerMenu.SIZE - 1).getCount() != 7) {
+                    errors.add(name + " set/get failed");
+                }
+                be.setItem(ScrollingContainerMenu.SIZE - 1, ItemStack.EMPTY);
+            }
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        }
+        if (!BuiltInRegistries.MENU.containsKey(CompressedBlocks.id("compressed_chest"))
+            || !BuiltInRegistries.MENU.containsKey(CompressedBlocks.id("compressed_shulker_box"))) {
+            errors.add("storage menu types not registered");
+        }
+    }
+
+    /** 漏斗盆栽自动收割：成熟后驱动 serverTick，产物应入下方箱子并自动补种。 */
+    private static void selfTestHopperPot(ServerLevel level, List<String> errors) {
+        Block potBlock = blockByName("hopper_pot");
+        BlockPos potPos = new BlockPos(11, 90, 8);
+        level.setBlock(potPos.below(), Blocks.CHEST.defaultBlockState(), 3);
+        level.setBlock(potPos, potBlock.defaultBlockState(), 3);
+        if (!(level.getBlockEntity(potPos) instanceof CompressedPotBlockEntity pot)) {
+            errors.add("hopper pot: no block entity");
+            return;
+        }
+        pot.setSoil(blockByName("1x_dirt").defaultBlockState());
+        pot.setPlant(Blocks.WHEAT.defaultBlockState(), "minecraft:wheat_seeds");
+        // 自动收割有 1 秒重试冷却（BE 内计数，与 gameTime 无关）：驱动到箱子收到产物或超时
+        for (int i = 0; i <= pot.requiredGrowth() + 40 && !containerHasItems(level, potPos.below()); i++) {
+            CompressedPotBlockEntity.serverTick(level, potPos, potBlock.defaultBlockState(), pot);
+        }
+        if (!containerHasItems(level, potPos.below())) {
+            errors.add("hopper pot did not auto-harvest into chest");
+        }
+        if (pot.growthFraction() != 0.0F) {
+            errors.add("hopper pot did not replant after auto-harvest");
+        }
+        level.setBlock(potPos, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(potPos.below(), Blocks.AIR.defaultBlockState(), 3);
+        // 无容器：成熟后驱动 serverTick 必须静默等待（growth 不清零，绝不吞作物）
+        level.setBlock(potPos, potBlock.defaultBlockState(), 3);
+        if (level.getBlockEntity(potPos) instanceof CompressedPotBlockEntity pot2) {
+            pot2.setSoil(blockByName("1x_dirt").defaultBlockState());
+            pot2.setPlant(Blocks.WHEAT.defaultBlockState(), "minecraft:wheat_seeds");
+            for (int i = 0; i < pot2.requiredGrowth() + 60; i++) {
+                CompressedPotBlockEntity.serverTick(level, potPos, potBlock.defaultBlockState(), pot2);
+            }
+            if (!pot2.grown()) {
+                errors.add("hopper pot lost crop without container (must wait for player)");
+            }
+        } else {
+            errors.add("hopper pot no-container: no block entity");
+        }
+        level.setBlock(potPos, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(potPos.below(), Blocks.AIR.defaultBlockState(), 3);
+    }
+
+    /** 压缩潜影盒掉落实证：getDrops 应构建恰好 1 个带 2 组内容的盒子（内容不落地）。 */
+    private static void selfTestShulkerDrop(ServerLevel level, List<String> errors) {
+        Block block = blockByName("compressed_shulker_box");
+        BlockPos pos = new BlockPos(2, 90, 8);
+        level.setBlock(pos, block.defaultBlockState(), 3);
+        if (!(level.getBlockEntity(pos) instanceof ScrollingContainerBlockEntity be)) {
+            errors.add("shulker drop: no block entity");
+            return;
+        }
+        if (!be.keepsContents()) {
+            errors.add("shulker keepsContents is false");
+        }
+        be.setItem(0, new ItemStack(Items.DIAMOND, 3));
+        be.setItem(1, new ItemStack(Items.DIAMOND, 5));
+        // 6 参公开入口：内部构建 LootParams（含 BLOCK_ENTITY）并分发到方块自己的 getDrops
+        List<ItemStack> drops = Block.getDrops(block.defaultBlockState(), level, pos, be, null, ItemStack.EMPTY);
+        if (drops.size() != 1) {
+            errors.add("shulker getDrops " + drops.size() + " stacks != 1");
+        } else {
+            ItemContainerContents container = drops.get(0).get(DataComponents.CONTAINER);
+            int contents = container == null ? 0 : (int) container.nonEmptyItemCopyStream().count();
+            if (contents != 2) {
+                errors.add("shulker box contents " + contents + " != 2");
+            }
+        }
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+    }
+
+
+    /** 压缩金属包抽查：22 材质 × 9 级全部注册且发光档正确。 */
+    private static void selfTestCompat(List<String> errors) {
+        long n = BuiltInRegistries.BLOCK.keySet().stream()
+            .filter(i -> i.getNamespace().equals(MOD_ID))
+            .filter(i -> i.getPath().endsWith("_block"))
+            .filter(i -> {
+                String p = i.getPath();
+                for (String key : new String[] {"tin", "lead", "zinc", "plastic", "silver", "nickel",
+                    "bronze", "brass", "electrum", "invar", "constantan", "steel", "manasteel",
+                    "uranium", "osmium", "signalum", "enderium", "refined_obsidian",
+                    "refined_glowstone", "lumium", "terrasteel", "elementium"}) {
+                    if (p.endsWith("_" + key + "_block")) {
+                        return true;
+                    }
+                }
+                return false;
+            }).count();
+        if (n != COMPAT_METALS.size() * LEVELS) {
+            errors.add("compat metal blocks " + n + " != " + COMPAT_METALS.size() * LEVELS);
+        }
+        Block lumium = blockByName("1x_lumium_block");
+        if (lumium == null || lumium.defaultBlockState().getLightEmission() != 12) {
+            errors.add("lumium light != 12");
+        }
+        Block glow = blockByName("1x_refined_glowstone_block");
+        if (glow == null || glow.defaultBlockState().getLightEmission() != 15) {
+            errors.add("refined glowstone light != 15");
+        }
+    }
+
+    private static double attackDamage(ItemStack stack) {
+        ItemAttributeModifiers mods = stack.get(DataComponents.ATTRIBUTE_MODIFIERS);
+        if (mods != null) {
+            for (ItemAttributeModifiers.Entry entry : mods.modifiers()) {
+                if (entry.attribute().is(Attributes.ATTACK_DAMAGE)) {
+                    return entry.modifier().amount();
+                }
+            }
+        }
+        return Double.NaN;
+    }
+
+    private static int levelOfName(String name) {
+        return switch (name.charAt(1)) {
+            case 'x' -> Integer.parseInt(name.substring(0, 1));
+            default -> Integer.parseInt(name.substring(0, 2));
+        };
+    }
+
+    private static Block blockByName(String name) {
+        for (BlockReg b : BLOCKS) {
+            if (b.name().equals(name)) {
+                return b.block();
+            }
+        }
+        return null;
+    }
+
+    private CompressedBlocks() {
+    }
+}
