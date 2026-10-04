@@ -1,0 +1,51 @@
+// MC 26.3 移植：附属 mod compressedblockspot（压缩盆栽+压缩漏斗盆栽）。
+// 与主 mod 同款 26.x 模板：net.fabricmc.fabric-loom 1.18.2、无 mappings、
+// loader/fabric-api 走 implementation、依赖主 mod 直接挂 26.3 构建产物（无 remap）。
+plugins {
+    id 'net.fabricmc.fabric-loom' version '1.18.2'
+}
+
+loom {
+    accessWidenerPath = file('src/main/resources/compressedblockspot.aw')
+}
+
+version = '0.3.2'
+group = 'dev.compressedblockspot'
+
+base {
+    archivesName = 'compressedblockspot-fabric-26.3'
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.fabricmc.net/' }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    // 主 mod 26.3 构建 jar（26.x 无混淆、无 remap，可直接编译/运行时随 mods 目录加载）
+    implementation files('../../fabric/build/libs/compressedblocks-fabric-26.3-0.3.2.jar')
+}
+
+// 26.x 线要求 Java 25：org.gradle.java.home 见本项目 gradle.properties（共享缓存 corretto-25）
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') {
+        expand 'version': project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 25
+}
