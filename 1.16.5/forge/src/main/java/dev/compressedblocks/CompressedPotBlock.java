@@ -56,6 +56,9 @@ public class CompressedPotBlock extends Block implements EntityBlock {
     /** 漏斗盆栽标记。 */
     private final boolean hopper;
 
+    /** 附属 mod compressedblockspot 在场时解锁压缩系植物种植（同 jar 双 mod，构造期置位）。 */
+    public static boolean SPOT_UNLOCKED = false;
+
     public CompressedPotBlock(Properties props) {
         this(props, false);
     }
@@ -229,11 +232,14 @@ public class CompressedPotBlock extends Block implements EntityBlock {
         if (stack.getItem() instanceof BlockItem) {
             Block block = ((BlockItem) stack.getItem()).getBlock();
             ResourceKeyCheck check = namespaceOf(block);
-            if (!check.vanilla) {
+            if (!check.vanilla && !(CompressedPotBlock.SPOT_UNLOCKED && "compressedblocks".equals(
+                net.minecraft.core.Registry.BLOCK.getKey(block).getNamespace()))) {
                 return null;
             }
             BlockState def = block.defaultBlockState();
-            if (def.is(BlockTags.SAPLINGS) || def.is(BlockTags.CROPS)) {
+            if (block instanceof net.minecraft.world.level.block.CropBlock
+                || block instanceof net.minecraft.world.level.block.SaplingBlock
+                || def.is(BlockTags.SAPLINGS) || def.is(BlockTags.CROPS)) {
                 return new Plantable(def, 0, check.id, SOIL_DIRT);
             }
             if (block instanceof net.minecraft.world.level.block.SugarCaneBlock) {
@@ -252,6 +258,15 @@ public class CompressedPotBlock extends Block implements EntityBlock {
             }
             if (block instanceof net.minecraft.world.level.block.StemBlock) {
                 return new Plantable(def, 0, check.id, SOIL_DIRT);
+            }
+            if (block instanceof CompressedCaneBlock) {
+                return new Plantable(def, ((CompressedCaneBlock) block).level(), check.id, SOIL_DIRT | SOIL_SAND);
+            }
+            if (block instanceof CompressedCropBlock) {
+                return new Plantable(def, ((CompressedCropBlock) block).level(), check.id, SOIL_DIRT);
+            }
+            if (block instanceof CompressedSaplingBlock) {
+                return new Plantable(def, ((CompressedSaplingBlock) block).level(), check.id, SOIL_DIRT);
             }
         }
         return null;

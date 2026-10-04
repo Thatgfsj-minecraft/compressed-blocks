@@ -7,7 +7,7 @@ issueTrackerURL="https://github.com/Thatgfsj-minecraft/compressed-blocks/issues"
 modId="compressedblocks"
 version="${file.jarVersion}"
 displayName="Compressed Blocks 压缩方块"
-description="9 级压缩方块、工具、盔甲、食物与农业系统。"
+description="9 级压缩方块、工具、盔甲、食物、盆栽与刷石机系统。"
 logoFile="assets/compressedblocks/icon.png"
 
 [[dependencies.compressedblocks]]
@@ -22,4 +22,32 @@ logoFile="assets/compressedblocks/icon.png"
     mandatory=true
     versionRange="[1.16.5,1.17)"
     ordering="NONE"
+    side="BOTH"
+
+# 附属 mod：压缩盆栽（与主 mod 同 jar 双 mod；1.21.11 线是独立子项目，1.16.5 合并打包）
+[[mods]]
+modId="compressedblockspot"
+version="${file.jarVersion}"
+displayName="Compressed Blocks Pots 压缩盆栽"
+description="压缩盆栽与压缩漏斗盆栽：能种压缩系作物的盆栽。"
+
+[[dependencies.compressedblockspot]]
+    modId="forge"
+    mandatory=true
+    versionRange="[36,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.compressedblockspot]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.16.5,1.17)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.compressedblockspot]]
+    modId="compressedblocks"
+    mandatory=true
+    versionRange="[0.3.0]"
+    ordering="AFTER"
     side="BOTH"
