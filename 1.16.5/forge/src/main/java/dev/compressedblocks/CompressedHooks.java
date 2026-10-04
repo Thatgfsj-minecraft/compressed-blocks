@@ -177,6 +177,19 @@ public final class CompressedHooks {
             .append(new net.minecraft.network.chat.TextComponent(found).withStyle(ChatFormatting.GRAY)), false);
     }
 
+    /** 盆栽土壤等级不足。 */
+    public static void sendPotHint(ServerPlayer player, int level, int soilLevel) {
+        if (!hintReady(player)) {
+            return;
+        }
+        player.displayClientMessage(new net.minecraft.network.chat.TextComponent("")
+            .append(new net.minecraft.network.chat.TextComponent("[压缩方块] ").withStyle(ChatFormatting.DARK_GRAY))
+            .append(new net.minecraft.network.chat.TextComponent("盆内需要 ").withStyle(ChatFormatting.RED))
+            .append(new net.minecraft.network.chat.TextComponent(level + " 重及以上的压缩泥土/沙子").withStyle(ChatFormatting.GOLD))
+            .append(new net.minecraft.network.chat.TextComponent("! 盆内土壤：").withStyle(ChatFormatting.RED))
+            .append(new net.minecraft.network.chat.TextComponent(soilLevel + " 重").withStyle(ChatFormatting.GRAY)), false);
+    }
+
     /** 锄头等级不足（锄压缩泥土）。 */
     public static void sendTillHint(ServerPlayer player, int hoeLevel, int dirtLevel) {
         if (!hintReady(player)) {

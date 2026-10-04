@@ -16,6 +16,8 @@ import dev.compressedblocks.CompressedSaplingBlock;
 import dev.compressedblocks.CompressedShulkerBlock;
 import dev.compressedblocks.CompressedSoilItem;
 import dev.compressedblocks.CompressedTier;
+import dev.compressedblocks.CompressedPotBlock;
+import dev.compressedblocks.CompressedPotBlockEntity;
 import dev.compressedblocks.CobblestoneGeneratorBlockEntity;
 import dev.compressedblocks.ScrollingContainerBlockEntity;
 import dev.compressedblocks.ScrollingContainerMenu;
@@ -66,6 +68,7 @@ public class CompressedBlocksForge {
     public static BlockEntityType<ScrollingContainerBlockEntity> CHEST_TYPE;
     public static BlockEntityType<ScrollingContainerBlockEntity> SHULKER_TYPE;
     public static BlockEntityType<CobblestoneGeneratorBlockEntity> GENERATOR_TYPE;
+    public static BlockEntityType<CompressedPotBlockEntity> POT_TYPE;
     public static MenuType<ScrollingContainerMenu> CHEST_MENU_TYPE;
     public static MenuType<ScrollingContainerMenu> SHULKER_MENU_TYPE;
 
@@ -478,6 +481,23 @@ public class CompressedBlocksForge {
                     caneEnName(m.enName()) + " Cane", m.key());
             }
         }
+        // 5f. 盆栽 + 漏斗盆栽（原版配色，主 mod 版）：只能种原版系作物/甘蔗/树木
+        CompressedPotBlock pot = new CompressedPotBlock(BlockBehaviour.Properties
+            .of(Material.STONE, net.minecraft.world.level.material.MaterialColor.TERRACOTTA_ORANGE)
+            .strength(1.5F, CompressedBlocks.STORAGE_BLAST)
+            .sound(SoundType.STONE)
+            .noOcclusion());
+        BlockItem potItem = new BlockItem(pot, new Item.Properties().tab(CompressedBlocks.TAB_TOOLS));
+        CompressedBlocks.addBlock(new CompressedBlocks.BlockReg("pot", pot, "pot"));
+        CompressedBlocks.addItem(new CompressedBlocks.ItemReg("pot", potItem, CompressedBlocks.Tab.TOOLS, true));
+        CompressedPotBlock hopperPot = new CompressedPotBlock(BlockBehaviour.Properties
+            .of(Material.STONE, net.minecraft.world.level.material.MaterialColor.TERRACOTTA_ORANGE)
+            .strength(1.5F, CompressedBlocks.STORAGE_BLAST)
+            .sound(SoundType.STONE)
+            .noOcclusion(), true);
+        BlockItem hopperPotItem = new BlockItem(hopperPot, new Item.Properties().tab(CompressedBlocks.TAB_TOOLS));
+        CompressedBlocks.addBlock(new CompressedBlocks.BlockReg("hopper_pot", hopperPot, "hopper_pot"));
+        CompressedBlocks.addItem(new CompressedBlocks.ItemReg("hopper_pot", hopperPotItem, CompressedBlocks.Tab.TOOLS, true));
         // 6. 刷石机（3 压缩等级）
         String[] generatorTiers = {"cobblestone_generator", "2x_cobblestone_generator", "3x_cobblestone_generator"};
         for (int i = 0; i < generatorTiers.length; i++) {
@@ -616,6 +636,13 @@ public class CompressedBlocksForge {
                 new Item(new Item.Properties().tab(CompressedBlocks.TAB_TOOLS)),
                 CompressedBlocks.Tab.INGREDIENTS, false));
         }
+        // 12. 盆栽方块实体类型（主 mod pot/hopper_pot 共用）
+        Block potBlock = CompressedBlocks.blockByName("pot");
+        Block hopperPotBlock = CompressedBlocks.blockByName("hopper_pot");
+        POT_TYPE = BlockEntityType.Builder.of(
+            () -> new CompressedPotBlockEntity(false), potBlock, hopperPotBlock).build(null);
+        net.minecraft.core.Registry.register(net.minecraft.core.Registry.BLOCK_ENTITY_TYPE,
+            id("pot"), POT_TYPE);
     }
 
     private static void registerCane(String name, int level, String enName, String matKey) {
