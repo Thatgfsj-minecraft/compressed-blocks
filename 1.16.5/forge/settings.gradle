@@ -1,1 +1,26 @@
+// 1.16.5 Forge 移植：Architectury Loom 1.6 + Gradle 8.8 + toolchain JDK8
+// （FG6 在本机管线不完整：mapped forge jar 缺 MC 类，见 backlog；Loom 走 binary remap 无需 recompile）
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven {
+            name = 'MinecraftForge'
+            url = 'https://maven.minecraftforge.net/'
+        }
+        maven {
+            name = 'Architectury'
+            url = 'https://maven.architectury.dev/'
+        }
+        maven {
+            name = 'FabricMC'
+            url = 'https://maven.fabricmc.net/'
+        }
+    }
+}
+
+plugins {
+    // 自动下载匹配的 JDK（8）：本机只有 JDK21，无此插件 toolchain 解析会失败
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+}
+
 rootProject.name = 'compressedblocks-forge-1.16.5'

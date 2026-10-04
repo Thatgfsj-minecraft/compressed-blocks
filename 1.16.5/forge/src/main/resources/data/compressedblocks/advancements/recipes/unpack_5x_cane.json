@@ -1,0 +1,1 @@
+{"parent":"minecraft:recipes/root","criteria":{"has_the_recipe":{"trigger":"minecraft:recipe_unlocked","conditions":{"recipe":"compressedblocks:unpack_5x_cane"}}},"requirements":[["has_the_recipe"]],"rewards":{"recipes":["compressedblocks:unpack_5x_cane"]}}
