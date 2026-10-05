@@ -1,0 +1,30 @@
+[
+{
+  "modid": "compressedblocks",
+  "name": "Compressed Blocks",
+  "description": "压缩方块：多层重压缩储存方块与配套工具/容器/盆栽（1.12.2 Forge 移植）。",
+  "version": "0.1.0",
+  "mcversion": "1.12.2",
+  "url": "",
+  "updateUrl": "",
+  "authorList": ["compressedblocks team"],
+  "credits": "",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+},
+{
+  "modid": "compressedblockspot",
+  "name": "Compressed Blocks Pots Spot",
+  "description": "附属：压缩盆栽与压缩漏斗盆栽，可种植压缩系作物/树苗/甘蔗（需主 mod）。",
+  "version": "0.1.0",
+  "mcversion": "1.12.2",
+  "url": "",
+  "updateUrl": "",
+  "authorList": ["compressedblocks team"],
+  "credits": "",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": ["compressedblocks"]
+}
+]

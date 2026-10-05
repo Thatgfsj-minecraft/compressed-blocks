@@ -1,0 +1,1 @@
+{"textures":{"particle":"compressedblocks:blocks/6x_dirt","dirt":"compressedblocks:blocks/6x_dirt","top":"compressedblocks:blocks/6x_farmland"},"elements":[{"from":[0,0,0],"to":[16,15,16],"faces":{"down":{"texture":"#dirt","cullface":"bottom"},"up":{"texture":"#top"},"north":{"texture":"#dirt"},"south":{"texture":"#dirt"},"west":{"texture":"#dirt"},"east":{"texture":"#dirt"}}}]}

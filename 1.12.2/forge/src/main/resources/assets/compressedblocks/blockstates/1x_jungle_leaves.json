@@ -1,0 +1,1 @@
+{"variants":{"check_decay=true,decayable=true":{"model":"compressedblocks:block/1x_jungle_leaves"},"check_decay=false,decayable=true":{"model":"compressedblocks:block/1x_jungle_leaves"},"check_decay=true,decayable=false":{"model":"compressedblocks:block/1x_jungle_leaves"},"check_decay=false,decayable=false":{"model":"compressedblocks:block/1x_jungle_leaves"}}}
