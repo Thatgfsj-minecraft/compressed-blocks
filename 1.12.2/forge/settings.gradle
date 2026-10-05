@@ -1,0 +1,21 @@
+// 压缩方块 1.12.2 Forge 移植：RetroFuturaGradle 2.0.6 + Gradle 8.8 + toolchain JDK8
+// RFG 对旧版（1.7.10/1.12.2）支持完整且可在 JDK21 守护进程运行（1.16.5 轮已验证 FG2/6 不可行）
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven {
+            // RetroFuturaGradle 插件发布仓库（GTNH）
+            name = 'GTNH Maven'
+            url = 'https://nexus.gtnewhorizons.com/repository/public/'
+        }
+        mavenCentral()
+    }
+}
+
+plugins {
+    // 自动下载匹配的 JDK（8）：本机只有 JDK21，无此插件 toolchain 解析会失败
+    // 1.0.0 = Gradle 9 兼容版（RFG 2.0.6 是 Java 25 字节码，Gradle 8.8 无法加载）
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
+rootProject.name = 'compressedblocks-forge-1.12.2'

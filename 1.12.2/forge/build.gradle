@@ -1,0 +1,41 @@
+// 压缩方块 1.12.2 Forge 移植：RetroFuturaGradle（GTNH）+ stable_39 映射 + Java 8 toolchain
+// 本机只有 JDK21：Gradle 本体跑在 21 上，编译用 toolchain JDK8（temurin-8 已在共享 gradle-home 缓存）
+plugins {
+    id 'java-library'
+    id 'com.gtnewhorizons.retrofuturagradle' version '2.0.6'
+}
+
+version = '0.1.0'
+group = 'dev.compressedblocks'
+// Gradle 9 移除了顶层 archivesBaseName 属性，走 base 扩展
+base {
+    archivesName = 'compressedblocks-forge-1.12.2'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(8)
+    }
+}
+
+minecraft {
+    mcVersion = '1.12.2'
+    usesForge = true
+    // 注意：不要设置 mcpMappingChannel/mcpMappingVersion——那是 1.7.10 管线（mcpbot zip）的属性，
+    // 1.12.2 走 forge maven 的 mcp-<ver>-srg.zip + csv 重命名，设了反而会去找不存在的 mcp_stable-39-1.12.2.zip
+}
+
+jar {
+    manifest {
+        attributes([
+            'Specification-Title': 'compressedblocks',
+            'Specification-Version': '1',
+            'Implementation-Title': base.archivesName.get(),
+            'Implementation-Version': project.version
+        ])
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
