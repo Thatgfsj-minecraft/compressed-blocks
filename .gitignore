@@ -16,5 +16,8 @@ _asset-src/
 .mimosa/
 1.21.11/neoforge/runs/
 1.21.11/neoforge/run/
+26.3/fabric/run/
+26.3/fabric/run-server/
+26.3/addon/fabric/run/
 _render-invest/
 .tmp-cmp/

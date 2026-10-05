@@ -1088,6 +1088,17 @@ public final class CompressedBlocks {
      */
     public static void selfTest(ServerLevel level) {
         List<String> errors = new ArrayList<>();
+        // mixin 目标类主动加载：26.3 无 refmap，注入点靠 loader 运行时解析；
+        // AnvilMenu/ServerPlayerGameMode 平时只在玩家交互时才加载，headless 服务端
+        // 永远走不到。类加载即触发 mixin apply（required=true，失配会当场硬崩），
+        // 由此把"三个注入点命中"变成实机可验证的事实。
+        try {
+            Class.forName("net.minecraft.world.inventory.AnvilMenu");
+            Class.forName("net.minecraft.world.level.block.state.BlockBehaviour");
+            Class.forName("net.minecraft.server.level.ServerPlayerGameMode");
+        } catch (ClassNotFoundException e) {
+            errors.add("mixin target class missing: " + e);
+        }
         long blockCount = BuiltInRegistries.BLOCK.keySet().stream().filter(i -> i.getNamespace().equals(MOD_ID)).count();
         long itemCount = BuiltInRegistries.ITEM.keySet().stream().filter(i -> i.getNamespace().equals(MOD_ID)).count();
         int expectItems = ITEMS.size();

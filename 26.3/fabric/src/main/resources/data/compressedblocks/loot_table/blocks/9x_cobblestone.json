@@ -1,1 +1,1 @@
-{"type":"minecraft:block","random_sequence":"compressedblocks:blocks/9x_cobblestone","pools":[{"rolls":1.0,"bonus_rolls":0.0,"conditions":[{"condition":"minecraft:survives_explosion"}],"entries":[{"type":"minecraft:item","name":"compressedblocks:9x_cobblestone"}]}]}
+{"type":"minecraft:block","random_sequence":"compressedblocks:blocks/9x_cobblestone","pools":[{"rolls":1.0,"bonus_rolls":0.0,"entries":[{"type":"minecraft:item","name":"compressedblocks:9x_cobblestone"}],"condition":{"type":"minecraft:survives_explosion"}}]}

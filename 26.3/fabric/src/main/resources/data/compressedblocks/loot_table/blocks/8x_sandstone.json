@@ -1,1 +1,1 @@
-{"type":"minecraft:block","random_sequence":"compressedblocks:blocks/8x_sandstone","pools":[{"rolls":1.0,"bonus_rolls":0.0,"conditions":[{"condition":"minecraft:survives_explosion"}],"entries":[{"type":"minecraft:item","name":"compressedblocks:8x_sandstone"}]}]}
+{"type":"minecraft:block","random_sequence":"compressedblocks:blocks/8x_sandstone","pools":[{"rolls":1.0,"bonus_rolls":0.0,"entries":[{"type":"minecraft:item","name":"compressedblocks:8x_sandstone"}],"condition":{"type":"minecraft:survives_explosion"}}]}

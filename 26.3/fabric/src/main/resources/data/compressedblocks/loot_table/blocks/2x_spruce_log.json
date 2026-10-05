@@ -1,1 +1,1 @@
-{"type":"minecraft:block","random_sequence":"compressedblocks:blocks/2x_spruce_log","pools":[{"rolls":1.0,"bonus_rolls":0.0,"conditions":[{"condition":"minecraft:survives_explosion"}],"entries":[{"type":"minecraft:item","name":"compressedblocks:2x_spruce_log"}]}]}
+{"type":"minecraft:block","random_sequence":"compressedblocks:blocks/2x_spruce_log","pools":[{"rolls":1.0,"bonus_rolls":0.0,"entries":[{"type":"minecraft:item","name":"compressedblocks:2x_spruce_log"}],"condition":{"type":"minecraft:survives_explosion"}}]}

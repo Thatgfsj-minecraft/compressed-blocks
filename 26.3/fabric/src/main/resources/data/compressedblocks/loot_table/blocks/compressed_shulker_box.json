@@ -1,1 +1,1 @@
-{"type":"minecraft:block","random_sequence":"compressedblocks:blocks/compressed_shulker_box","pools":[{"rolls":1.0,"bonus_rolls":0.0,"conditions":[{"condition":"minecraft:survives_explosion"}],"entries":[{"type":"minecraft:item","name":"compressedblocks:compressed_shulker_box"}]}]}
+{"type":"minecraft:block","random_sequence":"compressedblocks:blocks/compressed_shulker_box","pools":[{"rolls":1.0,"bonus_rolls":0.0,"entries":[{"type":"minecraft:item","name":"compressedblocks:compressed_shulker_box"}],"condition":{"type":"minecraft:survives_explosion"}}]}

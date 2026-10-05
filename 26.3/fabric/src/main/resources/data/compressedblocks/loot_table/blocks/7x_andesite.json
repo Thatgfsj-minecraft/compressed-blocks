@@ -1,1 +1,1 @@
-{"type":"minecraft:block","random_sequence":"compressedblocks:blocks/7x_andesite","pools":[{"rolls":1.0,"bonus_rolls":0.0,"conditions":[{"condition":"minecraft:survives_explosion"}],"entries":[{"type":"minecraft:item","name":"compressedblocks:7x_andesite"}]}]}
+{"type":"minecraft:block","random_sequence":"compressedblocks:blocks/7x_andesite","pools":[{"rolls":1.0,"bonus_rolls":0.0,"entries":[{"type":"minecraft:item","name":"compressedblocks:7x_andesite"}],"condition":{"type":"minecraft:survives_explosion"}}]}
