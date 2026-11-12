@@ -1052,6 +1052,27 @@ public final class CompressedBlocks {
 
     private static final BlockPos CHECK_POS = new BlockPos(0, 100, 0);
 
+    /**
+     * 自检清场：先清空测试方块实体的内容，再移除方块。
+     *
+     * <p>1.21.11 起方块被替换/移除会触发 {@code BlockEntity.preRemoveSideEffects}：
+     * {@link CompressedPotBlockEntity} 会把盆内土壤方块与作物当成掉落物洒出，
+     * 箱子变体/原版箱子会把槽位内容洒出。自检在真实主世界 (2..34, 90, 4..8) 反复放/拆测试方块，
+     * 只调 {@code setBlock(AIR)} 就会在出生点附近留下压缩泥土、小麦种子、圆石等掉落物
+     * （见 issue #1）。这里统一先清内容再拆，保证自检零残留。
+     */
+    private static void clearAndRemove(ServerLevel level, BlockPos pos) {
+        if (level.getBlockEntity(pos) instanceof CompressedPotBlockEntity pot) {
+            pot.takePlant();
+            pot.takeSoil();
+        } else if (level.getBlockEntity(pos) instanceof net.minecraft.world.Container container) {
+            for (int i = 0; i < container.getContainerSize(); i++) {
+                container.setItem(i, ItemStack.EMPTY);
+            }
+        }
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+    }
+
     private static TagKey<Item> vanillaItemTag(String path) {
         return TagKey.create(Registries.ITEM, Identifier.withDefaultNamespace(path));
     }
@@ -1286,7 +1307,7 @@ public final class CompressedBlocks {
         level.setBlock(pos, potBlock.defaultBlockState(), 3);
         if (!(level.getBlockEntity(pos) instanceof CompressedPotBlockEntity pot)) {
             errors.add("plant audit: no block entity");
-            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+            clearAndRemove(level, pos);
             return;
         }
         BlockState soulSand = net.minecraft.world.level.block.Blocks.SOUL_SAND.defaultBlockState();
@@ -1369,7 +1390,7 @@ public final class CompressedBlocks {
             }
         }
         pot.takePlant();
-        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        clearAndRemove(level, pos);
     }
 
     /** 定稿产量表抽查（原版泥土无翻倍）：土豆 2-4、小麦=麦粒 1-2+种子 0-2；翻倍概率表 1-9 重锚点。 */
@@ -1413,7 +1434,7 @@ public final class CompressedBlocks {
         } else {
             errors.add("crop yield: no block entity");
         }
-        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        clearAndRemove(level, pos);
     }
 
     private static void growFlow(ServerLevel level, List<String> errors, Block plant, int soilLevel) {
@@ -1423,6 +1444,7 @@ public final class CompressedBlocks {
         level.setBlock(potPos, potBlock.defaultBlockState(), 3);
         if (!(level.getBlockEntity(potPos) instanceof CompressedPotBlockEntity pot)) {
             errors.add("pot flow: no block entity");
+            clearAndRemove(level, potPos);
             return;
         }
         pot.setSoil(blockByName(soilName).defaultBlockState());
@@ -1438,7 +1460,7 @@ public final class CompressedBlocks {
         if (!pot.grown() || pot.plant() == null) {
             errors.add("pot flow not grown (soil " + soilLevel + ")");
         }
-        level.setBlock(potPos, Blocks.AIR.defaultBlockState(), 3);
+        clearAndRemove(level, potPos);
     }
 
     /** 刷石机：驱动 25 tick 应产出圆石并压入下方箱子。 */
@@ -1449,8 +1471,8 @@ public final class CompressedBlocks {
         level.setBlock(gpos, gen.defaultBlockState(), 3);
         if (!(level.getBlockEntity(gpos) instanceof CobblestoneGeneratorBlockEntity be)) {
             errors.add("generator flow: no block entity");
-            level.setBlock(gpos, Blocks.AIR.defaultBlockState(), 3);
-            level.setBlock(gpos.below(), Blocks.AIR.defaultBlockState(), 3);
+            clearAndRemove(level, gpos);
+            clearAndRemove(level, gpos.below());
             return;
         }
         for (int i = 0; i < 25; i++) {
@@ -1467,8 +1489,8 @@ public final class CompressedBlocks {
         if (!produced) {
             errors.add("generator produced no cobblestone");
         }
-        level.setBlock(gpos, Blocks.AIR.defaultBlockState(), 3);
-        level.setBlock(gpos.below(), Blocks.AIR.defaultBlockState(), 3);
+        clearAndRemove(level, gpos);
+        clearAndRemove(level, gpos.below());
         // 六向优先级：先放上方箱子、再放下方箱子 → 应切到下方（下 > 上，与放置顺序无关）
         BlockPos gpos2 = new BlockPos(13, 90, 4);
         level.setBlock(gpos2, gen.defaultBlockState(), 3);
@@ -1489,9 +1511,9 @@ public final class CompressedBlocks {
                 errors.add("generator fed above container despite below priority");
             }
         }
-        level.setBlock(gpos2, Blocks.AIR.defaultBlockState(), 3);
-        level.setBlock(gpos2.above(), Blocks.AIR.defaultBlockState(), 3);
-        level.setBlock(gpos2.below(), Blocks.AIR.defaultBlockState(), 3);
+        clearAndRemove(level, gpos2);
+        clearAndRemove(level, gpos2.above());
+        clearAndRemove(level, gpos2.below());
     }
 
     private static boolean containerHasItems(ServerLevel level, BlockPos pos) {
@@ -1527,7 +1549,7 @@ public final class CompressedBlocks {
                 }
                 be.setItem(ScrollingContainerMenu.SIZE - 1, ItemStack.EMPTY);
             }
-            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+            clearAndRemove(level, pos);
         }
         if (!BuiltInRegistries.MENU.containsKey(CompressedBlocks.id("compressed_chest"))
             || !BuiltInRegistries.MENU.containsKey(CompressedBlocks.id("compressed_shulker_box"))) {
@@ -1543,6 +1565,8 @@ public final class CompressedBlocks {
         level.setBlock(potPos, potBlock.defaultBlockState(), 3);
         if (!(level.getBlockEntity(potPos) instanceof CompressedPotBlockEntity pot)) {
             errors.add("hopper pot: no block entity");
+            clearAndRemove(level, potPos);
+            clearAndRemove(level, potPos.below());
             return;
         }
         pot.setSoil(blockByName("1x_dirt").defaultBlockState());
@@ -1557,8 +1581,8 @@ public final class CompressedBlocks {
         if (pot.growthFraction() != 0.0F) {
             errors.add("hopper pot did not replant after auto-harvest");
         }
-        level.setBlock(potPos, Blocks.AIR.defaultBlockState(), 3);
-        level.setBlock(potPos.below(), Blocks.AIR.defaultBlockState(), 3);
+        clearAndRemove(level, potPos);
+        clearAndRemove(level, potPos.below());
         // 无容器：成熟后驱动 serverTick 必须静默等待（growth 不清零，绝不吞作物）
         level.setBlock(potPos, potBlock.defaultBlockState(), 3);
         if (level.getBlockEntity(potPos) instanceof CompressedPotBlockEntity pot2) {
@@ -1573,8 +1597,8 @@ public final class CompressedBlocks {
         } else {
             errors.add("hopper pot no-container: no block entity");
         }
-        level.setBlock(potPos, Blocks.AIR.defaultBlockState(), 3);
-        level.setBlock(potPos.below(), Blocks.AIR.defaultBlockState(), 3);
+        clearAndRemove(level, potPos);
+        clearAndRemove(level, potPos.below());
     }
 
     /** 压缩潜影盒掉落实证：getDrops 应构建恰好 1 个带 2 组内容的盒子（内容不落地）。 */
@@ -1584,6 +1608,7 @@ public final class CompressedBlocks {
         level.setBlock(pos, block.defaultBlockState(), 3);
         if (!(level.getBlockEntity(pos) instanceof ScrollingContainerBlockEntity be)) {
             errors.add("shulker drop: no block entity");
+            clearAndRemove(level, pos);
             return;
         }
         if (!be.keepsContents()) {
@@ -1602,7 +1627,7 @@ public final class CompressedBlocks {
                 errors.add("shulker box contents " + contents + " != 2");
             }
         }
-        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        clearAndRemove(level, pos);
     }
 
 
