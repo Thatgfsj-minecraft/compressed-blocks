@@ -29,7 +29,8 @@ import net.minecraft.world.phys.Vec3;
 /**
  * 压缩盆栽方块实体：土壤/作物/进度独立实现；生长需求 = 600 tick /（1 + 等级差×5%）。
  * 收获：作物走方块自身命名空间战利品表（含时运）；树苗找同命名空间 "{wood}_log"×4-6
- * （无则木棍）；其余（甘蔗等）=2-4×自身，并补发一份作物本体。hopper 变体自动收割入下方容器。
+ * （无则木棍）；甘蔗产出 2-4×自身并补发 1 份本体；异常植物兜底只掉落 1 份本体杜绝刷物。
+ * hopper 变体自动收割入下方容器。
  */
 public class SpotPotBlockEntity extends BlockEntity {
     /** 基础生长时长：30 秒（最慢档）。 */
@@ -279,7 +280,9 @@ public class SpotPotBlockEntity extends BlockEntity {
         Identifier blockId = BuiltInRegistries.BLOCK.getKey(block);
         String name = blockId.getPath();
         RandomSource random = server.random;
-        if (this.plant.is(BlockTags.CROPS)) {
+
+        // 1. 作物：按满龄状态结算战利品表
+        if (SpotPotBlock.isCrop(block, this.plant)) {
             // 战利品表带 age 条件：收割按满龄状态结算（盆内存的是 age=0 默认态，
             // 不推满龄则成熟收割永远只掉种子——夜间审批 P1-2）
             BlockState lootState = this.plant;
@@ -297,8 +300,9 @@ public class SpotPotBlockEntity extends BlockEntity {
             server.getServer().reloadableRegistries().getLootTable(key).getRandomItems(params, out::add);
             return out;
         }
-        if (block instanceof net.minecraft.world.level.block.SaplingBlock
-            || (this.plant.is(BlockTags.SAPLINGS) && name.endsWith("_sapling"))) {
+
+        // 2. 树苗：产出对应原木（无则木棍）并补发 1 份树苗本体
+        if (SpotPotBlock.isSapling(block, this.plant)) {
             String wood = name.endsWith("_sapling")
                 ? name.substring(0, name.length() - "_sapling".length()) : name;
             var log = BuiltInRegistries.BLOCK.get(
@@ -307,14 +311,32 @@ public class SpotPotBlockEntity extends BlockEntity {
             out.add(log.filter(h -> h.value().asItem() != Items.AIR)
                 .map(h -> new ItemStack(h.value().asItem(), count))
                 .orElse(new ItemStack(Items.STICK, count)));
-        } else {
-            ItemStack cane = itemStack(this.plantItem);
-            cane.setCount(CANE_MIN + random.nextInt(3));
-            out.add(cane);
+            ItemStack plant = itemStack(this.plantItem);
+            if (!plant.isEmpty()) {
+                out.add(plant);
+            }
+            return out;
         }
+
+        // 3. 甘蔗：产出 2~4 根甘蔗并补发 1 份甘蔗本体
+        if (SpotPotBlock.isCane(block, this.plant)) {
+            ItemStack cane = itemStack(this.plantItem);
+            if (!cane.isEmpty()) {
+                cane.setCount(CANE_MIN + random.nextInt(3));
+                out.add(cane);
+            }
+            ItemStack plant = itemStack(this.plantItem);
+            if (!plant.isEmpty()) {
+                out.add(plant);
+            }
+            return out;
+        }
+
+        // 4. 兜底防御分支：若存在未预期的异常/非法植物状态，绝不允许按甘蔗倍率复制刷物！
+        // 增加防御性保障：仅掉落 1 份本体或空列表，彻底杜绝刷物隐患
         ItemStack plant = itemStack(this.plantItem);
         if (!plant.isEmpty()) {
-            out.add(plant);
+            out.add(plant.copyWithCount(1));
         }
         return out;
     }

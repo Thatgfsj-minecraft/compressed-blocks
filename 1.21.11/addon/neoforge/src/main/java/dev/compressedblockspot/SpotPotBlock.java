@@ -2,6 +2,7 @@ package dev.compressedblockspot;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.InteractionHand;
@@ -70,8 +71,64 @@ public class SpotPotBlock extends Block implements EntityBlock {
             : (BlockEntityTicker<T>) (BlockEntityTicker<SpotPotBlockEntity>) SpotPotBlockEntity::serverTick;
     }
 
-    /** 土壤等级：压缩方块解析 id 前缀；原版泥土系/沙子系 = 1；其余 0。 */
+    /** 判断是否为作物（原版或压缩作物）。 */
+    static boolean isCrop(Block block, BlockState state) {
+        if (block == null || state == null) {
+            return false;
+        }
+        if (state.is(BlockTags.CROPS) || block instanceof net.minecraft.world.level.block.CropBlock) {
+            return true;
+        }
+        String cls = block.getClass().getSimpleName();
+        if ("CompressedCropBlock".equals(cls)) {
+            return true;
+        }
+        Identifier id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block);
+        return id.getPath().endsWith("_plant") && CompressedPotsAddon.levelOfId(id) > 0;
+    }
+
+    /** 判断是否为树苗（原版或压缩树苗）。 */
+    static boolean isSapling(Block block, BlockState state) {
+        if (block == null || state == null) {
+            return false;
+        }
+        if (state.is(BlockTags.SAPLINGS) || block instanceof net.minecraft.world.level.block.SaplingBlock) {
+            return true;
+        }
+        String cls = block.getClass().getSimpleName();
+        if ("CompressedSaplingBlock".equals(cls)) {
+            return true;
+        }
+        Identifier id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block);
+        return id.getPath().endsWith("_sapling") && CompressedPotsAddon.levelOfId(id) > 0;
+    }
+
+    /** 判断是否为甘蔗（原版或压缩甘蔗）。 */
+    static boolean isCane(Block block, BlockState state) {
+        if (block == null || state == null) {
+            return false;
+        }
+        if (block instanceof net.minecraft.world.level.block.SugarCaneBlock) {
+            return true;
+        }
+        String cls = block.getClass().getSimpleName();
+        if ("CompressedCaneBlock".equals(cls)) {
+            return true;
+        }
+        Identifier id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block);
+        return id.getPath().endsWith("_cane") && CompressedPotsAddon.levelOfId(id) > 0;
+    }
+
+    /** 判断是否为合法植物白名单：作物、树苗或甘蔗。严格排除存储材料与介质。 */
+    static boolean isPlant(Block block, BlockState state) {
+        return isCrop(block, state) || isSapling(block, state) || isCane(block, state);
+    }
+
+    /** 土壤等级：无机压缩介质解析 id 前缀；原版泥土系/沙子系 = 1；植物/非法介质 = 0。 */
     static int soilLevelOf(BlockState state) {
+        if (state == null || isPlant(state.getBlock(), state)) {
+            return 0;
+        }
         int level = CompressedPotsAddon.levelOf(state);
         if (level > 0) {
             return level;
@@ -79,18 +136,18 @@ public class SpotPotBlock extends Block implements EntityBlock {
         return state.is(BlockTags.DIRT) || state.is(BlockTags.SAND) ? 1 : 0;
     }
 
-    /** 植物等级：压缩植物解析前缀；原版/普通 mod 植物 = 0。 */
+    /** 植物等级：压缩植物解析前缀；原版/普通 mod 植物 = 0。非植物 = 0。 */
     static int plantLevel(BlockState state) {
-        return CompressedPotsAddon.levelOf(state);
+        return state != null && isPlant(state.getBlock(), state)
+            ? CompressedPotsAddon.levelOf(state) : 0;
     }
 
-    /** 持有物是否可种：作物/树苗标签、原版甘蔗、或任意压缩方块（id 带等级前缀）。 */
+    /** 持有物是否可种：仅允许白名单内的原版与压缩植物（作物/树苗/甘蔗）。严格排除存储材料与土壤。 */
     static BlockState plantStateOf(ItemStack stack) {
         if (stack.getItem() instanceof BlockItem bi) {
-            BlockState def = bi.getBlock().defaultBlockState();
-            if (def.is(BlockTags.CROPS) || def.is(BlockTags.SAPLINGS)
-                || bi.getBlock() instanceof net.minecraft.world.level.block.SugarCaneBlock
-                || CompressedPotsAddon.levelOf(def) > 0) {
+            Block block = bi.getBlock();
+            BlockState def = block.defaultBlockState();
+            if (isPlant(block, def)) {
                 return def;
             }
         }
