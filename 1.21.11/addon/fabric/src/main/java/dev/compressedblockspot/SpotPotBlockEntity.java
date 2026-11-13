@@ -5,19 +5,26 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.level.storage.loot.LootParams;
@@ -30,6 +37,7 @@ import net.minecraft.world.phys.Vec3;
  * 压缩盆栽方块实体：土壤/作物/进度独立实现；生长需求 = 600 tick /（1 + 等级差×5%）。
  * 收获：作物走方块自身命名空间战利品表（含时运）；树苗找同命名空间 "{wood}_log"×4-6
  * （无则木棍）；其余（甘蔗等）=2-4×自身，并补发一份作物本体。hopper 变体自动收割入下方容器。
+ * 服务端作为唯一权威，状态变更通过 sync() 即时发包同步到客户端。
  */
 public class SpotPotBlockEntity extends BlockEntity {
     /** 基础生长时长：30 秒（最慢档）。 */
@@ -88,7 +96,7 @@ public class SpotPotBlockEntity extends BlockEntity {
 
     public void setSoil(BlockState state) {
         this.soil = state;
-        setChanged();
+        sync();
     }
 
     public boolean setPlant(BlockState state, String itemName) {
@@ -98,7 +106,7 @@ public class SpotPotBlockEntity extends BlockEntity {
         this.plant = state;
         this.plantItem = itemName;
         this.growth = 0;
-        setChanged();
+        sync();
         return true;
     }
 
@@ -110,7 +118,7 @@ public class SpotPotBlockEntity extends BlockEntity {
         this.plant = null;
         this.plantItem = null;
         this.growth = 0;
-        setChanged();
+        sync();
         return stack;
     }
 
@@ -120,7 +128,7 @@ public class SpotPotBlockEntity extends BlockEntity {
         }
         ItemStack stack = new ItemStack(this.soil.getBlock());
         this.soil = null;
-        setChanged();
+        sync();
         return stack;
     }
 
@@ -140,7 +148,7 @@ public class SpotPotBlockEntity extends BlockEntity {
             out.add(drop);
         }
         this.growth = 0;
-        setChanged();
+        sync();
         return out;
     }
 
@@ -167,6 +175,13 @@ public class SpotPotBlockEntity extends BlockEntity {
         }
     }
 
+    /** 盆被替换/破坏（1.21.11 移除路径）：掉落土壤与作物。 */
+    @Override
+    public void preRemoveSideEffects(BlockPos pos, BlockState state) {
+        super.preRemoveSideEffects(pos, state);
+        dropContents();
+    }
+
     public static void serverTick(Level level, BlockPos pos, BlockState state, SpotPotBlockEntity be) {
         if (be.plant == null) {
             return;
@@ -186,7 +201,7 @@ public class SpotPotBlockEntity extends BlockEntity {
             } else if (level instanceof ServerLevel server) {
                 if (be.tryAutoHarvest(server)) {
                     be.growth = 0;
-                    be.setChanged();
+                    be.sync();
                 }
                 // 成功防抖；失败 1 秒重试（无容器/塞不下时静默等待，绝不吞作物）
                 be.harvestCooldown = 20;
@@ -198,12 +213,6 @@ public class SpotPotBlockEntity extends BlockEntity {
         if (be.plant != null && be.growth < be.requiredGrowth()) {
             be.growth++;
         }
-    }
-
-    /** 盆被替换/破坏（1.21.11 移除路径）：掉落土壤与作物。 */
-    @Override
-    public void preRemoveSideEffects(BlockPos pos, BlockState state) {
-        dropContents();
     }
 
     /** 漏斗盆栽自动收割（与主 mod 同款语义）：下方原版容器全塞得下才收割补种；
@@ -286,7 +295,7 @@ public class SpotPotBlockEntity extends BlockEntity {
             if (this.plant.getBlock() instanceof net.minecraft.world.level.block.CropBlock crop) {
                 lootState = crop.getStateForAge(crop.getMaxAge());
             }
-            ResourceKey<LootTable> key = ResourceKey.create(net.minecraft.core.registries.Registries.LOOT_TABLE,
+            ResourceKey<LootTable> key = ResourceKey.create(Registries.LOOT_TABLE,
                 blockId.withPrefix("blocks/"));
             LootParams params = new LootParams.Builder(server)
                 .withParameter(LootContextParams.ORIGIN, Vec3.atCenterOf(getBlockPos()))
@@ -304,9 +313,9 @@ public class SpotPotBlockEntity extends BlockEntity {
             var log = BuiltInRegistries.BLOCK.get(
                 Identifier.fromNamespaceAndPath(blockId.getNamespace(), wood + "_log"));
             int count = SAPLING_LOGS + random.nextInt(3);
-            out.add(log.filter(h -> h.value().asItem() != net.minecraft.world.item.Items.AIR)
+            out.add(log.filter(h -> h.value().asItem() != Items.AIR)
                 .map(h -> new ItemStack(h.value().asItem(), count))
-                .orElse(new ItemStack(net.minecraft.world.item.Items.STICK, count)));
+                .orElse(new ItemStack(Items.STICK, count)));
         } else {
             ItemStack cane = itemStack(this.plantItem);
             cane.setCount(CANE_MIN + random.nextInt(3));
@@ -365,6 +374,13 @@ public class SpotPotBlockEntity extends BlockEntity {
         return moved;
     }
 
+    private void sync() {
+        setChanged();
+        if (getLevel() instanceof ServerLevel server) {
+            server.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), 2);
+        }
+    }
+
     private static ItemStack itemStack(String id) {
         Identifier rl = id == null ? null : Identifier.tryParse(id);
         if (rl == null) {
@@ -400,6 +416,19 @@ public class SpotPotBlockEntity extends BlockEntity {
             this.plantItem = null;
             this.growth = 0;
         }
+    }
+
+    /** 全量同步盆内数据：覆写 getUpdatePacket，默认 null 永不同步。 */
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        TagValueOutput out = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, registries);
+        this.saveAdditional(out);
+        return out.buildResult();
     }
 
     private static BlockState blockState(String id) {
