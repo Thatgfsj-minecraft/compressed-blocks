@@ -10,13 +10,14 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.state.CameraRenderState;
 import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.SaplingBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * 压缩盆栽渲染：土壤 10×10×2 嵌口沿内腔（仅相机高于盆时绘制），作物 0.40→1.00 平滑缩放；
+ * 压缩盆栽渲染：土壤 10×10×2 嵌口沿内腔（仅相机高于盆或合理仰视时绘制），作物 0.40→1.00 平滑缩放；
  * 有 age 属性的方块按进度推进视觉年龄；带环境染色的模型（作物/甘蔗等）按原版 BlockColors
  * 取生物群系色（无染色的方块取回白色，保持本色）。
  */
@@ -40,13 +41,36 @@ public class SpotPotRenderer implements BlockEntityRenderer<SpotPotBlockEntity, 
         state.plant = be.plant();
         state.growth = be.growthFraction();
         state.grown = be.grown();
-        state.cameraAbove = cameraPos != null && cameraPos.y >= be.getBlockPos().getY();
+        state.cameraAbove = isSoilVisible(cameraPos, be.getBlockPos());
         // 原版环境染色（BlockColors）；无染色方块的取值为 -1（白）
         state.tint = -1;
         if (state.plant != null && be.getLevel() != null) {
             state.tint = Minecraft.getInstance().getBlockColors()
                 .getColor(state.plant, be.getLevel(), be.getBlockPos(), 0);
         }
+    }
+
+    /**
+     * 土壤可见性视角判定：
+     * 盆沿（y=4..6px）与腰身（y=1..4px）已将土壤模型（嵌在内腔 4..6px）四周与底部完整包裹，
+     * 平视或合理仰角下由外壁自然遮挡，深度测试保证完全不会产生穿模瑕疵。
+     * 原判定要求 cameraPos.y >= blockPos.getY() 过于严苛，将盆栽置于抽屉等高处方块上时，
+     * 玩家平视或仰视会导致泥土被暴力剔除而闪烁消失；
+     * 优化后：在相机高于盆底、处于合理视距（水平距离 >= 0.25 格）或相机在盆底下方 2 格内的仰角下均保持绘制，
+     * 仅在极近距离正下方垂直向上仰望时才做剔除。
+     */
+    private static boolean isSoilVisible(Vec3 cameraPos, BlockPos pos) {
+        if (cameraPos == null) {
+            return true;
+        }
+        double dy = cameraPos.y - pos.getY();
+        if (dy >= -0.1) {
+            return true;
+        }
+        double dx = cameraPos.x - (pos.getX() + 0.5);
+        double dz = cameraPos.z - (pos.getZ() + 0.5);
+        double horizDistSq = dx * dx + dz * dz;
+        return dy >= -2.0 || horizDistSq >= 0.25;
     }
 
     @Override
