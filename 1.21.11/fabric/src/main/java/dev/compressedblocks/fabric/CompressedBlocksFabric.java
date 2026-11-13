@@ -105,5 +105,7 @@ public class CompressedBlocksFabric implements ModInitializer {
         // 九重满套：取消一切伤害（含 /kill）
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) ->
             !(entity instanceof ServerPlayer player && CompressedHooks.rejectDamage(player)));
+        // FTB Ultimine（连锁破坏）收获适配
+        dev.compressedblocks.FtbUltimineCompat.init();
     }
 }

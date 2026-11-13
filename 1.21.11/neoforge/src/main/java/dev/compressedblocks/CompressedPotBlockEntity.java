@@ -152,16 +152,24 @@ public class CompressedPotBlockEntity extends BlockEntity {
         return stack;
     }
 
-    /** 收割并自动补种（作物保留在盆内、进度清零）；产物掉在盆边，时运用收割者手持物。 */
-    public void harvest(Player player) {
+    /** 收割并自动补种（作物保留在盆内、进度清零）；返回掉落物列表（用于 FTB Ultimine 等外部集成）。 */
+    public List<ItemStack> harvestDrops(Player player) {
         if (!(getLevel() instanceof ServerLevel server) || this.plant == null) {
-            return;
+            return java.util.Collections.emptyList();
         }
-        for (ItemStack drop : drops(server, player)) {
-            Block.popResource(server, getBlockPos(), drop);
-        }
+        List<ItemStack> result = drops(server, player);
         this.growth = 0;
         sync();
+        return result;
+    }
+
+    /** 收割并自动补种（作物保留在盆内、进度清零）；产物掉在盆边，时运用收割者手持物。 */
+    public void harvest(Player player) {
+        if (getLevel() instanceof ServerLevel server) {
+            for (ItemStack drop : harvestDrops(player)) {
+                Block.popResource(server, getBlockPos(), drop);
+            }
+        }
     }
 
     /** 盆被破坏：补发盆内土壤与作物（盆本体走战利品表）。 */

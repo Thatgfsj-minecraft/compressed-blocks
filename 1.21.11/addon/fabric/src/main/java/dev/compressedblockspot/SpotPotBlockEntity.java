@@ -124,11 +124,12 @@ public class SpotPotBlockEntity extends BlockEntity {
         return stack;
     }
 
-    /** 收割并自动补种。 */
-    public void harvest(Player player) {
+    /** 收割并自动补种，返回产物列表（用于 FTB Ultimine 等外部集成）。 */
+    public List<ItemStack> harvestDrops(Player player) {
         if (!(getLevel() instanceof ServerLevel server) || this.plant == null) {
-            return;
+            return java.util.Collections.emptyList();
         }
+        List<ItemStack> out = new ArrayList<>();
         for (ItemStack drop : drops(server, player)) {
             if (isHopperPot() && !drop.isEmpty()) {
                 int before = drop.getCount();
@@ -136,10 +137,20 @@ public class SpotPotBlockEntity extends BlockEntity {
                     continue;
                 }
             }
-            Block.popResource(server, getBlockPos(), drop);
+            out.add(drop);
         }
         this.growth = 0;
         setChanged();
+        return out;
+    }
+
+    /** 收割并自动补种。 */
+    public void harvest(Player player) {
+        if (getLevel() instanceof ServerLevel server) {
+            for (ItemStack drop : harvestDrops(player)) {
+                Block.popResource(server, getBlockPos(), drop);
+            }
+        }
     }
 
     /** 盆被破坏：补发土壤与作物。 */

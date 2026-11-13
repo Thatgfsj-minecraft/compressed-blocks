@@ -30,6 +30,8 @@ public class CompressedBlocksNeoForge {
         NeoForge.EVENT_BUS.addListener(this::onServerStarted);
         NeoForge.EVENT_BUS.addListener(this::onPlayerTick);
         NeoForge.EVENT_BUS.addListener(this::onIncomingDamage);
+        // FTB Ultimine（连锁破坏）收获适配
+        dev.compressedblocks.FtbUltimineCompat.init();
     }
 
     private void onRegister(RegisterEvent event) {
