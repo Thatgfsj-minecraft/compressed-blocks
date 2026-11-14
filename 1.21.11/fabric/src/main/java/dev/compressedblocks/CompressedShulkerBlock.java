@@ -94,6 +94,12 @@ public class CompressedShulkerBlock extends Block implements EntityBlock {
     }
 
     @Override
+    protected MenuProvider getMenuProvider(BlockState state, Level level, BlockPos pos) {
+        BlockEntity be = level.getBlockEntity(pos);
+        return be instanceof MenuProvider menu ? menu : null;
+    }
+
+    @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
                                                Player player, BlockHitResult hit) {
         if (level.getBlockEntity(pos) instanceof MenuProvider menu) {
