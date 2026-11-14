@@ -67,9 +67,9 @@ for target in TARGET_DIRS:
         t_item.save(os.path.join(tex_item_dir, f"{name}.png"))
 
         # 2. 模型
-        # 方块向下模型
+        # 方块向下模型（指向模组自包含模板）
         dump_json(os.path.join(assets_dir, "models", "block", f"{name}.json"), {
-            "parent": "minecraft:block/hopper",
+            "parent": "compressedblocks:block/template_hopper",
             "textures": {
                 "particle": f"compressedblocks:block/{name}_outside",
                 "top": f"compressedblocks:block/{name}_top",
@@ -77,9 +77,9 @@ for target in TARGET_DIRS:
                 "inside": f"compressedblocks:block/{name}_inside"
             }
         })
-        # 方块侧向模型
+        # 方块侧向模型（指向模组自包含模板）
         dump_json(os.path.join(assets_dir, "models", "block", f"{name}_side.json"), {
-            "parent": "minecraft:block/hopper_side",
+            "parent": "compressedblocks:block/template_hopper_side",
             "textures": {
                 "particle": f"compressedblocks:block/{name}_outside",
                 "top": f"compressedblocks:block/{name}_top",

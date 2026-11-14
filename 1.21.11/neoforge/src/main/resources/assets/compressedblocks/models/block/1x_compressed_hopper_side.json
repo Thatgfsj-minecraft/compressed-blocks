@@ -1,5 +1,5 @@
 {
-  "parent": "minecraft:block/hopper_side",
+  "parent": "compressedblocks:block/template_hopper_side",
   "textures": {
     "particle": "compressedblocks:block/1x_compressed_hopper_outside",
     "top": "compressedblocks:block/1x_compressed_hopper_top",

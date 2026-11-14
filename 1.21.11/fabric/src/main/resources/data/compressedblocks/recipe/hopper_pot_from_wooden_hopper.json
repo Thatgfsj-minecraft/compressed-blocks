@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "building",
+  "ingredients": [
+    "compressedblocks:pot",
+    "compressedblocks:wooden_hopper"
+  ],
+  "result": {
+    "count": 1,
+    "id": "compressedblocks:hopper_pot"
+  }
+}
