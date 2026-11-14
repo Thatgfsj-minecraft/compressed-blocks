@@ -332,6 +332,11 @@ public final class CompressedBlocks {
     public static final List<Block> HOPPER_BLOCKS = new ArrayList<>();
     public static BlockEntityType<?>[] HOPPER_TYPE;
 
+    /** 木质漏斗（4 个等级：0=基础木漏斗，1~3=一至三重压缩木漏斗）与方块实体类型。 */
+    public static final int WOODEN_HOPPER_TIERS = 4;
+    public static final List<Block> WOODEN_HOPPER_BLOCKS = new ArrayList<>();
+    public static BlockEntityType<?>[] WOODEN_HOPPER_TYPE;
+
     /** 大容量容器插入钩子（加载器入口注入：Fabric=Transfer API、NeoForge=IItemHandler），
      *  兼容储物抽屉等不按原版 Container 64 上限计算的 mod。 */
     public interface ItemSink {
@@ -840,6 +845,25 @@ public final class CompressedBlocks {
             ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
             HOPPER_BLOCKS.add(block);
         }
+        // 5h. 木质漏斗体系（4 个等级）：基础木漏斗（速度为原版一半），以及一至三重压缩木漏斗（速度对应压缩铁漏斗的一半）
+        for (int tier = 0; tier < WOODEN_HOPPER_TIERS; tier++) {
+            String name = tier == 0 ? "wooden_hopper" : LEVEL_PREFIX[tier - 1] + "_compressed_wooden_hopper";
+            float blast = tier == 0 ? 3.0F : STORAGE_BLAST;
+            WoodenHopperBlock block = new WoodenHopperBlock(tier,
+                BlockBehaviour.Properties.of()
+                    .setId(ResourceKey.create(Registries.BLOCK, id(name)))
+                    .mapColor(MapColor.WOOD)
+                    .strength(2.0F, blast)
+                    .sound(SoundType.WOOD)
+                    .noOcclusion());
+            BlockItem item = new BlockItem(block,
+                new Item.Properties()
+                    .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                    .useBlockDescriptionPrefix());
+            BLOCKS.add(new BlockReg(name, block, name));
+            ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
+            WOODEN_HOPPER_BLOCKS.add(block);
+        }
         // 5e. 压缩箱子/压缩潜影盒（单一等级）：243 格滚动存储，压缩工具栏；
         // 箱子破坏洒出内容，潜影盒破坏内容随物品保留；不能拼大箱子（右键各开各的菜单）
         COMPRESSED_CHEST = new CompressedChestBlock(BlockBehaviour.Properties.of()
@@ -1137,17 +1161,20 @@ public final class CompressedBlocks {
         if (itemCount != expectItems) {
             errors.add("item count " + itemCount + " != " + expectItems);
         }
-        if (BLOCKS.size() != 1322) {
-            errors.add("block registry size " + BLOCKS.size() + " != 1322");
+        if (BLOCKS.size() != 1326) {
+            errors.add("block registry size " + BLOCKS.size() + " != 1326");
         }
-        if (expectItems != 1556) {
-            errors.add("item registry size " + expectItems + " != 1556");
+        if (expectItems != 1560) {
+            errors.add("item registry size " + expectItems + " != 1560");
         }
         if (FURNACE_BLOCKS.size() != FURNACE_TIERS) {
             errors.add("furnace blocks count " + FURNACE_BLOCKS.size() + " != " + FURNACE_TIERS);
         }
         if (HOPPER_BLOCKS.size() != HOPPER_TIERS) {
             errors.add("hopper blocks count " + HOPPER_BLOCKS.size() + " != " + HOPPER_TIERS);
+        }
+        if (WOODEN_HOPPER_BLOCKS.size() != WOODEN_HOPPER_TIERS) {
+            errors.add("wooden hopper blocks count " + WOODEN_HOPPER_BLOCKS.size() + " != " + WOODEN_HOPPER_TIERS);
         }
         // 方块：注册、翻译键、物品映射
         for (BlockReg b : BLOCKS) {

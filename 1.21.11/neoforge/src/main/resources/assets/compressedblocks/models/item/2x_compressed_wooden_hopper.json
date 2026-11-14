@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "compressedblocks:item/2x_compressed_wooden_hopper"
+  }
+}

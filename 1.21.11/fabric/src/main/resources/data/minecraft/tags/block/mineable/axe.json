@@ -1,1 +1,12 @@
-{"replace":false,"values":["compressedblocks:compressed_chest","compressedblocks:hopper_pot","compressedblocks:pot"]}
+{
+  "replace": false,
+  "values": [
+    "compressedblocks:1x_compressed_wooden_hopper",
+    "compressedblocks:2x_compressed_wooden_hopper",
+    "compressedblocks:3x_compressed_wooden_hopper",
+    "compressedblocks:compressed_chest",
+    "compressedblocks:hopper_pot",
+    "compressedblocks:pot",
+    "compressedblocks:wooden_hopper"
+  ]
+}

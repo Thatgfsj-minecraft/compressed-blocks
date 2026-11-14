@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/hopper",
+  "textures": {
+    "particle": "compressedblocks:block/2x_compressed_wooden_hopper_outside",
+    "top": "compressedblocks:block/2x_compressed_wooden_hopper_top",
+    "side": "compressedblocks:block/2x_compressed_wooden_hopper_outside",
+    "inside": "compressedblocks:block/2x_compressed_wooden_hopper_inside"
+  }
+}

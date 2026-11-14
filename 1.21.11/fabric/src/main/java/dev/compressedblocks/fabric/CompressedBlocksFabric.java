@@ -106,6 +106,21 @@ public class CompressedBlocksFabric implements ModInitializer {
             ItemStorage.SIDED.registerForBlockEntity(
                 (be, side) -> InventoryStorage.of((net.minecraft.world.Container) be, side), CompressedBlocks.HOPPER_TYPE[i]);
         }
+        // 木质漏斗方块实体类型（4 个等级）
+        CompressedBlocks.WOODEN_HOPPER_TYPE = new net.minecraft.world.level.block.entity.BlockEntityType[CompressedBlocks.WOODEN_HOPPER_TIERS];
+        for (int i = 0; i < CompressedBlocks.WOODEN_HOPPER_TIERS; i++) {
+            int tier = i;
+            String name = tier == 0 ? "wooden_hopper" : CompressedBlocks.LEVEL_PREFIX[tier - 1] + "_compressed_wooden_hopper";
+            Block block = CompressedBlocks.WOODEN_HOPPER_BLOCKS.get(i);
+            Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE,
+                CompressedBlocks.id(name),
+                CompressedBlocks.WOODEN_HOPPER_TYPE[i] = FabricBlockEntityTypeBuilder
+                    .<dev.compressedblocks.WoodenHopperBlockEntity>create(
+                        (pos, state) -> new dev.compressedblocks.WoodenHopperBlockEntity(pos, state, tier), block)
+                    .build());
+            ItemStorage.SIDED.registerForBlockEntity(
+                (be, side) -> InventoryStorage.of((net.minecraft.world.Container) be, side), CompressedBlocks.WOODEN_HOPPER_TYPE[i]);
+        }
         // 大容量容器插入钩子：Fabric Transfer API（储物抽屉等现代 mod 的标准接口）
         CompressedBlocks.ITEM_SINK = new CompressedBlocks.ItemSink() {
             @Override
