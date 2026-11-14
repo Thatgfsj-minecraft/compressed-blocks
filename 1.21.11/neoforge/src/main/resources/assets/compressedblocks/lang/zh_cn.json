@@ -1586,5 +1586,13 @@
   "block.compressedblocks.2x_compressed_hopper": "二重压缩漏斗",
   "container.compressedblocks.2x_compressed_hopper": "二重压缩漏斗",
   "block.compressedblocks.3x_compressed_hopper": "三重压缩漏斗",
-  "container.compressedblocks.3x_compressed_hopper": "三重压缩漏斗"
+  "container.compressedblocks.3x_compressed_hopper": "三重压缩漏斗",
+  "block.compressedblocks.wooden_hopper": "木质漏斗",
+  "container.compressedblocks.wooden_hopper": "木质漏斗",
+  "block.compressedblocks.1x_compressed_wooden_hopper": "一重压缩木质漏斗",
+  "container.compressedblocks.1x_compressed_wooden_hopper": "一重压缩木质漏斗",
+  "block.compressedblocks.2x_compressed_wooden_hopper": "二重压缩木质漏斗",
+  "container.compressedblocks.2x_compressed_wooden_hopper": "二重压缩木质漏斗",
+  "block.compressedblocks.3x_compressed_wooden_hopper": "三重压缩木质漏斗",
+  "container.compressedblocks.3x_compressed_wooden_hopper": "三重压缩木质漏斗"
 }

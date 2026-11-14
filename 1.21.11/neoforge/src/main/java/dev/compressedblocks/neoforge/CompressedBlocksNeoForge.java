@@ -117,6 +117,15 @@ public class CompressedBlocksNeoForge {
                     helper.register(CompressedBlocks.id(CompressedBlocks.LEVEL_PREFIX[i] + "_compressed_hopper"),
                         CompressedBlocks.HOPPER_TYPE[i]);
                 }
+                CompressedBlocks.WOODEN_HOPPER_TYPE = new BlockEntityType[CompressedBlocks.WOODEN_HOPPER_TIERS];
+                for (int i = 0; i < CompressedBlocks.WOODEN_HOPPER_TIERS; i++) {
+                    int tier = i;
+                    String name = tier == 0 ? "wooden_hopper" : CompressedBlocks.LEVEL_PREFIX[tier - 1] + "_compressed_wooden_hopper";
+                    Block block = CompressedBlocks.WOODEN_HOPPER_BLOCKS.get(i);
+                    CompressedBlocks.WOODEN_HOPPER_TYPE[i] = new BlockEntityType<>(
+                        (pos, state) -> new dev.compressedblocks.WoodenHopperBlockEntity(pos, state, tier), block);
+                    helper.register(CompressedBlocks.id(name), CompressedBlocks.WOODEN_HOPPER_TYPE[i]);
+                }
                 CompressedBlocks.CHEST_TYPE = new BlockEntityType<dev.compressedblocks.ScrollingContainerBlockEntity>(
                     (pos, state) -> new dev.compressedblocks.ScrollingContainerBlockEntity(
                         CompressedBlocks.CHEST_TYPE, pos, state, false),
@@ -184,6 +193,16 @@ public class CompressedBlocksNeoForge {
         }
         if (CompressedBlocks.HOPPER_TYPE != null) {
             for (net.minecraft.world.level.block.entity.BlockEntityType<?> type : CompressedBlocks.HOPPER_TYPE) {
+                if (type != null) {
+                    event.registerBlockEntity(
+                        net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+                        type,
+                        (be, side) -> net.neoforged.neoforge.transfer.item.VanillaContainerWrapper.of((net.minecraft.world.Container) be));
+                }
+            }
+        }
+        if (CompressedBlocks.WOODEN_HOPPER_TYPE != null) {
+            for (net.minecraft.world.level.block.entity.BlockEntityType<?> type : CompressedBlocks.WOODEN_HOPPER_TYPE) {
                 if (type != null) {
                     event.registerBlockEntity(
                         net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,

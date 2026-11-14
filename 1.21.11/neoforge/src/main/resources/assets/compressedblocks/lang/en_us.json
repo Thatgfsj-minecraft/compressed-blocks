@@ -1586,5 +1586,13 @@
   "block.compressedblocks.2x_compressed_hopper": "Double Compressed Hopper",
   "container.compressedblocks.2x_compressed_hopper": "Double Compressed Hopper",
   "block.compressedblocks.3x_compressed_hopper": "Triple Compressed Hopper",
-  "container.compressedblocks.3x_compressed_hopper": "Triple Compressed Hopper"
+  "container.compressedblocks.3x_compressed_hopper": "Triple Compressed Hopper",
+  "block.compressedblocks.wooden_hopper": "Wooden Hopper",
+  "container.compressedblocks.wooden_hopper": "Wooden Hopper",
+  "block.compressedblocks.1x_compressed_wooden_hopper": "Compressed Wooden Hopper",
+  "container.compressedblocks.1x_compressed_wooden_hopper": "Compressed Wooden Hopper",
+  "block.compressedblocks.2x_compressed_wooden_hopper": "Double Compressed Wooden Hopper",
+  "container.compressedblocks.2x_compressed_wooden_hopper": "Double Compressed Wooden Hopper",
+  "block.compressedblocks.3x_compressed_wooden_hopper": "Triple Compressed Wooden Hopper",
+  "container.compressedblocks.3x_compressed_wooden_hopper": "Triple Compressed Wooden Hopper"
 }
