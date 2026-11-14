@@ -129,14 +129,12 @@ for target in TARGET_DIRS:
 
     # 5. 配方
     recipe_dir = os.path.join(data_dir, "compressedblocks", "recipe")
-    # 1 重压缩漏斗：9 个原木直接合成
+    # 1 重压缩漏斗：9 个原版漏斗合成
     dump_json(os.path.join(recipe_dir, "1x_compressed_hopper.json"), {
         "type": "minecraft:crafting_shaped",
         "category": "redstone",
         "key": {
-            "#": {
-                "tag": "minecraft:logs"
-            }
+            "#": "minecraft:hopper"
         },
         "pattern": [
             "###",
@@ -146,6 +144,17 @@ for target in TARGET_DIRS:
         "result": {
             "count": 1,
             "id": "compressedblocks:1x_compressed_hopper"
+        }
+    })
+    dump_json(os.path.join(recipe_dir, "unpack_1x_compressed_hopper.json"), {
+        "type": "minecraft:crafting_shapeless",
+        "category": "redstone",
+        "ingredients": [
+            "compressedblocks:1x_compressed_hopper"
+        ],
+        "result": {
+            "count": 9,
+            "id": "minecraft:hopper"
         }
     })
     # 2 重压缩漏斗
