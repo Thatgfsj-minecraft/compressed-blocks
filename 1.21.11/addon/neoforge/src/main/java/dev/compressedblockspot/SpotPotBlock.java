@@ -124,19 +124,28 @@ public class SpotPotBlock extends Block implements EntityBlock {
         return isCrop(block, state) || isSapling(block, state) || isCane(block, state);
     }
 
-    /** 土壤等级：无机压缩介质解析 id 前缀；原版泥土系/沙子系 = 1；植物/非法介质 = 0。 */
-    static int soilLevelOf(BlockState state) {
+    /** 判断是否为合法土壤介质：压缩土壤、原版泥土系/沙子系/下界系。严格排除植物。 */
+    static boolean isSoil(BlockState state) {
         if (state == null || isPlant(state.getBlock(), state)) {
-            return 0;
+            return false;
         }
-        int level = CompressedPotsAddon.levelOf(state);
-        if (level > 0) {
-            return level;
+        if (CompressedPotsAddon.levelOf(state) > 0) {
+            return true;
         }
-        return state.is(BlockTags.DIRT) || state.is(BlockTags.SAND) ? 1 : 0;
+        return state.is(BlockTags.DIRT) || state.is(BlockTags.SAND)
+            || state.is(net.minecraft.world.level.block.Blocks.NETHERRACK)
+            || state.is(net.minecraft.world.level.block.Blocks.SOUL_SAND);
     }
 
-    /** 植物等级：压缩植物解析前缀；原版/普通 mod 植物 = 0。非植物 = 0。 */
+    /** 土壤压缩等级：压缩介质按前缀返回 1~9 重；原版未压缩泥土系/沙子系/下界系 = 0 重；非土壤/植物 = 0。 */
+    static int soilLevelOf(BlockState state) {
+        if (!isSoil(state)) {
+            return 0;
+        }
+        return CompressedPotsAddon.levelOf(state);
+    }
+
+    /** 植物等级：压缩植物解析前缀（1~9 重）；原版/普通 mod 植物 = 0 重。非植物 = 0。 */
     static int plantLevel(BlockState state) {
         return state != null && isPlant(state.getBlock(), state)
             ? CompressedPotsAddon.levelOf(state) : 0;
@@ -179,7 +188,7 @@ public class SpotPotBlock extends Block implements EntityBlock {
             return InteractionResult.CONSUME;
         }
         if (pot.soil() == null) {
-            if (stack.getItem() instanceof BlockItem bi && soilLevelOf(bi.getBlock().defaultBlockState()) > 0) {
+            if (stack.getItem() instanceof BlockItem bi && isSoil(bi.getBlock().defaultBlockState())) {
                 if (level.isClientSide()) {
                     return InteractionResult.SUCCESS;
                 }
