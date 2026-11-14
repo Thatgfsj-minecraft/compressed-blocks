@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    "compressedblocks:2x_compressed_hopper"
+  ],
+  "result": {
+    "count": 9,
+    "id": "compressedblocks:1x_compressed_hopper"
+  }
+}

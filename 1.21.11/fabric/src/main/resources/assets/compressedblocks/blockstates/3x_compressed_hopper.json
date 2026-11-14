@@ -1,0 +1,22 @@
+{
+  "variants": {
+    "facing=down": {
+      "model": "compressedblocks:block/3x_compressed_hopper"
+    },
+    "facing=east": {
+      "model": "compressedblocks:block/3x_compressed_hopper_side",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "compressedblocks:block/3x_compressed_hopper_side"
+    },
+    "facing=south": {
+      "model": "compressedblocks:block/3x_compressed_hopper_side",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "compressedblocks:block/3x_compressed_hopper_side",
+      "y": 270
+    }
+  }
+}
