@@ -74,7 +74,7 @@ public final class CompressedBlocks {
     public static final int CROP_MAX_LEVEL = 3;
     public static final int FOOD_MAX_LEVEL = 3;
 
-    private static final String[] LEVEL_PREFIX = {
+    public static final String[] LEVEL_PREFIX = {
         "1x", "2x", "3x", "4x", "5x", "6x", "7x", "8x", "9x"
     };
     private static final String[] LEVEL_EN_PREFIX = {
@@ -321,6 +321,11 @@ public final class CompressedBlocks {
 
     /** 刷石机（3 压缩等级）与共享方块实体类型（类型由加载器入口构建注入）。 */
     public static BlockEntityType<CobblestoneGeneratorBlockEntity> GENERATOR_TYPE;
+
+    /** 压缩熔炉（4 压缩等级）与各等级方块实体类型（类型由加载器入口构建注入）。 */
+    public static final int FURNACE_TIERS = 4;
+    public static final List<Block> FURNACE_BLOCKS = new ArrayList<>();
+    public static BlockEntityType<?>[] FURNACE_TYPE;
 
     /** 大容量容器插入钩子（加载器入口注入：Fabric=Transfer API、NeoForge=IItemHandler），
      *  兼容储物抽屉等不按原版 Container 64 上限计算的 mod。 */
@@ -792,6 +797,25 @@ public final class CompressedBlocks {
             ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
             GENERATOR_BLOCKS.add(block);
         }
+        // 5f. 压缩熔炉（4 个压缩等级）：3x/9x/27x/81x 速度与阶梯权限
+        for (int tier = 1; tier <= FURNACE_TIERS; tier++) {
+            String name = LEVEL_PREFIX[tier - 1] + "_compressed_furnace";
+            CompressedFurnaceBlock block = new CompressedFurnaceBlock(tier,
+                BlockBehaviour.Properties.of()
+                    .setId(ResourceKey.create(Registries.BLOCK, id(name)))
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(3.5F, STORAGE_BLAST)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.STONE)
+                    .lightLevel(state -> state.getValue(net.minecraft.world.level.block.AbstractFurnaceBlock.LIT) ? 13 : 0));
+            BlockItem item = new BlockItem(block,
+                new Item.Properties()
+                    .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                    .useBlockDescriptionPrefix());
+            BLOCKS.add(new BlockReg(name, block, name));
+            ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
+            FURNACE_BLOCKS.add(block);
+        }
         // 5e. 压缩箱子/压缩潜影盒（单一等级）：243 格滚动存储，压缩工具栏；
         // 箱子破坏洒出内容，潜影盒破坏内容随物品保留；不能拼大箱子（右键各开各的菜单）
         COMPRESSED_CHEST = new CompressedChestBlock(BlockBehaviour.Properties.of()
@@ -1089,11 +1113,14 @@ public final class CompressedBlocks {
         if (itemCount != expectItems) {
             errors.add("item count " + itemCount + " != " + expectItems);
         }
-        if (BLOCKS.size() != 1315) {
-            errors.add("block registry size " + BLOCKS.size() + " != 1315");
+        if (BLOCKS.size() != 1319) {
+            errors.add("block registry size " + BLOCKS.size() + " != 1319");
         }
-        if (expectItems != 1549) {
-            errors.add("item registry size " + expectItems + " != 1549");
+        if (expectItems != 1553) {
+            errors.add("item registry size " + expectItems + " != 1553");
+        }
+        if (FURNACE_BLOCKS.size() != FURNACE_TIERS) {
+            errors.add("furnace blocks count " + FURNACE_BLOCKS.size() + " != " + FURNACE_TIERS);
         }
         // 方块：注册、翻译键、物品映射
         for (BlockReg b : BLOCKS) {

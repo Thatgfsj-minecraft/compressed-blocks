@@ -54,6 +54,18 @@ public class CompressedBlocksFabric implements ModInitializer {
                 .create(CobblestoneGeneratorBlockEntity::new,
                     CompressedBlocks.GENERATOR_BLOCKS.toArray(new Block[0]))
                 .build());
+        // 压缩熔炉方块实体类型（4 压缩等级）
+        CompressedBlocks.FURNACE_TYPE = new net.minecraft.world.level.block.entity.BlockEntityType[CompressedBlocks.FURNACE_TIERS];
+        for (int i = 0; i < CompressedBlocks.FURNACE_TIERS; i++) {
+            int tier = i + 1;
+            Block block = CompressedBlocks.FURNACE_BLOCKS.get(i);
+            Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE,
+                CompressedBlocks.id(CompressedBlocks.LEVEL_PREFIX[i] + "_compressed_furnace"),
+                CompressedBlocks.FURNACE_TYPE[i] = FabricBlockEntityTypeBuilder
+                    .<dev.compressedblocks.CompressedFurnaceBlockEntity>create(
+                        (pos, state) -> new dev.compressedblocks.CompressedFurnaceBlockEntity(pos, state, tier), block)
+                    .build());
+        }
         // 压缩箱子/压缩潜影盒：方块实体类型 + 滚动容器菜单类型
         Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, CompressedBlocks.id("compressed_chest"),
             CompressedBlocks.CHEST_TYPE = FabricBlockEntityTypeBuilder
@@ -76,6 +88,10 @@ public class CompressedBlocksFabric implements ModInitializer {
             (be, side) -> InventoryStorage.of(be, side), CompressedBlocks.CHEST_TYPE);
         ItemStorage.SIDED.registerForBlockEntity(
             (be, side) -> InventoryStorage.of(be, side), CompressedBlocks.SHULKER_TYPE);
+        for (int i = 0; i < CompressedBlocks.FURNACE_TIERS; i++) {
+            ItemStorage.SIDED.registerForBlockEntity(
+                (be, side) -> InventoryStorage.of((net.minecraft.world.Container) be, side), CompressedBlocks.FURNACE_TYPE[i]);
+        }
         // 大容量容器插入钩子：Fabric Transfer API（储物抽屉等现代 mod 的标准接口）
         CompressedBlocks.ITEM_SINK = new CompressedBlocks.ItemSink() {
             @Override
