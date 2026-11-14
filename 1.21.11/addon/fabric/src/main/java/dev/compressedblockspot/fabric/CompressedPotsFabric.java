@@ -53,5 +53,7 @@ public class CompressedPotsFabric implements ModInitializer {
         for (Block ignored : CompressedPotsAddon.BLOCKS) {
             // 已在 init 注册
         }
+        // FTB Ultimine（连锁破坏）收获适配
+        dev.compressedblockspot.FtbUltimineCompat.init();
     }
 }

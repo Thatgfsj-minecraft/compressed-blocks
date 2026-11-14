@@ -27,9 +27,12 @@ public class CompressedBlocksNeoForge {
         // 注意：不能在构造期触达 CompressedBlocks——new Block() 会写注册表的侵入式 holder，
         // 而 21.11 构造期注册表已冻结；核心类首次加载必须发生在 RegisterEvent（注册期）内。
         modEventBus.addListener(this::onRegister);
+        modEventBus.addListener(this::registerCapabilities);
         NeoForge.EVENT_BUS.addListener(this::onServerStarted);
         NeoForge.EVENT_BUS.addListener(this::onPlayerTick);
         NeoForge.EVENT_BUS.addListener(this::onIncomingDamage);
+        // FTB Ultimine（连锁破坏）收获适配
+        dev.compressedblocks.FtbUltimineCompat.init();
     }
 
     private void onRegister(RegisterEvent event) {
@@ -139,5 +142,16 @@ public class CompressedBlocksNeoForge {
         if (event.getEntity() instanceof Player player && CompressedHooks.rejectDamage(player)) {
             event.setCanceled(true);
         }
+    }
+
+    private void registerCapabilities(net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent event) {
+        event.registerBlockEntity(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            CompressedBlocks.CHEST_TYPE,
+            (be, side) -> net.neoforged.neoforge.transfer.item.VanillaContainerWrapper.of(be));
+        event.registerBlockEntity(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            CompressedBlocks.SHULKER_TYPE,
+            (be, side) -> net.neoforged.neoforge.transfer.item.VanillaContainerWrapper.of(be));
     }
 }

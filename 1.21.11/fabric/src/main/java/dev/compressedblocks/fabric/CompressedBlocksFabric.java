@@ -10,6 +10,7 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
+import net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.fabricmc.fabric.api.transfer.v1.storage.Storage;
@@ -70,6 +71,11 @@ public class CompressedBlocksFabric implements ModInitializer {
             CompressedBlocks.CHEST_MENU_TYPE);
         Registry.register(BuiltInRegistries.MENU, CompressedBlocks.id("compressed_shulker_box"),
             CompressedBlocks.SHULKER_MENU_TYPE);
+        // 挂载 Fabric Transfer API：使抽屉、管道、漏斗盆栽等自动化设施原生支持存取
+        ItemStorage.SIDED.registerForBlockEntity(
+            (be, side) -> InventoryStorage.of(be, side), CompressedBlocks.CHEST_TYPE);
+        ItemStorage.SIDED.registerForBlockEntity(
+            (be, side) -> InventoryStorage.of(be, side), CompressedBlocks.SHULKER_TYPE);
         // 大容量容器插入钩子：Fabric Transfer API（储物抽屉等现代 mod 的标准接口）
         CompressedBlocks.ITEM_SINK = new CompressedBlocks.ItemSink() {
             @Override
@@ -105,5 +111,7 @@ public class CompressedBlocksFabric implements ModInitializer {
         // 九重满套：取消一切伤害（含 /kill）
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) ->
             !(entity instanceof ServerPlayer player && CompressedHooks.rejectDamage(player)));
+        // FTB Ultimine（连锁破坏）收获适配
+        dev.compressedblocks.FtbUltimineCompat.init();
     }
 }

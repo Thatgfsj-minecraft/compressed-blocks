@@ -2,9 +2,12 @@ package dev.compressedblocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -81,6 +84,24 @@ public class CompressedChestBlock extends Block implements EntityBlock {
     protected boolean triggerEvent(BlockState state, Level level, BlockPos pos, int type, int data) {
         BlockEntity be = level.getBlockEntity(pos);
         return be != null && be.triggerEvent(type, data);
+    }
+
+    @Override
+    protected MenuProvider getMenuProvider(BlockState state, Level level, BlockPos pos) {
+        BlockEntity be = level.getBlockEntity(pos);
+        return be instanceof MenuProvider menu ? menu : null;
+    }
+
+    /** 创造模式破坏保护：若箱内有物品，掉落带内容的箱子物品，避免创造模式误击导致 243 格内容永久丢失。 */
+    @Override
+    public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
+        if (!level.isClientSide() && player.isCreative()
+            && level.getBlockEntity(pos) instanceof ScrollingContainerBlockEntity be && !be.isEmpty()) {
+            ItemStack chest = new ItemStack(CompressedBlocks.itemByName("compressed_chest"));
+            chest.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(be.allItems()));
+            Block.popResource(level, pos, chest);
+        }
+        return super.playerWillDestroy(level, pos, state, player);
     }
 
     @Override

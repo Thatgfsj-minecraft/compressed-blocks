@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "compressedblocks:pot",
+    "compressedblocks:hopper_pot"
+  ]
+}

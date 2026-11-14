@@ -3,12 +3,18 @@ package dev.compressedblockspot;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
@@ -18,6 +24,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.level.storage.loot.LootParams;
@@ -29,7 +36,9 @@ import net.minecraft.world.phys.Vec3;
 /**
  * 压缩盆栽方块实体：土壤/作物/进度独立实现；生长需求 = 600 tick /（1 + 等级差×5%）。
  * 收获：作物走方块自身命名空间战利品表（含时运）；树苗找同命名空间 "{wood}_log"×4-6
- * （无则木棍）；其余（甘蔗等）=2-4×自身，并补发一份作物本体。hopper 变体自动收割入下方容器。
+ * （无则木棍）；甘蔗产出 2-4×自身并补发 1 份本体；异常植物兜底只掉落 1 份本体杜绝刷物。
+ * hopper 变体自动收割入下方容器。
+ * 服务端作为唯一权威，状态变更通过 sync() 即时发包同步到客户端。
  */
 public class SpotPotBlockEntity extends BlockEntity {
     /** 基础生长时长：30 秒（最慢档）。 */
@@ -88,7 +97,7 @@ public class SpotPotBlockEntity extends BlockEntity {
 
     public void setSoil(BlockState state) {
         this.soil = state;
-        setChanged();
+        sync();
     }
 
     public boolean setPlant(BlockState state, String itemName) {
@@ -98,7 +107,7 @@ public class SpotPotBlockEntity extends BlockEntity {
         this.plant = state;
         this.plantItem = itemName;
         this.growth = 0;
-        setChanged();
+        sync();
         return true;
     }
 
@@ -110,7 +119,7 @@ public class SpotPotBlockEntity extends BlockEntity {
         this.plant = null;
         this.plantItem = null;
         this.growth = 0;
-        setChanged();
+        sync();
         return stack;
     }
 
@@ -120,15 +129,16 @@ public class SpotPotBlockEntity extends BlockEntity {
         }
         ItemStack stack = new ItemStack(this.soil.getBlock());
         this.soil = null;
-        setChanged();
+        sync();
         return stack;
     }
 
-    /** 收割并自动补种。 */
-    public void harvest(Player player) {
+    /** 收割并自动补种，返回产物列表（用于 FTB Ultimine 等外部集成）。 */
+    public List<ItemStack> harvestDrops(Player player) {
         if (!(getLevel() instanceof ServerLevel server) || this.plant == null) {
-            return;
+            return java.util.Collections.emptyList();
         }
+        List<ItemStack> out = new ArrayList<>();
         for (ItemStack drop : drops(server, player)) {
             if (isHopperPot() && !drop.isEmpty()) {
                 int before = drop.getCount();
@@ -136,10 +146,20 @@ public class SpotPotBlockEntity extends BlockEntity {
                     continue;
                 }
             }
-            Block.popResource(server, getBlockPos(), drop);
+            out.add(drop);
         }
         this.growth = 0;
-        setChanged();
+        sync();
+        return out;
+    }
+
+    /** 收割并自动补种。 */
+    public void harvest(Player player) {
+        if (getLevel() instanceof ServerLevel server) {
+            for (ItemStack drop : harvestDrops(player)) {
+                Block.popResource(server, getBlockPos(), drop);
+            }
+        }
     }
 
     /** 盆被破坏：补发土壤与作物。 */
@@ -159,6 +179,7 @@ public class SpotPotBlockEntity extends BlockEntity {
     /** 盆被替换/破坏（1.21.11 移除路径）：掉落土壤与作物。 */
     @Override
     public void preRemoveSideEffects(BlockPos pos, BlockState state) {
+        super.preRemoveSideEffects(pos, state);
         dropContents();
     }
 
@@ -181,7 +202,7 @@ public class SpotPotBlockEntity extends BlockEntity {
             } else if (level instanceof ServerLevel server) {
                 if (be.tryAutoHarvest(server)) {
                     be.growth = 0;
-                    be.setChanged();
+                    be.sync();
                 }
                 // 成功防抖；失败 1 秒重试（无容器/塞不下时静默等待，绝不吞作物）
                 be.harvestCooldown = 20;
@@ -268,7 +289,9 @@ public class SpotPotBlockEntity extends BlockEntity {
         Identifier blockId = BuiltInRegistries.BLOCK.getKey(block);
         String name = blockId.getPath();
         RandomSource random = server.random;
-        if (this.plant.is(BlockTags.CROPS)) {
+
+        // 1. 作物：按满龄状态结算战利品表
+        if (SpotPotBlock.isCrop(block, this.plant)) {
             // 战利品表带 age 条件：收割按满龄状态结算（盆内存的是 age=0 默认态，
             // 不推满龄则成熟收割永远只掉种子——夜间审批 P1-2）
             BlockState lootState = this.plant;
@@ -286,8 +309,9 @@ public class SpotPotBlockEntity extends BlockEntity {
             server.getServer().reloadableRegistries().getLootTable(key).getRandomItems(params, out::add);
             return out;
         }
-        if (block instanceof net.minecraft.world.level.block.SaplingBlock
-            || (this.plant.is(BlockTags.SAPLINGS) && name.endsWith("_sapling"))) {
+
+        // 2. 树苗：产出对应原木（无则木棍）并补发 1 份树苗本体
+        if (SpotPotBlock.isSapling(block, this.plant)) {
             String wood = name.endsWith("_sapling")
                 ? name.substring(0, name.length() - "_sapling".length()) : name;
             var log = BuiltInRegistries.BLOCK.get(
@@ -296,14 +320,32 @@ public class SpotPotBlockEntity extends BlockEntity {
             out.add(log.filter(h -> h.value().asItem() != Items.AIR)
                 .map(h -> new ItemStack(h.value().asItem(), count))
                 .orElse(new ItemStack(Items.STICK, count)));
-        } else {
-            ItemStack cane = itemStack(this.plantItem);
-            cane.setCount(CANE_MIN + random.nextInt(3));
-            out.add(cane);
+            ItemStack plant = itemStack(this.plantItem);
+            if (!plant.isEmpty()) {
+                out.add(plant);
+            }
+            return out;
         }
+
+        // 3. 甘蔗：产出 2~4 根甘蔗并补发 1 份甘蔗本体
+        if (SpotPotBlock.isCane(block, this.plant)) {
+            ItemStack cane = itemStack(this.plantItem);
+            if (!cane.isEmpty()) {
+                cane.setCount(CANE_MIN + random.nextInt(3));
+                out.add(cane);
+            }
+            ItemStack plant = itemStack(this.plantItem);
+            if (!plant.isEmpty()) {
+                out.add(plant);
+            }
+            return out;
+        }
+
+        // 4. 兜底防御分支：若存在未预期的异常/非法植物状态，绝不允许按甘蔗倍率复制刷物！
+        // 增加防御性保障：仅掉落 1 份本体或空列表，彻底杜绝刷物隐患
         ItemStack plant = itemStack(this.plantItem);
         if (!plant.isEmpty()) {
-            out.add(plant);
+            out.add(plant.copyWithCount(1));
         }
         return out;
     }
@@ -354,6 +396,13 @@ public class SpotPotBlockEntity extends BlockEntity {
         return moved;
     }
 
+    private void sync() {
+        setChanged();
+        if (getLevel() instanceof ServerLevel server) {
+            server.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), 2);
+        }
+    }
+
     private static ItemStack itemStack(String id) {
         Identifier rl = id == null ? null : Identifier.tryParse(id);
         if (rl == null) {
@@ -389,6 +438,19 @@ public class SpotPotBlockEntity extends BlockEntity {
             this.plantItem = null;
             this.growth = 0;
         }
+    }
+
+    /** 全量同步盆内数据：覆写 getUpdatePacket，默认 null 永不同步。 */
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        TagValueOutput out = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, registries);
+        this.saveAdditional(out);
+        return out.buildResult();
     }
 
     private static BlockState blockState(String id) {

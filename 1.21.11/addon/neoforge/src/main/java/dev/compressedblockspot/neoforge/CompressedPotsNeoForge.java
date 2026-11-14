@@ -13,6 +13,8 @@ public class CompressedPotsNeoForge {
 
     public CompressedPotsNeoForge(IEventBus modEventBus) {
         modEventBus.addListener(this::onRegister);
+        // FTB Ultimine（连锁破坏）收获适配
+        dev.compressedblockspot.FtbUltimineCompat.init();
     }
 
     private void onRegister(RegisterEvent event) {
