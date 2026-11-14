@@ -126,5 +126,15 @@ public class ScrollingContainerMenu extends AbstractContainerMenu {
         public boolean isActive() {
             return isRowVisible(this.row);
         }
+
+        @Override
+        public int getMaxStackSize() {
+            return Integer.MAX_VALUE;
+        }
+
+        @Override
+        public int getMaxStackSize(ItemStack stack) {
+            return stack.getMaxStackSize();
+        }
     }
 }
