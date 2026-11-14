@@ -61,6 +61,16 @@ public class ScrollingContainerBlockEntity extends BaseContainerBlockEntity {
     }
 
     @Override
+    public int getMaxStackSize() {
+        return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public int getMaxStackSize(ItemStack stack) {
+        return stack.getMaxStackSize();
+    }
+
+    @Override
     protected NonNullList<ItemStack> getItems() {
         return this.items;
     }

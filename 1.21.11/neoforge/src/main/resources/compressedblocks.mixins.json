@@ -6,7 +6,8 @@
   "mixins": [
     "AnvilMenuMixin",
     "BlockBehaviourMixin",
-    "ServerPlayerGameModeMixin"
+    "ServerPlayerGameModeMixin",
+    "ServerboundContainerClickPacketMixin"
   ],
   "injectors": {
     "defaultRequire": 1
