@@ -108,6 +108,15 @@ public class CompressedBlocksNeoForge {
                     helper.register(CompressedBlocks.id(CompressedBlocks.LEVEL_PREFIX[i] + "_compressed_furnace"),
                         CompressedBlocks.FURNACE_TYPE[i]);
                 }
+                CompressedBlocks.HOPPER_TYPE = new BlockEntityType[CompressedBlocks.HOPPER_TIERS];
+                for (int i = 0; i < CompressedBlocks.HOPPER_TIERS; i++) {
+                    int tier = i + 1;
+                    Block block = CompressedBlocks.HOPPER_BLOCKS.get(i);
+                    CompressedBlocks.HOPPER_TYPE[i] = new BlockEntityType<>(
+                        (pos, state) -> new dev.compressedblocks.CompressedHopperBlockEntity(pos, state, tier), block);
+                    helper.register(CompressedBlocks.id(CompressedBlocks.LEVEL_PREFIX[i] + "_compressed_hopper"),
+                        CompressedBlocks.HOPPER_TYPE[i]);
+                }
                 CompressedBlocks.CHEST_TYPE = new BlockEntityType<dev.compressedblocks.ScrollingContainerBlockEntity>(
                     (pos, state) -> new dev.compressedblocks.ScrollingContainerBlockEntity(
                         CompressedBlocks.CHEST_TYPE, pos, state, false),
@@ -170,6 +179,16 @@ public class CompressedBlocksNeoForge {
                         type,
                         (be, side) -> new net.neoforged.neoforge.transfer.item.WorldlyContainerWrapper(
                             (net.minecraft.world.WorldlyContainer) be, side));
+                }
+            }
+        }
+        if (CompressedBlocks.HOPPER_TYPE != null) {
+            for (net.minecraft.world.level.block.entity.BlockEntityType<?> type : CompressedBlocks.HOPPER_TYPE) {
+                if (type != null) {
+                    event.registerBlockEntity(
+                        net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+                        type,
+                        (be, side) -> net.neoforged.neoforge.transfer.item.VanillaContainerWrapper.of((net.minecraft.world.Container) be));
                 }
             }
         }
