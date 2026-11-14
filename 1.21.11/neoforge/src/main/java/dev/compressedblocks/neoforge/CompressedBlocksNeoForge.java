@@ -98,6 +98,15 @@ public class CompressedBlocksNeoForge {
                     CompressedBlocks.POT, CompressedBlocks.HOPPER_POT);
                 CompressedBlocks.GENERATOR_TYPE = new BlockEntityType<>(CobblestoneGeneratorBlockEntity::new,
                     CompressedBlocks.GENERATOR_BLOCKS.toArray(new Block[0]));
+                CompressedBlocks.FURNACE_TYPE = new BlockEntityType[CompressedBlocks.FURNACE_TIERS];
+                for (int i = 0; i < CompressedBlocks.FURNACE_TIERS; i++) {
+                    int tier = i + 1;
+                    Block block = CompressedBlocks.FURNACE_BLOCKS.get(i);
+                    CompressedBlocks.FURNACE_TYPE[i] = new BlockEntityType<>(
+                        (pos, state) -> new dev.compressedblocks.CompressedFurnaceBlockEntity(pos, state, tier), block);
+                    helper.register(CompressedBlocks.id(CompressedBlocks.LEVEL_PREFIX[i] + "_compressed_furnace"),
+                        CompressedBlocks.FURNACE_TYPE[i]);
+                }
                 CompressedBlocks.CHEST_TYPE = new BlockEntityType<dev.compressedblocks.ScrollingContainerBlockEntity>(
                     (pos, state) -> new dev.compressedblocks.ScrollingContainerBlockEntity(
                         CompressedBlocks.CHEST_TYPE, pos, state, false),

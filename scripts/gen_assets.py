@@ -707,6 +707,18 @@ def main():
         block_tex[f"{prefix}cobblestone_generator_top"] = gen_block_tex(wood.copy(), tier, gray=False)
         block_tex[f"{prefix}cobblestone_generator_bottom"] = gen_block_tex(iron.copy(), tier, gray=False)
 
+    # 压缩熔炉（4 个压缩等级）：正（灭）、正（亮）、侧、顶/底，加压缩环
+    furnace_front = load_base("block/furnace_front")
+    furnace_front_on = load_base("block/furnace_front_on")
+    furnace_side = load_base("block/furnace_side")
+    furnace_top = load_base("block/furnace_top")
+    for tier in range(1, 5):
+        prefix = f"{tier}x_"
+        block_tex[f"{prefix}compressed_furnace_front"] = gen_block_tex(furnace_front.copy(), tier, gray=False)
+        block_tex[f"{prefix}compressed_furnace_front_on"] = gen_block_tex(furnace_front_on.copy(), tier, gray=False)
+        block_tex[f"{prefix}compressed_furnace_side"] = gen_block_tex(furnace_side.copy(), tier, gray=False)
+        block_tex[f"{prefix}compressed_furnace_top"] = gen_block_tex(furnace_top.copy(), tier, gray=False)
+
     # 压缩金属包：金属噪点条纹 + 压缩环，9 级
     for key, base_rgb in COMPAT_COLORS.items():
         for _, prefix, _, _ in LEVELS:
@@ -829,8 +841,8 @@ def main():
     gui_tex = {"compressed_container": gui}
 
     # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 60 作物阶段 + 468 甘蔗 + 5 盆栽贴图
-    # + 9 刷石机（侧/顶/底） + 198 金属 + 4 箱子 + 3 潜影盒 = 1377
-    assert len(block_tex) == 1377, len(block_tex)
+    # + 9 刷石机（侧/顶/底） + 198 金属 + 4 箱子 + 3 潜影盒 + 16 压缩熔炉 = 1393
+    assert len(block_tex) == 1393, len(block_tex)
     print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}, armor layers: {len(armor_layer_tex)}")
     for sub in SUBPROJECTS:
         rel = os.path.relpath(sub, ROOT)

@@ -293,6 +293,14 @@ def generator_names():
     return GENERATOR_TIERS
 
 
+# 压缩熔炉（4 个压缩等级：3x/9x/27x/81x 速度与阶梯权限）
+FURNACE_TIERS = ["1x_compressed_furnace", "2x_compressed_furnace", "3x_compressed_furnace", "4x_compressed_furnace"]
+
+
+def furnace_names():
+    return FURNACE_TIERS
+
+
 # 0.3.2 压缩金属包（科技/魔法 mod 经典材质预置；合成走 #c:*_ingots 通用标签实现跨 mod 适配）
 # (key, en, zh, 挖掘等级: stone|iron|diamond, 发光 0-15)
 COMPAT_METALS = [
@@ -436,6 +444,39 @@ def gen_assets(res):
              {"parent": f"{NS}:block/{name}"})
         dump(f"{res}/items/{name}.json",
              {"model": {"type": "minecraft:model", "model": f"{NS}:item/{name}"}})
+    # 压缩熔炉（4 个压缩等级）：带朝向与 lit 状态
+    for name in furnace_names():
+        dump(f"{res}/blockstates/{name}.json", {
+            "variants": {
+                "facing=east,lit=false": {"model": f"{NS}:block/{name}", "y": 90},
+                "facing=east,lit=true": {"model": f"{NS}:block/{name}_on", "y": 90},
+                "facing=north,lit=false": {"model": f"{NS}:block/{name}"},
+                "facing=north,lit=true": {"model": f"{NS}:block/{name}_on"},
+                "facing=south,lit=false": {"model": f"{NS}:block/{name}", "y": 180},
+                "facing=south,lit=true": {"model": f"{NS}:block/{name}_on", "y": 180},
+                "facing=west,lit=false": {"model": f"{NS}:block/{name}", "y": 270},
+                "facing=west,lit=true": {"model": f"{NS}:block/{name}_on", "y": 270}
+            }
+        })
+        dump(f"{res}/models/block/{name}.json", {
+            "parent": "minecraft:block/orientable",
+            "textures": {
+                "front": f"{NS}:block/{name}_front",
+                "side": f"{NS}:block/{name}_side",
+                "top": f"{NS}:block/{name}_top"
+            }
+        })
+        dump(f"{res}/models/block/{name}_on.json", {
+            "parent": "minecraft:block/orientable",
+            "textures": {
+                "front": f"{NS}:block/{name}_front_on",
+                "side": f"{NS}:block/{name}_side",
+                "top": f"{NS}:block/{name}_top"
+            }
+        })
+        dump(f"{res}/items/{name}.json", {
+            "model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}
+        })
     # 压缩箱子（带朝向，正面锁扣）：与潜影盒同款 BER 实体渲染（原版开盖动画），
     # 方块模型只留 particle；物品走原版 chest special 渲染（texture 填短 id，
     # mapper 自动加 entity/chest/ 前缀），底模用原版 template_chest 平面图标
@@ -579,6 +620,16 @@ def gen_lang(res):
         en_name, zh_name = generator_lang[name]
         en["block." + NS + "." + name] = en_name
         zh["block." + NS + "." + name] = zh_name
+    furnace_lang = {"1x_compressed_furnace": ("Compressed Furnace", "一重压缩熔炉"),
+                    "2x_compressed_furnace": ("Double Compressed Furnace", "二重压缩熔炉"),
+                    "3x_compressed_furnace": ("Triple Compressed Furnace", "三重压缩熔炉"),
+                    "4x_compressed_furnace": ("Quadruple Compressed Furnace", "四重压缩熔炉")}
+    for name in furnace_names():
+        en_name, zh_name = furnace_lang[name]
+        en["block." + NS + "." + name] = en_name
+        zh["block." + NS + "." + name] = zh_name
+        en["container." + NS + "." + name] = en_name
+        zh["container." + NS + "." + name] = zh_name
     en["block." + NS + ".compressed_chest"] = "Compressed Chest"
     zh["block." + NS + ".compressed_chest"] = "压缩箱子"
     en["block." + NS + ".compressed_shulker_box"] = "Compressed Shulker Box"
@@ -808,6 +859,15 @@ def gen_data(data):
             continue
         compress(f"{NS}:{name}", f"{NS}:{generator_names()[i - 1]}")
         unpack(f"{NS}:{name}", f"{NS}:{generator_names()[i - 1]}")
+    # ---- 压缩熔炉：1重：8×1x圆石围绕1原版熔炉，或9×原版熔炉；2~4重同理围绕上一级熔炉，或9×上一级熔炉
+    for i, name in enumerate(furnace_names()):
+        tier = i + 1
+        prev_furnace = "minecraft:furnace" if i == 0 else f"{NS}:{furnace_names()[i - 1]}"
+        cobble = f"{NS}:{tier}x_cobblestone"
+        shaped(f"{name}_surround", ["CCC", "CFC", "CCC"], {"C": cobble, "F": prev_furnace},
+               f"{NS}:{name}", category="misc")
+        compress(f"{NS}:{name}", prev_furnace)
+        unpack(f"{NS}:{name}", prev_furnace)
     # ---- 压缩箱子/压缩潜影盒：9→1 压缩（刻意不做 1→9 解包：带内容解包会丢数据）
     shaped("compressed_chest", ["AAA", "AAA", "AAA"], {"A": "minecraft:chest"},
            f"{NS}:compressed_chest")
@@ -869,6 +929,55 @@ def gen_data(data):
                     "cookingtime": int(seconds * 20),
                 })
                 unlock_advancement(path, f"{NS}:{p}_{cooked}", [f"{NS}:{p}_{raw}"])
+    # ---- 压缩物烧炼配方矩阵 (Issue #13)
+    # 1. 压缩圆石 -> 压缩石头（1~9 重）
+    for i, p in enumerate(LV):
+        path = f"{p}_stone_smelting"
+        dump(f"{data}/{NS}/recipe/{path}.json", {
+            "type": "minecraft:smelting", "category": "blocks",
+            "ingredient": f"{NS}:{p}_cobblestone",
+            "result": {"id": f"{NS}:{p}_stone"},
+            "experience": 0.1 * (9 ** i),
+            "cookingtime": 200
+        })
+        unlock_advancement(path, f"{NS}:{p}_stone", [f"{NS}:{p}_cobblestone"])
+
+    # 2. 压缩深板岩圆石 -> 压缩深板岩（1~9 重）
+    for i, p in enumerate(LV):
+        path = f"{p}_deepslate_smelting"
+        dump(f"{data}/{NS}/recipe/{path}.json", {
+            "type": "minecraft:smelting", "category": "blocks",
+            "ingredient": f"{NS}:{p}_cobbled_deepslate",
+            "result": {"id": f"{NS}:{p}_deepslate"},
+            "experience": 0.1 * (9 ** i),
+            "cookingtime": 200
+        })
+        unlock_advancement(path, f"{NS}:{p}_deepslate", [f"{NS}:{p}_cobbled_deepslate"])
+
+    # 3. 压缩粘土块 -> 压缩陶瓦（1~9 重）
+    for i, p in enumerate(LV):
+        path = f"{p}_terracotta_smelting"
+        dump(f"{data}/{NS}/recipe/{path}.json", {
+            "type": "minecraft:smelting", "category": "blocks",
+            "ingredient": f"{NS}:{p}_clay",
+            "result": {"id": f"{NS}:{p}_terracotta"},
+            "experience": 0.35 * (9 ** i),
+            "cookingtime": 200
+        })
+        unlock_advancement(path, f"{NS}:{p}_terracotta", [f"{NS}:{p}_clay"])
+
+    # 4. 9 种压缩原木 -> 压缩煤炭块（1~9 重）
+    for wood, _, _ in WOODS:
+        for i, p in enumerate(LV):
+            path = f"{p}_{wood}_log_smelting"
+            dump(f"{data}/{NS}/recipe/{path}.json", {
+                "type": "minecraft:smelting", "category": "misc",
+                "ingredient": f"{NS}:{p}_{wood}_log",
+                "result": {"id": f"{NS}:{p}_coal_block"},
+                "experience": 0.15 * (9 ** i),
+                "cookingtime": 200
+            })
+            unlock_advancement(path, f"{NS}:{p}_coal_block", [f"{NS}:{p}_{wood}_log"])
     # ---- 工具两条线：材料位=同重数混用标签（圆石线=圆石+深板岩圆石，木线=9 原木），棍位=同重数压缩木棍
     for mat, _, _ in TOOL_LINES:
         for p in LV:
@@ -914,6 +1023,9 @@ def gen_data(data):
     # 刷石机：掉落自身
     for name in generator_names():
         dump(f"{data}/{NS}/loot_table/blocks/{name}.json", self_drop(name))
+    # 压缩熔炉：掉落自身
+    for name in furnace_names():
+        dump(f"{data}/{NS}/loot_table/blocks/{name}.json", self_drop(name))
     # 压缩箱子：掉落自身（内容洒出由 BE preRemoveSideEffects 处理）
     dump(f"{data}/{NS}/loot_table/blocks/compressed_chest.json", self_drop("compressed_chest"))
     # 压缩潜影盒：掉落自身（内容保留由 CompressedShulkerBlock#getDrops 直接构建，不走战利品表）
@@ -922,10 +1034,13 @@ def gen_data(data):
     # 所有压缩方块统一镐子采掘；挖掘等级：L1-2 石镐、L3-4 铁镐、L5+ 钻镐封顶
     pickaxe = ([f"{NS}:{n}" for n in storage_names()] + [f"{NS}:{n}" for n in pot_names()]
                + [f"{NS}:{n}" for n in generator_names()]
+               + [f"{NS}:{n}" for n in furnace_names()]
                + [f"{NS}:{n}" for n in compat_names()]
                + [f"{NS}:compressed_shulker_box"])
-    stone_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) <= 2]
-    iron_tool = [f"{NS}:{n}" for n in storage_names() if 3 <= int(n.split("_", 1)[0][:-1]) <= 4]
+    stone_tool = ([f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) <= 2]
+                  + [f"{NS}:{n}" for n in furnace_names()[:2]])
+    iron_tool = ([f"{NS}:{n}" for n in storage_names() if 3 <= int(n.split("_", 1)[0][:-1]) <= 4]
+                 + [f"{NS}:{n}" for n in furnace_names()[2:]])
     diamond_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) >= 5]
     # 压缩金属包挖掘等级并入同一阶梯
     for m in COMPAT_METALS:
@@ -945,6 +1060,8 @@ def gen_data(data):
     # 压缩潜影盒进原版 shulker_boxes 物品标签（原版/mod 按 item 标签识别潜影盒）
     dump(f"{data}/minecraft/tags/item/shulker_boxes.json",
          {"replace": False, "values": [f"{NS}:compressed_shulker_box"]})
+    dump(f"{data}/ftbultimine/tags/block/single_crop_harvesting_blacklist.json",
+         {"replace": False, "values": [f"{NS}:compressed_pot", f"{NS}:compressed_hopper_pot"]})
     # 基础工具/盔甲标签覆盖：进原版 #pickaxes…/#enchantable/*，附魔修复自动生效
     tool_tag_values = {
         "pickaxes": [f"{NS}:{n}" for n in tool_names() if n.endswith("_pickaxe")],
@@ -1084,16 +1201,16 @@ def main():
     subs = [os.path.join(ROOT, args.target, loader) for loader in ("fabric", "neoforge")]
 
     blocks = (storage_names() + leaves_names() + sapling_names() + farmland_names()
-              + crop_block_names() + cane_names() + pot_names() + generator_names()
+              + crop_block_names() + cane_names() + pot_names() + generator_names() + furnace_names()
               + compat_names() + ["compressed_chest", "compressed_shulker_box"])
     items = (storage_names() + leaves_names() + sapling_names() + crop_block_names() + cane_names()
-             + pot_names() + generator_names() + tool_names() + armor_names() + food_names()
+             + pot_names() + generator_names() + furnace_names() + tool_names() + armor_names() + food_names()
              + crop_produce_names() + stick_names() + extra_seed_names() + compat_names()
              + ["compressed_chest", "compressed_shulker_box"])
     assert len(storage_names()) == 459, len(storage_names())
     assert len(tool_names()) == 90, len(tool_names())
-    assert len(blocks) == 1315, len(blocks)
-    assert len(items) == 1549, len(items)
+    assert len(blocks) == 1319, len(blocks)
+    assert len(items) == 1553, len(items)
     print(f"blocks={len(blocks)} items={len(items)} (tools={len(tool_names())} armor={len(armor_names())} "
           f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())} "
           f"canes={len(cane_names())})")
