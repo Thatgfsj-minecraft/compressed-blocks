@@ -89,9 +89,9 @@ for target in TARGET_DIRS:
         t_inside.save(os.path.join(tex_block_dir, f"{name}_inside.png"))
         t_item.save(os.path.join(tex_item_dir, f"{name}.png"))
 
-        # 2. 模型
+        # 2. 模型（parent 均指向模组自包含模板，防止原版模型被红石等材质包篡改键名导致漏斗材质回退）
         dump_json(os.path.join(assets_dir, "models", "block", f"{name}.json"), {
-            "parent": "minecraft:block/hopper",
+            "parent": "compressedblocks:block/template_hopper",
             "textures": {
                 "particle": f"compressedblocks:block/{name}_outside",
                 "top": f"compressedblocks:block/{name}_top",
@@ -100,7 +100,7 @@ for target in TARGET_DIRS:
             }
         })
         dump_json(os.path.join(assets_dir, "models", "block", f"{name}_side.json"), {
-            "parent": "minecraft:block/hopper_side",
+            "parent": "compressedblocks:block/template_hopper_side",
             "textures": {
                 "particle": f"compressedblocks:block/{name}_outside",
                 "top": f"compressedblocks:block/{name}_top",
