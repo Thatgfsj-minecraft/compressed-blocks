@@ -386,6 +386,17 @@ public final class CompressedBlocks {
         (id, inv) -> new ScrollingContainerMenu(
             CompressedBlocks.SHULKER_MENU_TYPE, id, inv, new SimpleContainer(ScrollingContainerMenu.SIZE)),
         FeatureFlags.VANILLA_SET);
+    /** 木质漏斗界面：容量随等级变化，1 格与 3 格各一个菜单类型（客户端工厂拿不到方块实体）。 */
+    public static final MenuType<WoodenHopperMenu> WOODEN_HOPPER_MENU_TYPE = new MenuType<>(
+        (id, inv) -> new WoodenHopperMenu(
+            CompressedBlocks.WOODEN_HOPPER_MENU_TYPE, id, inv,
+            new SimpleContainer(WoodenHopperMenu.BASE_SIZE), WoodenHopperMenu.BASE_SIZE),
+        FeatureFlags.VANILLA_SET);
+    public static final MenuType<WoodenHopperMenu> COMPRESSED_WOODEN_HOPPER_MENU_TYPE = new MenuType<>(
+        (id, inv) -> new WoodenHopperMenu(
+            CompressedBlocks.COMPRESSED_WOODEN_HOPPER_MENU_TYPE, id, inv,
+            new SimpleContainer(WoodenHopperMenu.COMPRESSED_SIZE), WoodenHopperMenu.COMPRESSED_SIZE),
+        FeatureFlags.VANILLA_SET);
 
     /** 压缩金属包（科技/魔法 mod 经典材质；合成走 #c:*_ingots 通用标签）。(key, 挖掘档 0-2, 发光) */
     private record CompatMetal(String key, int tier, int light) {

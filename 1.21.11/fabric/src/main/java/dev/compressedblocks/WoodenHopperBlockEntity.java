@@ -11,9 +11,10 @@ import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.DispenserMenu;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.HopperBlock;
 import net.minecraft.world.level.block.entity.Hopper;
 import net.minecraft.world.level.block.entity.HopperBlockEntity;
@@ -24,18 +25,27 @@ import net.minecraft.world.level.storage.ValueOutput;
 
 /**
  * 木质漏斗方块实体：
- * tier 0 为基础木质漏斗，单次传输 1 个，冷却 16 tick（原版速度的一半）；
- * tier 1~3 分别为一至三重压缩木质漏斗，单次传输量为 8 / 32 / 288 个，冷却 8 tick（对应压缩铁漏斗 16/64/576 的一半）；
- * 统一 9 格槽位（3x3 布局），支持红石锁死、比较器输出、上方掉落物吸入与下游推入。
+ * tier 0 为基础木质漏斗，单次传输 1 个，冷却 16 tick（原版速度的一半），容量 1 格；
+ * tier 1~3 分别为一至三重压缩木质漏斗，单次传输量为 8 / 32 / 288 个，冷却 8 tick（对应压缩铁漏斗 16/64/576 的一半），
+ * 容量统一 3 格。
+ * 容量刻意低于原版铁漏斗（5 格）：木质漏斗造价远低于铁漏斗，仅靠速度减半不足以制衡，故同时限制缓冲深度。
+ * 支持红石锁死、比较器输出、上方掉落物吸入与下游推入。
  */
 public class WoodenHopperBlockEntity extends RandomizableContainerBlockEntity implements Hopper, WorldlyContainer {
-    public static final int CONTAINER_SIZE = 9;
-    private static final int[] SLOTS = new int[]{0, 1, 2, 3, 4, 5, 6, 7, 8};
+    /** 基础木质漏斗容量。 */
+    public static final int BASE_CONTAINER_SIZE = 1;
+    /** 压缩木质漏斗（1x/2x/3x）统一容量。 */
+    public static final int COMPRESSED_CONTAINER_SIZE = 3;
+    /** 缩容前（0.3.4 及更早）的统一容量，仅用于读取老存档。 */
+    private static final int LEGACY_CONTAINER_SIZE = 9;
 
     private final int tier; // 0=base, 1=1x, 2=2x, 3=3x
     private final int transferRate;
     private final int baseCooldown;
-    private NonNullList<ItemStack> items = NonNullList.withSize(CONTAINER_SIZE, ItemStack.EMPTY);
+    private final int size;
+    private final int[] slots;
+    /** 构造期即有非 null 值，避免 super() 期间的容器查询触发 NPE。 */
+    private NonNullList<ItemStack> items = NonNullList.withSize(BASE_CONTAINER_SIZE, ItemStack.EMPTY);
     private int cooldownTime = 0;
     private long tickedGameTime = 0;
 
@@ -50,6 +60,17 @@ public class WoodenHopperBlockEntity extends RandomizableContainerBlockEntity im
             default -> 1;
         };
         this.baseCooldown = tier == 0 ? 16 : 8;
+        this.size = tier == 0 ? BASE_CONTAINER_SIZE : COMPRESSED_CONTAINER_SIZE;
+        this.slots = new int[this.size];
+        for (int i = 0; i < this.size; i++) {
+            this.slots[i] = i;
+        }
+        this.items = NonNullList.withSize(this.size, ItemStack.EMPTY);
+    }
+
+    /** 当前容量（1 或 3），供界面对齐与外部查询。 */
+    public int getStorageSize() {
+        return this.size;
     }
 
     public int getTier() {
@@ -66,7 +87,7 @@ public class WoodenHopperBlockEntity extends RandomizableContainerBlockEntity im
 
     @Override
     public int getContainerSize() {
-        return CONTAINER_SIZE;
+        return this.size;
     }
 
     @Override
@@ -90,12 +111,15 @@ public class WoodenHopperBlockEntity extends RandomizableContainerBlockEntity im
 
     @Override
     protected AbstractContainerMenu createMenu(int containerId, Inventory playerInventory) {
-        return new DispenserMenu(containerId, playerInventory, this);
+        MenuType<WoodenHopperMenu> type = this.tier == 0
+            ? CompressedBlocks.WOODEN_HOPPER_MENU_TYPE
+            : CompressedBlocks.COMPRESSED_WOODEN_HOPPER_MENU_TYPE;
+        return new WoodenHopperMenu(type, containerId, playerInventory, this, this.size);
     }
 
     @Override
     public int[] getSlotsForFace(Direction side) {
-        return SLOTS;
+        return this.slots;
     }
 
     @Override
@@ -155,8 +179,19 @@ public class WoodenHopperBlockEntity extends RandomizableContainerBlockEntity im
     @Override
     protected void loadAdditional(ValueInput in) {
         super.loadAdditional(in);
-        this.items = NonNullList.withSize(CONTAINER_SIZE, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(in, this.items);
+        // 老存档（0.3.4 及更早）统一 9 格，缩容后多出的物品掉落在漏斗上方，避免静默丢失
+        NonNullList<ItemStack> loaded = NonNullList.withSize(LEGACY_CONTAINER_SIZE, ItemStack.EMPTY);
+        ContainerHelper.loadAllItems(in, loaded);
+        this.items = NonNullList.withSize(this.size, ItemStack.EMPTY);
+        for (int i = 0; i < this.size; i++) {
+            this.items.set(i, loaded.get(i));
+        }
+        for (int i = this.size; i < LEGACY_CONTAINER_SIZE; i++) {
+            ItemStack overflow = loaded.get(i);
+            if (!overflow.isEmpty() && this.level != null) {
+                Block.popResource(this.level, this.worldPosition.above(), overflow);
+            }
+        }
         this.cooldownTime = in.getIntOr("TransferCooldown", 0);
     }
 

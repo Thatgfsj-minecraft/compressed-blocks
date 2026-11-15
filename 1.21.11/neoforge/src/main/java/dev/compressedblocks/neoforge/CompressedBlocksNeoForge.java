@@ -142,6 +142,9 @@ public class CompressedBlocksNeoForge {
             event.register(Registries.MENU, helper -> {
                 helper.register(CompressedBlocks.id("compressed_chest"), CompressedBlocks.CHEST_MENU_TYPE);
                 helper.register(CompressedBlocks.id("compressed_shulker_box"), CompressedBlocks.SHULKER_MENU_TYPE);
+                helper.register(CompressedBlocks.id("wooden_hopper"), CompressedBlocks.WOODEN_HOPPER_MENU_TYPE);
+                helper.register(CompressedBlocks.id("compressed_wooden_hopper"),
+                    CompressedBlocks.COMPRESSED_WOODEN_HOPPER_MENU_TYPE);
             });
         } else if (event.getRegistryKey() == Registries.CREATIVE_MODE_TAB) {
             // "压缩盆栽"栏由附属 mod 独有

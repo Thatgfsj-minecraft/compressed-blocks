@@ -851,6 +851,9 @@ def gen_data(data):
     shaped("pot", ["A A", "AAA"], {"A": "#minecraft:pot_stones"}, f"{NS}:pot")
     # 漏斗盆栽 = 盆栽 + 漏斗（无序；成熟自动收割入下方容器）
     shapeless("hopper_pot", [f"{NS}:pot", "minecraft:hopper"], f"{NS}:hopper_pot")
+    # 木漏斗版：造价低，允许用木质漏斗直接合成漏斗盆栽（与铁漏斗配方并存）
+    shapeless("hopper_pot_from_wooden_hopper", [f"{NS}:pot", f"{NS}:wooden_hopper"],
+              f"{NS}:hopper_pot")
     # ---- 刷石机：红石/铁锭/红石 + 水桶/原石/岩浆桶 + 黑曜石/漏斗/黑曜石；机器可 9↔1 压缩（最多三重）
     shaped("cobblestone_generator",
            ["RIR", "BCL", "OHO"],
@@ -858,6 +861,14 @@ def gen_data(data):
             "B": "minecraft:water_bucket", "C": "minecraft:cobblestone",
             "L": "minecraft:lava_bucket", "O": "minecraft:obsidian",
             "H": "minecraft:hopper"},
+           f"{NS}:cobblestone_generator")
+    # 木漏斗版：木质漏斗替代铁漏斗（两条配方并存，与漏斗盆栽同款惯例）
+    shaped("cobblestone_generator_from_wooden_hopper",
+           ["RIR", "BCL", "OHO"],
+           {"R": "minecraft:redstone", "I": "minecraft:iron_ingot",
+            "B": "minecraft:water_bucket", "C": "minecraft:cobblestone",
+            "L": "minecraft:lava_bucket", "O": "minecraft:obsidian",
+            "H": f"{NS}:wooden_hopper"},
            f"{NS}:cobblestone_generator")
     for i, name in enumerate(generator_names()):
         if i == 0:
