@@ -19,6 +19,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
+import net.minecraft.util.RandomSource;
 import net.minecraft.util.Unit;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -246,8 +247,29 @@ public final class CompressedBlocks {
         new FoodDef("cooked_salmon", "Cooked Salmon", 6.0F, 9.6F),
         new FoodDef("melon", "Watermelon", 2.0F, 1.2F),
         new FoodDef("rotten_flesh", "Rotten Flesh", 4.0F, 0.8F),
-        new FoodDef("baked_potato", "Baked Potato", 5.0F, 6.0F)
+        new FoodDef("baked_potato", "Baked Potato", 5.0F, 6.0F),
+        new FoodDef("apple", "Apple", 4.0F, 2.4F)
     );
+
+    /** 盆栽苹果掉落：1 重 15%，每层 +1%（9 重 23%）；时运沿用原版 table_bonus 的相对倍数。 */
+    private static final double[] APPLE_FORTUNE_MULT = {1.0, 1.1111112, 1.25, 1.6666667};
+
+    /** 盆栽种 level 重树苗时的苹果掉落概率（%）。 */
+    public static int applePotPct(int level) {
+        return 15 + (Math.max(level, 1) - 1);
+    }
+
+    /** 压缩苹果只做到 3 重：4 重及以上统一掉 3 重苹果。 */
+    public static int appleTier(int level) {
+        return Math.min(Math.max(level, 1), FOOD_MAX_LEVEL);
+    }
+
+    /** 按百分比掷苹果数量（受时运提升概率；当前上限 < 100%，返回 0 或 1）。 */
+    public static int appleCount(int basePct, int fortune, RandomSource random) {
+        int f = Math.min(Math.max(fortune, 0), APPLE_FORTUNE_MULT.length - 1);
+        int pct = (int) Math.round(basePct * APPLE_FORTUNE_MULT[f]);
+        return random.nextInt(100) < pct ? 1 : 0;
+    }
 
     // ------------------------------------------------------------------ 护甲
 
@@ -1164,8 +1186,8 @@ public final class CompressedBlocks {
         if (BLOCKS.size() != 1326) {
             errors.add("block registry size " + BLOCKS.size() + " != 1326");
         }
-        if (expectItems != 1560) {
-            errors.add("item registry size " + expectItems + " != 1560");
+        if (expectItems != 1563) {
+            errors.add("item registry size " + expectItems + " != 1563");
         }
         if (FURNACE_BLOCKS.size() != FURNACE_TIERS) {
             errors.add("furnace blocks count " + FURNACE_BLOCKS.size() + " != " + FURNACE_TIERS);

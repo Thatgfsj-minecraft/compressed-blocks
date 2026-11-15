@@ -31,6 +31,8 @@ import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -323,6 +325,23 @@ public class SpotPotBlockEntity extends BlockEntity {
             ItemStack plant = itemStack(this.plantItem);
             if (!plant.isEmpty()) {
                 out.add(plant);
+            }
+            // 压缩苹果：仅橡木系；1 重 15%，每层 +1%，4 重以上掉 3 重苹果（受时运）
+            if (wood.endsWith("x_oak")) {
+                int plantLevel = Math.max(1, SpotPotBlock.plantLevel(this.plant));
+                int fortune = player == null ? 0
+                    : EnchantmentHelper.getEnchantmentLevel(
+                        player.level().registryAccess().holderOrThrow(Enchantments.FORTUNE), player);
+                int[] mult = {100, 111, 125, 167};
+                int f = Math.min(Math.max(fortune, 0), mult.length - 1);
+                int pct = (15 + (plantLevel - 1)) * mult[f] / 100;
+                if (random.nextInt(100) < pct) {
+                    ItemStack apple = itemStack(CompressedPotsAddon.MAIN_NS + ":"
+                        + Math.min(plantLevel, 3) + "x_apple");
+                    if (!apple.isEmpty()) {
+                        out.add(apple);
+                    }
+                }
             }
             return out;
         }

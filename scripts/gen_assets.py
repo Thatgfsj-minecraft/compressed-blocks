@@ -182,6 +182,7 @@ FOODS = [
     ("melon", "Watermelon", "西瓜", "item/melon_slice"),
     ("rotten_flesh", "Rotten Flesh", "腐肉", "item/rotten_flesh"),
     ("baked_potato", "Baked Potato", "烤土豆", "item/baked_potato"),
+    ("apple", "Apple", "苹果", "item/apple"),
 ]
 
 ARMOR_PIECES = ["helmet", "chestplate", "leggings", "boots"]
