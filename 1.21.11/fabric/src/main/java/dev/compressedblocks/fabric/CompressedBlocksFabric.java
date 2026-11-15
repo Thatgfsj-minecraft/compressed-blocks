@@ -83,6 +83,10 @@ public class CompressedBlocksFabric implements ModInitializer {
             CompressedBlocks.CHEST_MENU_TYPE);
         Registry.register(BuiltInRegistries.MENU, CompressedBlocks.id("compressed_shulker_box"),
             CompressedBlocks.SHULKER_MENU_TYPE);
+        Registry.register(BuiltInRegistries.MENU, CompressedBlocks.id("wooden_hopper"),
+            CompressedBlocks.WOODEN_HOPPER_MENU_TYPE);
+        Registry.register(BuiltInRegistries.MENU, CompressedBlocks.id("compressed_wooden_hopper"),
+            CompressedBlocks.COMPRESSED_WOODEN_HOPPER_MENU_TYPE);
         // 挂载 Fabric Transfer API：使抽屉、管道、漏斗盆栽等自动化设施原生支持存取
         ItemStorage.SIDED.registerForBlockEntity(
             (be, side) -> InventoryStorage.of(be, side), CompressedBlocks.CHEST_TYPE);

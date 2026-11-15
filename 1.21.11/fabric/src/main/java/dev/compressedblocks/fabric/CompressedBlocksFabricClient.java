@@ -5,6 +5,7 @@ import dev.compressedblocks.CompressedChestRenderer;
 import dev.compressedblocks.CompressedPotRenderer;
 import dev.compressedblocks.CompressedShulkerRenderer;
 import dev.compressedblocks.ScrollingContainerScreen;
+import dev.compressedblocks.WoodenHopperScreen;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.rendering.v1.BlockRenderLayerMap;
 import net.minecraft.client.gui.screens.MenuScreens;
@@ -21,6 +22,8 @@ public class CompressedBlocksFabricClient implements ClientModInitializer {
         BlockEntityRenderers.register(CompressedBlocks.CHEST_TYPE, CompressedChestRenderer::new);
         MenuScreens.register(CompressedBlocks.CHEST_MENU_TYPE, ScrollingContainerScreen::new);
         MenuScreens.register(CompressedBlocks.SHULKER_MENU_TYPE, ScrollingContainerScreen::new);
+        MenuScreens.register(CompressedBlocks.WOODEN_HOPPER_MENU_TYPE, WoodenHopperScreen::new);
+        MenuScreens.register(CompressedBlocks.COMPRESSED_WOODEN_HOPPER_MENU_TYPE, WoodenHopperScreen::new);
         for (Block block : CompressedBlocks.SAPLING_BLOCKS) {
             BlockRenderLayerMap.putBlocks(ChunkSectionLayer.CUTOUT, block);
         }

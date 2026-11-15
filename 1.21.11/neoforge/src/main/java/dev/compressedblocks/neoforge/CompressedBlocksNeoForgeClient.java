@@ -5,6 +5,7 @@ import dev.compressedblocks.CompressedChestRenderer;
 import dev.compressedblocks.CompressedPotRenderer;
 import dev.compressedblocks.CompressedShulkerRenderer;
 import dev.compressedblocks.ScrollingContainerScreen;
+import dev.compressedblocks.WoodenHopperScreen;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.world.level.block.Block;
@@ -30,6 +31,8 @@ public class CompressedBlocksNeoForgeClient {
     public static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
         event.register(CompressedBlocks.CHEST_MENU_TYPE, ScrollingContainerScreen::new);
         event.register(CompressedBlocks.SHULKER_MENU_TYPE, ScrollingContainerScreen::new);
+        event.register(CompressedBlocks.WOODEN_HOPPER_MENU_TYPE, WoodenHopperScreen::new);
+        event.register(CompressedBlocks.COMPRESSED_WOODEN_HOPPER_MENU_TYPE, WoodenHopperScreen::new);
     }
 
     @SubscribeEvent
