@@ -390,8 +390,10 @@ public class CompressedPotBlockEntity extends BlockEntity {
             // 压缩苹果：主盆栽只种原版树苗，固定 1 重 10% 基准（受时运）
             if (name.equals("oak_sapling")) {
                 int fortune = player == null ? 0
-                    : EnchantmentHelper.getEnchantmentLevel(
-                        player.level().registryAccess().holderOrThrow(Enchantments.FORTUNE), player);
+                    : player.level().registryAccess().lookupOrThrow(Registries.ENCHANTMENT)
+                        .get(Enchantments.FORTUNE)
+                        .map(h -> EnchantmentHelper.getEnchantmentLevel(h, player))
+                        .orElse(0);
                 int apples = CompressedBlocks.appleCount(10, fortune, server.random);
                 if (apples > 0) {
                     ItemStack apple = itemStack("compressedblocks:1x_apple");
