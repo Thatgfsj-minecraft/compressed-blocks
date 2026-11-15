@@ -8,7 +8,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.WorldlyContainer;
-import net.minecraft.world.entity.EntitySelector;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -292,11 +291,7 @@ public class WoodenHopperBlockEntity extends RandomizableContainerBlockEntity im
             }
         }
         if (budget > 0) {
-            List<ItemEntity> items = level.getEntitiesOfClass(
-                ItemEntity.class,
-                hopper.getSuckAabb(),
-                EntitySelector.ENTITY_STILL_ALIVE
-            );
+            List<ItemEntity> items = HopperBlockEntity.getItemsAtAndAbove(level, hopper);
             for (ItemEntity itemEntity : items) {
                 if (budget <= 0) {
                     break;
