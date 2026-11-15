@@ -173,17 +173,17 @@
             },
             {
               "chances": [
-                0.005,
-                0.0055555557,
-                0.00625,
-                0.008333334,
-                0.025
+                0.006,
+                0.0066666672,
+                0.0075,
+                0.0100000002,
+                0.03
               ],
               "condition": "minecraft:table_bonus",
               "enchantment": "minecraft:fortune"
             }
           ],
-          "name": "minecraft:apple"
+          "name": "compressedblocks:1x_apple"
         }
       ],
       "rolls": 1.0

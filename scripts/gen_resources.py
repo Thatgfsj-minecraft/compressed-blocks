@@ -16,6 +16,7 @@
 import argparse
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -145,6 +146,7 @@ FOODS = [
     ("melon", "Watermelon", "西瓜"),
     ("rotten_flesh", "Rotten Flesh", "腐肉"),
     ("baked_potato", "Baked Potato", "烤土豆"),
+    ("apple", "Apple", "苹果"),
 ]
 # 烤制：生的 → 熟的（烤土豆=土豆）
 COOKED_FROM = [("potato", "baked_potato"), ("beef", "cooked_beef"),
@@ -701,8 +703,11 @@ def gen_lang(res):
     zh["itemGroup.compressedblocks.food"] = "压缩食物"
     en["itemGroup.compressedblocks.pots"] = "Compressed Pots"
     zh["itemGroup.compressedblocks.pots"] = "压缩盆栽"
-    dump(f"{res}/lang/en_us.json", dict(sorted(en.items())), indent=2)
-    dump(f"{res}/lang/zh_cn.json", dict(sorted(zh.items())), indent=2)
+    # lang 用带空格的分隔符，与仓库既有格式一致（json.dumps 默认 separator）
+    dump_text(f"{res}/lang/en_us.json",
+              json.dumps(dict(sorted(en.items())), ensure_ascii=False, indent=2) + "\n")
+    dump_text(f"{res}/lang/zh_cn.json",
+              json.dumps(dict(sorted(zh.items())), ensure_ascii=False, indent=2) + "\n")
 
 
 # ---------------------------------------------------------------- data
@@ -906,6 +911,12 @@ def gen_data(data):
     for i, p in enumerate(LV[:FOOD_MAX_LEVEL]):
         cur = f"{NS}:{p}_beef"
         prev = "minecraft:beef" if i == 0 else f"{NS}:{LV[i - 1]}_beef"
+        compress(cur, prev)
+        unpack(cur, prev)
+    # 压缩苹果：9 原版苹果 ↔ 1x，逐级 9↔1
+    for i, p in enumerate(LV[:FOOD_MAX_LEVEL]):
+        cur = f"{NS}:{p}_apple"
+        prev = "minecraft:apple" if i == 0 else f"{NS}:{LV[i - 1]}_apple"
         compress(cur, prev)
         unpack(cur, prev)
     # 压缩腐肉：无饥饿副作用（Java 侧 FoodProperties 不带任何效果），数值 ×9^层
@@ -1139,6 +1150,17 @@ def gen_leaves_loot(data, name):
     text = text.replace(f'"minecraft:{wood}_leaves"', f'"{NS}:{name}"')
     text = text.replace(f'"{vanilla_sapling}"', f'"{NS}:{name.replace("_leaves", "_sapling")}"')
     text = text.replace(f'"minecraft:blocks/{wood}_leaves"', f'"{NS}:blocks/{name}"')
+    if wood == "oak":
+        # 压缩橡木叶掉压缩苹果：0.5% + 0.1%/层（1 重 0.6% … 9 重 1.4%），受时运（沿用原版相对倍数）
+        level = int(p[:-1])
+        tier = min(level, FOOD_MAX_LEVEL)
+        base = 0.005 + 0.001 * level
+        mults = (1.0, 1.1111112, 1.25, 1.6666667, 5.0)
+        vals = [base * m for m in mults]
+        chances = ",\n".join(f"                {v:.10f}".rstrip("0").rstrip(".") for v in vals)
+        text = re.sub(r'"chances": \[\s*0\.005[^\]]*\]',
+                      '"chances": [\n' + chances + "\n              ]", text)
+        text = text.replace('"name": "minecraft:apple"', f'"name": "{NS}:{tier}x_apple"')
     dump_text(f"{data}/{NS}/loot_table/blocks/{name}.json", text)
 
 
@@ -1210,7 +1232,7 @@ def main():
     assert len(storage_names()) == 459, len(storage_names())
     assert len(tool_names()) == 90, len(tool_names())
     assert len(blocks) == 1319, len(blocks)
-    assert len(items) == 1553, len(items)
+    assert len(items) == 1556, len(items)
     print(f"blocks={len(blocks)} items={len(items)} (tools={len(tool_names())} armor={len(armor_names())} "
           f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())} "
           f"canes={len(cane_names())})")
@@ -1222,13 +1244,17 @@ def main():
         data = f"{sub}/src/main/resources/data"
         # 生成目录整体归本脚本所有：先清空再生成，避免 0.2.0 遗留文件。
         # textures/ 例外——归 gen_assets.py 所有，只清本脚本拥有的条目。
-        if os.path.isdir(res):
+        if os.environ.get("NO_CLEAN") != "1" and os.path.isdir(res):
             for entry in os.listdir(res):
                 if entry == "textures":
                     continue
                 full = os.path.join(res, entry)
-                shutil.rmtree(full, ignore_errors=True) if os.path.isdir(full) else os.remove(full)
-        shutil.rmtree(data, ignore_errors=True)
+                try:
+                    shutil.rmtree(full, ignore_errors=True) if os.path.isdir(full) else os.remove(full)
+                except OSError:
+                    pass
+        if os.environ.get("NO_CLEAN") != "1":
+            shutil.rmtree(data, ignore_errors=True)
         gen_assets(res)
         gen_lang(res)
         gen_data(data)

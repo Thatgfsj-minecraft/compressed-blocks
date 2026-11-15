@@ -32,6 +32,8 @@ import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -384,6 +386,20 @@ public class CompressedPotBlockEntity extends BlockEntity {
             int saplings = server.random.nextInt(4);
             if (saplings > 0 && !self.isEmpty()) {
                 out.add(new ItemStack(self.getItem(), saplings));
+            }
+            // 压缩苹果：主盆栽只种原版树苗，固定 1 重 10% 基准（受时运）
+            if (name.equals("oak_sapling")) {
+                int fortune = player == null ? 0
+                    : EnchantmentHelper.getEnchantmentLevel(
+                        player.level().registryAccess().holderOrThrow(Enchantments.FORTUNE), player);
+                int apples = CompressedBlocks.appleCount(10, fortune, server.random);
+                if (apples > 0) {
+                    ItemStack apple = itemStack("compressedblocks:1x_apple");
+                    if (!apple.isEmpty()) {
+                        apple.setCount(apples);
+                        out.add(apple);
+                    }
+                }
             }
             return out;
         }
