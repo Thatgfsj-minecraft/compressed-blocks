@@ -330,8 +330,10 @@ public class SpotPotBlockEntity extends BlockEntity {
             if (wood.endsWith("x_oak")) {
                 int plantLevel = Math.max(1, SpotPotBlock.plantLevel(this.plant));
                 int fortune = player == null ? 0
-                    : EnchantmentHelper.getEnchantmentLevel(
-                        player.level().registryAccess().holderOrThrow(Enchantments.FORTUNE), player);
+                    : player.level().registryAccess().lookupOrThrow(Registries.ENCHANTMENT)
+                        .get(Enchantments.FORTUNE)
+                        .map(h -> EnchantmentHelper.getEnchantmentLevel(h, player))
+                        .orElse(0);
                 int[] mult = {100, 111, 125, 167};
                 int f = Math.min(Math.max(fortune, 0), mult.length - 1);
                 int pct = (15 + (plantLevel - 1)) * mult[f] / 100;
