@@ -255,29 +255,54 @@ public class CompressedFurnaceBlockEntity extends AbstractFurnaceBlockEntity {
         return Mth.clamp((int) ((long) this.litTime * 1000L / this.litTotal), 0, 1000);
     }
 
-    /** 产出槽还能接收多少件 result（0 = 接不住）。 */
-    private int outputCapacity(int outputSlot, ItemStack result) {
-        ItemStack out = this.items.get(outputSlot);
-        if (out.isEmpty()) {
-            return result.getMaxStackSize();
+    /** 所有产出槽合计还能接收多少件 result（0 = 全部接不住）。 */
+    private int outputRoom(ItemStack result) {
+        int room = 0;
+        for (int lane = 0; lane < this.lanes; lane++) {
+            int slot = CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_OUTPUT);
+            ItemStack out = this.items.get(slot);
+            if (out.isEmpty()) {
+                room += result.getMaxStackSize();
+            } else if (ItemStack.isSameItemSameComponents(out, result)) {
+                room += Math.max(0, out.getMaxStackSize() - out.getCount());
+            }
         }
-        if (!ItemStack.isSameItemSameComponents(out, result)) {
-            return 0;
-        }
-        return Math.max(0, out.getMaxStackSize() - out.getCount());
+        return room;
     }
 
-    private boolean canAcceptResult(int outputSlot, ItemStack result) {
-        return outputCapacity(outputSlot, result) > 0;
-    }
-
-    private void growOutput(int outputSlot, ItemStack result, int count) {
-        ItemStack out = this.items.get(outputSlot);
-        if (out.isEmpty()) {
-            this.items.set(outputSlot, result.copyWithCount(count));
-        } else {
-            out.grow(count);
+    /**
+     * 把产物按"箱子式自动堆叠"放进产出槽：先填同类堆，再找空槽（均按 lane 升序）。
+     *
+     * @return 实际放入数量（调用方据此扣输入与结算经验）
+     */
+    private int insertOutput(ItemStack result, int count) {
+        int remaining = count;
+        // 第一遍：优先同类堆叠
+        for (int lane = 0; lane < this.lanes && remaining > 0; lane++) {
+            int slot = CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_OUTPUT);
+            ItemStack out = this.items.get(slot);
+            if (out.isEmpty() || !ItemStack.isSameItemSameComponents(out, result)) {
+                continue;
+            }
+            int room = Math.max(0, out.getMaxStackSize() - out.getCount());
+            int move = Math.min(room, remaining);
+            if (move > 0) {
+                out.grow(move);
+                remaining -= move;
+            }
         }
+        // 第二遍：放进空槽
+        for (int lane = 0; lane < this.lanes && remaining > 0; lane++) {
+            int slot = CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_OUTPUT);
+            ItemStack out = this.items.get(slot);
+            if (!out.isEmpty()) {
+                continue;
+            }
+            int move = Math.min(result.getMaxStackSize(), remaining);
+            this.items.set(slot, result.copyWithCount(move));
+            remaining -= move;
+        }
+        return count - remaining;
     }
 
     /** 比较器输出：只统计 N 个产出槽，避免 27 格稀释（与原版单槽熔炉同量级）。 */
@@ -373,8 +398,7 @@ public class CompressedFurnaceBlockEntity extends AbstractFurnaceBlockEntity {
                     result = recipe.value().assemble(new SingleRecipeInput(input), registries);
                 }
             }
-            boolean ready = recipe != null && !result.isEmpty() && be.canAcceptResult(
-                CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_OUTPUT), result);
+            boolean ready = recipe != null && !result.isEmpty() && be.outputRoom(result) > 0;
             be.laneRecipe[lane] = recipe;
             be.laneResult[lane] = ready ? result : ItemStack.EMPTY;
             be.laneReady[lane] = ready;
@@ -429,19 +453,22 @@ public class CompressedFurnaceBlockEntity extends AbstractFurnaceBlockEntity {
         if (produced <= 0) {
             return;
         }
-        int outputSlot = CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_OUTPUT);
         int inputSlot = CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_INPUT);
         ItemStack input = this.items.get(inputSlot);
-        int count = Math.min(produced, Math.min(this.outputCapacity(outputSlot, result), input.getCount()));
+        int count = Math.min(produced, Math.min(this.outputRoom(result), input.getCount()));
         if (count <= 0) {
             // 输出满/输入空：与原版一致，进度清零（点燃中的燃料继续烧完）
             this.cookTime[lane] = 0;
             return;
         }
-        this.cookTime[lane] -= count * total;
-        this.growOutput(outputSlot, result, count);
-        input.shrink(count);
-        for (int i = 0; i < count; i++) {
+        int inserted = this.insertOutput(result, count);
+        if (inserted <= 0) {
+            this.cookTime[lane] = 0;
+            return;
+        }
+        this.cookTime[lane] -= inserted * total;
+        input.shrink(inserted);
+        for (int i = 0; i < inserted; i++) {
             this.setRecipeUsed(recipe);
         }
     }
