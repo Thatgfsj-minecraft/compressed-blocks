@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
+import net.fabricmc.fabric.api.registry.FuelRegistryEvents;
 import net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
@@ -26,6 +27,10 @@ public class CompressedBlocksFabric implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        // 压缩木制物品可燃（原版熔炉与压缩熔炉共用同一套 FuelValues；
+        // NeoForge 走 data map，两份数值由 CompressedFuels 统一，SELF-TEST 会对拍）
+        FuelRegistryEvents.BUILD.register((builder, context) ->
+            dev.compressedblocks.CompressedFuels.forEach((item, ticks) -> builder.add(item, ticks)));
         java.util.Set<String> registeredItems = new java.util.HashSet<>();
         for (CompressedBlocks.BlockReg e : CompressedBlocks.blocks()) {
             Registry.register(BuiltInRegistries.BLOCK, CompressedBlocks.id(e.name()), e.block());

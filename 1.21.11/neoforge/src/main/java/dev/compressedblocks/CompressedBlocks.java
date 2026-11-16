@@ -1287,6 +1287,23 @@ public final class CompressedBlocks {
         if (oakLeaves == null || !oakLeaves.defaultBlockState().is(BlockTags.LEAVES)) {
             errors.add("compressed leaves not in #minecraft:leaves");
         }
+
+        // 可燃物：压缩木制物品必须被 FuelValues 收录且燃烧时间符合 CompressedFuels 规则；
+        // 盆栽不可燃。Fabric 走 FuelRegistryEvents、NeoForge 走 furnace_fuels 数据图，两边都要过。
+        net.minecraft.world.level.block.entity.FuelValues fuels = level.fuelValues();
+        CompressedFuels.forEach((item, ticks) -> {
+            int actual = fuels.burnDuration(new ItemStack(item));
+            if (actual != ticks) {
+                errors.add("fuel " + BuiltInRegistries.ITEM.getKey(item).getPath()
+                    + " burn " + actual + " != " + ticks);
+            }
+        });
+        for (String notFuel : new String[] {"pot", "hopper_pot"}) {
+            Item notFuelItem = itemByName(notFuel);
+            if (notFuelItem != null && fuels.isFuel(new ItemStack(notFuelItem))) {
+                errors.add(notFuel + " must not be fuel");
+            }
+        }
         // 压缩熔炉挖掘门：与原版 minecraft:furnace 一致 —— 任意等级镐（含木镐）即可挖掘掉落，
         // 只保留在 #mineable/pickaxe，绝不能进 needs_stone_tool / needs_iron_tool / needs_diamond_tool
         for (Block furnace : FURNACE_BLOCKS) {

@@ -86,7 +86,7 @@ public class CompressedFurnaceScreen extends AbstractContainerScreen<CompressedF
             drawSlot(graphics, this.leftPos + slot.x, this.topPos + slot.y);
         }
         // 整机共享燃烧池剩余时间（原中间燃烧条位置，空出来只放文字；水平居中于 A/C 区块）
-        String burnText = String.format(Locale.ROOT, "%.1fs", this.menu.litSeconds());
+        String burnText = this.menu.burnTimeText();
         int burnTextX = this.leftPos + this.menu.burnInfoCenterX() - this.font.width(burnText) / 2;
         graphics.drawString(this.font, burnText, burnTextX,
             this.topPos + this.menu.burnInfoY(), TEXT_DARK, false);
