@@ -1059,10 +1059,10 @@ def gen_data(data):
                + [f"{NS}:{n}" for n in furnace_names()]
                + [f"{NS}:{n}" for n in compat_names()]
                + [f"{NS}:compressed_shulker_box"])
-    stone_tool = ([f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) <= 2]
-                  + [f"{NS}:{n}" for n in furnace_names()[:2]])
-    iron_tool = ([f"{NS}:{n}" for n in storage_names() if 3 <= int(n.split("_", 1)[0][:-1]) <= 4]
-                 + [f"{NS}:{n}" for n in furnace_names()[2:]])
+    # 注意：压缩熔炉**不进** needs_stone_tool / needs_iron_tool —— 与原版 minecraft:furnace 一致，
+    # 只要任意等级镐（含木镐）即可挖掘并掉落；仅以 #mineable/pickaxe 限定"必须用镐"。
+    stone_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) <= 2]
+    iron_tool = [f"{NS}:{n}" for n in storage_names() if 3 <= int(n.split("_", 1)[0][:-1]) <= 4]
     diamond_tool = [f"{NS}:{n}" for n in storage_names() if int(n.split("_", 1)[0][:-1]) >= 5]
     # 压缩金属包挖掘等级并入同一阶梯
     for m in COMPAT_METALS:

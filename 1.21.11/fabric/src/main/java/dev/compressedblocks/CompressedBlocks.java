@@ -1259,6 +1259,21 @@ public final class CompressedBlocks {
         if (oakLeaves == null || !oakLeaves.defaultBlockState().is(BlockTags.LEAVES)) {
             errors.add("compressed leaves not in #minecraft:leaves");
         }
+        // 压缩熔炉挖掘门：与原版 minecraft:furnace 一致 —— 任意等级镐（含木镐）即可挖掘掉落，
+        // 只保留在 #mineable/pickaxe，绝不能进 needs_stone_tool / needs_iron_tool / needs_diamond_tool
+        for (Block furnace : FURNACE_BLOCKS) {
+            BlockState furnaceState = furnace.defaultBlockState();
+            String furnaceName = BuiltInRegistries.BLOCK.getKey(furnace).getPath();
+            if (!furnaceState.is(BlockTags.MINEABLE_WITH_PICKAXE)) {
+                errors.add(furnaceName + " not in #mineable/pickaxe");
+            }
+            for (TagKey<Block> tierTag : List.of(BlockTags.NEEDS_STONE_TOOL,
+                BlockTags.NEEDS_IRON_TOOL, BlockTags.NEEDS_DIAMOND_TOOL)) {
+                if (furnaceState.is(tierTag)) {
+                    errors.add(furnaceName + " must not be in #" + tierTag.location());
+                }
+            }
+        }
         // 物品：注册、翻译键、耐久/速度/伤害（工具）、护甲属性、食物数值、附魔标签
         TagKey<Item> enchantableArmor = vanillaItemTag("enchantable/armor");
         TagKey<Item> durability = vanillaItemTag("enchantable/durability");

@@ -183,6 +183,32 @@ function check(name, ok, detail) {
   await cmd('kill @e[type=minecraft:item]');
   await cmd('setblock 2 -60 20 minecraft:air');
 
+  // 3b) 压缩熔炉挖掘门（issue #36）：与原版 minecraft:furnace 一致 —— 任意等级镐（含木镐）都能挖掉
+  //     并掉落本体；空手（无正确工具）因 requiresCorrectToolForDrops 不掉落。
+  await cmd('kill @e[type=minecraft:item]');
+  await cmd(`setblock 2 -60 20 ${NS}:1x_compressed_furnace`);
+  async function furnaceLoot(tool) {
+    await cmd('kill @e[type=minecraft:item]');
+    const lootCmd = tool
+      ? `loot spawn 2 -59 20 mine 2 -60 20 ${tool}`
+      : 'loot spawn 2 -59 20 mine 2 -60 20';
+    const res = await cmd(lootCmd);
+    const dropped = await cmd(
+      'data get entity @e[type=minecraft:item,x=2,y=-59,z=20,distance=..3,limit=1,sort=nearest] Item.id');
+    return { res: res.trim(), dropped: dropped.trim() };
+  }
+  const wooden = await furnaceLoot('minecraft:wooden_pickaxe');
+  check('furnace drops with wooden pickaxe',
+    wooden.dropped.includes(`"${NS}:1x_compressed_furnace"`), `${wooden.res} | ${wooden.dropped}`);
+  const stonePick = await furnaceLoot('minecraft:stone_pickaxe');
+  check('furnace drops with stone pickaxe',
+    stonePick.dropped.includes(`"${NS}:1x_compressed_furnace"`), `${stonePick.res} | ${stonePick.dropped}`);
+  const noTool = await furnaceLoot(null);
+  check('furnace no drop without pickaxe',
+    !noTool.dropped.includes('1x_compressed_furnace'), `${noTool.res} | ${noTool.dropped}`);
+  await cmd('kill @e[type=minecraft:item]');
+  await cmd('setblock 2 -60 20 minecraft:air');
+
   // 4) 全矩阵物品：盔甲架主手换装 + 读 id 断言（全部 1549 个物品）。
   //    组件数值（耐久 9ⁿ / unbreakable / 速度阶梯 / 护甲防御 / 食物数值）已由服务端
   //    SELF-TEST 权威覆盖，这里验证"物品存在 + 可装备 + 组件补丁可写"。
