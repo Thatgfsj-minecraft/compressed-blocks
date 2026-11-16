@@ -31,7 +31,7 @@ import net.minecraft.world.level.storage.ValueOutput;
 /**
  * 压缩熔炉方块实体（并行多路版）。
  *
- * <p>每档槽位：1 重 3 入/3 燃/3 出（N=3）、2 重 6/6/6、3/4 重 9/9/9。
+ * <p>每档槽位：1 重 3 入/3 燃/3 出（N=3）、2 重 6/6/6、3/4 重 9/9/9；单路烧炼速度 2x/3x/6x/27x（整机 6x/18x/54x/243x）。
  * 每路独立配方缓存与进度（O(1) 批量结算，避免 81x 档位下每 tick 数百次配方 assemble），
  * 但整机共享一个 litTime 燃烧池：燃料按 lane 索引升序消耗（fuel_0 -> fuel_1 -> ...），
  * 按真实 tick 燃烧（不加速燃料消耗），因此档位越高单位燃料的产出越高。保留空转保护：
@@ -353,8 +353,8 @@ public class CompressedFurnaceBlockEntity extends AbstractFurnaceBlockEntity {
             if (fuel.isEmpty()) {
                 continue;
             }
-            // 压缩熔炉的燃料燃烧时间 = 原版 ×2（用户 2026-11-17 要求）
-            int duration = fuels.burnDuration(fuel) * 2;
+            // 燃料燃烧时间与原版一致（用户澄清：×2 的是烧炼速度，不是耐烧时间）
+            int duration = fuels.burnDuration(fuel);
             if (duration <= 0) {
                 continue;
             }
