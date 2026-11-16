@@ -41,12 +41,8 @@ public class CompressedFurnaceMenu extends AbstractContainerMenu {
     private static final int OUT_X = 118;
     /** 首行槽位 y（相对面板）。 */
     private static final int TOP_Y = 18;
-    /** 输入区与燃料区之间的燃烧进度条。 */
-    public static final int BURN_BAR_HEIGHT = 5;
-    /** 燃烧条与燃料区之间的间距。 */
-    private static final int BURN_BAR_GAP = 10;
-    /** 燃烧条宽度 = 3 个槽位列。 */
-    private static final int BURN_BAR_WIDTH = 54;
+    /** 输入区与燃料区之间的间距：放燃烧剩余时间文字。 */
+    private static final int BURN_INFO_GAP = 10;
 
     private final Container container;
     private final ContainerData data;
@@ -107,7 +103,7 @@ public class CompressedFurnaceMenu extends AbstractContainerMenu {
 
     /** 物品区高度：输入 R 行 + 燃烧条 + 燃料 R 行 + 底部留白。 */
     public int bodyHeight() {
-        return (TOP_Y + ROW_PITCH * this.rows * 2 + BURN_BAR_GAP + 8) - BODY_TOP;
+        return (TOP_Y + ROW_PITCH * this.rows * 2 + BURN_INFO_GAP + 8) - BODY_TOP;
     }
 
     public int imageHeight() {
@@ -122,21 +118,13 @@ public class CompressedFurnaceMenu extends AbstractContainerMenu {
         return BODY_TOP + this.bodyHeight() + 14;
     }
 
-    /** 燃烧进度条（相对面板左上角）：x / y / 宽 / 高。 */
-    public int burnBarX() {
+    /** 燃烧剩余时间文字锚点（相对面板左上角；原燃烧条位置改用文字）。 */
+    public int burnInfoX() {
         return LEFT_X;
     }
 
-    public int burnBarY() {
-        return TOP_Y + ROW_PITCH * this.rows + 1;
-    }
-
-    public int burnBarWidth() {
-        return BURN_BAR_WIDTH;
-    }
-
-    public int burnBarHeight() {
-        return BURN_BAR_HEIGHT;
+    public int burnInfoY() {
+        return TOP_Y + ROW_PITCH * this.rows - 1;
     }
 
     private int inputX(int col) {
@@ -152,7 +140,7 @@ public class CompressedFurnaceMenu extends AbstractContainerMenu {
     }
 
     private int fuelY(int row) {
-        return TOP_Y + ROW_PITCH * this.rows + BURN_BAR_GAP + ROW_PITCH * row;
+        return TOP_Y + ROW_PITCH * this.rows + BURN_INFO_GAP + ROW_PITCH * row;
     }
 
     private int outputX(int col) {
@@ -174,12 +162,18 @@ public class CompressedFurnaceMenu extends AbstractContainerMenu {
         return this.data.get(CompressedFurnaceData.activeIndex(lane)) != 0;
     }
 
-    public float litProgress() {
-        return this.data.get(CompressedFurnaceData.litIndex(this.lanes)) / 1000.0F;
+    /** 燃烧池剩余 tick。 */
+    public int litTicks() {
+        return this.data.get(CompressedFurnaceData.litIndex(this.lanes));
+    }
+
+    /** 燃烧池剩余秒数（界面显示 "xx.xs"）。 */
+    public float litSeconds() {
+        return this.litTicks() / 20.0F;
     }
 
     public boolean isLit() {
-        return this.data.get(CompressedFurnaceData.litIndex(this.lanes)) > 0;
+        return this.litTicks() > 0;
     }
 
     // ---------------------------------------------------------------- 交互

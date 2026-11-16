@@ -97,7 +97,8 @@ public class CompressedFurnaceBlockEntity extends AbstractFurnaceBlockEntity {
                     return 0;
                 }
                 if (index == CompressedFurnaceData.litIndex(lanes)) {
-                    return litPermille();
+                    // 燃烧池剩余 tick：界面据此显示剩余秒数；short 上限内 clamp
+                    return Mth.clamp(litTime, 0, CompressedFurnaceData.MAX_DATA_VALUE);
                 }
                 int lane = index / 2;
                 if ((index & 1) == 0) {
@@ -246,13 +247,6 @@ public class CompressedFurnaceBlockEntity extends AbstractFurnaceBlockEntity {
             return 0;
         }
         return Mth.clamp((int) ((long) this.cookTime[lane] * 1000L / total), 0, 1000);
-    }
-
-    private int litPermille() {
-        if (this.litTotal <= 0) {
-            return 0;
-        }
-        return Mth.clamp((int) ((long) this.litTime * 1000L / this.litTotal), 0, 1000);
     }
 
     /** 所有产出槽合计还能接收多少件 result（0 = 全部接不住）。 */
