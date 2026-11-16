@@ -28,6 +28,12 @@ public final class CompressedFurnaceMenus {
             new SimpleContainer(CompressedFurnaceData.slotCount(9)),
             new SimpleContainerData(CompressedFurnaceData.dataCount(9)), 3),
         FeatureFlags.VANILLA_SET);
+    /** 4 重：布局与 3 重一致（9 路），但 tier=4 让客户端输入槽校验也放行全部等级。 */
+    public static final MenuType<CompressedFurnaceMenu> MENU_4X = new MenuType<>(
+        (id, inventory) -> new CompressedFurnaceMenu(forTier(4), id, inventory,
+            new SimpleContainer(CompressedFurnaceData.slotCount(9)),
+            new SimpleContainerData(CompressedFurnaceData.dataCount(9)), 4),
+        FeatureFlags.VANILLA_SET);
 
     private CompressedFurnaceMenus() {
     }
@@ -36,7 +42,8 @@ public final class CompressedFurnaceMenus {
         return switch (tier) {
             case 1 -> MENU_1X;
             case 2 -> MENU_2X;
-            default -> MENU_3X;
+            case 3 -> MENU_3X;
+            default -> MENU_4X;
         };
     }
 }

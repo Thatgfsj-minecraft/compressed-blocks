@@ -85,11 +85,17 @@ public class CompressedFurnaceScreen extends AbstractContainerScreen<CompressedF
             Slot slot = this.menu.getSlot(i);
             drawSlot(graphics, this.leftPos + slot.x, this.topPos + slot.y);
         }
-        // 整机共享燃烧池剩余时间（原中间燃烧条位置，空出来只放文字；水平居中于 A/C 区块）
-        String burnText = this.menu.burnTimeText();
-        int burnTextX = this.leftPos + this.menu.burnInfoCenterX() - this.font.width(burnText) / 2;
-        graphics.drawString(this.font, burnText, burnTextX,
-            this.topPos + this.menu.burnInfoY(), TEXT_DARK, false);
+        // 整机共享燃烧池状态：火焰图标 + 文字（燃烧中显示剩余时间，熄灭显示"已熄灭"）
+        // 避免"没有火焰图标 + 空闲时 0.0s"被误读成熔炉熄灭
+        boolean lit = this.menu.isLit();
+        String burnText = lit ? this.menu.burnTimeText() : "已熄灭";
+        int textWidth = this.font.width(burnText);
+        int groupWidth = FLAME_W + 2 + textWidth;
+        int groupX = this.leftPos + this.menu.burnInfoCenterX() - groupWidth / 2;
+        int burnY = this.topPos + this.menu.burnInfoY();
+        drawFlame(graphics, groupX, burnY, lit);
+        graphics.drawString(this.font, burnText, groupX + FLAME_W + 2, burnY,
+            lit ? TEXT_DARK : 0xFF8B0000, false);
         // 产出方向箭头：水平居中于 A/C 与 D 之间，垂直居中于 A/C/D 整体
         int arrowX = this.leftPos + this.menu.arrowX();
         int arrowY = this.topPos + this.menu.arrowCenterY() - 2;
@@ -116,6 +122,20 @@ public class CompressedFurnaceScreen extends AbstractContainerScreen<CompressedF
         if (filled > 0) {
             graphics.fill(x, y, x + filled, y + height, color);
         }
+    }
+
+    /** 小火焰图标宽度（像素）。 */
+    private static final int FLAME_W = 7;
+
+    /** 画 7×7 小火焰：点燃时橙黄，熄灭时深灰。 */
+    private static void drawFlame(GuiGraphics graphics, int x, int y, boolean lit) {
+        int outer = lit ? 0xFFE06A00 : 0xFF6E6E6E;
+        int inner = lit ? 0xFFFFD24A : 0xFF9A9A9A;
+        graphics.fill(x + 3, y, x + 5, y + 1, outer);
+        graphics.fill(x + 2, y + 1, x + 6, y + 3, outer);
+        graphics.fill(x + 1, y + 3, x + 7, y + 6, outer);
+        graphics.fill(x + 2, y + 6, x + 6, y + 7, outer);
+        graphics.fill(x + 3, y + 3, x + 5, y + 6, inner);
     }
 
     /** 右向箭头：杆 + 三角箭头（完整形状，不再缺角）。 */

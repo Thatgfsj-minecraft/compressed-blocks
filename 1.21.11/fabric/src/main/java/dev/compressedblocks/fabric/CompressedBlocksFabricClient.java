@@ -29,6 +29,7 @@ public class CompressedBlocksFabricClient implements ClientModInitializer {
         MenuScreens.register(CompressedFurnaceMenus.MENU_1X, CompressedFurnaceScreen::new);
         MenuScreens.register(CompressedFurnaceMenus.MENU_2X, CompressedFurnaceScreen::new);
         MenuScreens.register(CompressedFurnaceMenus.MENU_3X, CompressedFurnaceScreen::new);
+        MenuScreens.register(CompressedFurnaceMenus.MENU_4X, CompressedFurnaceScreen::new);
         for (Block block : CompressedBlocks.SAPLING_BLOCKS) {
             BlockRenderLayerMap.putBlocks(ChunkSectionLayer.CUTOUT, block);
         }

@@ -150,6 +150,7 @@ public class CompressedBlocksNeoForge {
                 helper.register(CompressedBlocks.id("compressed_furnace_1x"), CompressedFurnaceMenus.MENU_1X);
                 helper.register(CompressedBlocks.id("compressed_furnace_2x"), CompressedFurnaceMenus.MENU_2X);
                 helper.register(CompressedBlocks.id("compressed_furnace_3x"), CompressedFurnaceMenus.MENU_3X);
+                helper.register(CompressedBlocks.id("compressed_furnace_4x"), CompressedFurnaceMenus.MENU_4X);
             });
         } else if (event.getRegistryKey() == Registries.CREATIVE_MODE_TAB) {
             // "压缩盆栽"栏由附属 mod 独有

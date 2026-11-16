@@ -67,6 +67,8 @@ public class CompressedFurnaceBlock extends AbstractFurnaceBlock {
         BlockEntity blockEntity = level.getBlockEntity(pos);
         if (blockEntity instanceof MenuProvider menu) {
             player.openMenu(menu);
+            // 与原版 FurnaceBlock.openContainer 对齐：交互统计
+            player.awardStat(net.minecraft.stats.Stats.INTERACT_WITH_FURNACE);
         }
     }
 
