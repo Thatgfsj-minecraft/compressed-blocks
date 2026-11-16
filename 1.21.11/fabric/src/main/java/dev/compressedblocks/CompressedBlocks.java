@@ -1231,6 +1231,18 @@ public final class CompressedBlocks {
         if (FURNACE_BLOCKS.size() != FURNACE_TIERS) {
             errors.add("furnace blocks count " + FURNACE_BLOCKS.size() + " != " + FURNACE_TIERS);
         }
+
+        // 压缩熔炉规格：lane 数 3/6/9/9，单路速度 2x/3x/6x/27x（整机 6x/18x/54x/243x）
+        int[] wantLanes = {3, 6, 9, 9};
+        int[] wantSpeedMilli = {2000, 3000, 6000, 27000};
+        for (int tier = 1; tier <= FURNACE_TIERS; tier++) {
+            if (CompressedFurnaceData.lanesForTier(tier) != wantLanes[tier - 1]) {
+                errors.add("furnace lanes tier " + tier);
+            }
+            if (CompressedFurnaceData.cookSpeedMilli(tier) != wantSpeedMilli[tier - 1]) {
+                errors.add("furnace speed tier " + tier);
+            }
+        }
         if (HOPPER_BLOCKS.size() != HOPPER_TIERS) {
             errors.add("hopper blocks count " + HOPPER_BLOCKS.size() + " != " + HOPPER_TIERS);
         }

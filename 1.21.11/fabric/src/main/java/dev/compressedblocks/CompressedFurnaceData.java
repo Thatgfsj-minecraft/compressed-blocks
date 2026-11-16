@@ -29,13 +29,16 @@ public final class CompressedFurnaceData {
         };
     }
 
-    /** 单路速度（milli / 真实 tick）：1x / 1.5x / 3x / 13.5x，整机吞吐 3x / 9x / 27x / 121.5x。 */
+    /**
+     * 单路速度（milli / 真实 tick）：2x / 3x / 6x / 27x（2026-11-17 用户要求整体 ×2），
+     * 整机吞吐 = 单路 × lane 数（3/6/9/9）= 6x / 18x / 54x / 243x。
+     */
     public static int cookSpeedMilli(int tier) {
         return switch (tier) {
-            case 1 -> 1000;
-            case 2 -> 1500;
-            case 3 -> 3000;
-            default -> 13500;
+            case 1 -> 2000;
+            case 2 -> 3000;
+            case 3 -> 6000;
+            default -> 27000;
         };
     }
 
