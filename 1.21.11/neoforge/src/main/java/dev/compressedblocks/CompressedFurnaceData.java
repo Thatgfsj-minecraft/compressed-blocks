@@ -70,8 +70,11 @@ public final class CompressedFurnaceData {
         return 2 * lane + 1;
     }
 
-    /** 2N：全机共享燃烧池的剩余千分比（0..1000）。 */
+    /** 2N：全机共享燃烧池剩余 tick（用于界面显示"xx.xs"；网络包为 short，值需 clamp 到 32767）。 */
     public static int litIndex(int lanes) {
         return 2 * lanes;
     }
+
+    /** ContainerData 经 short 传输，单值上限。 */
+    public static final int MAX_DATA_VALUE = 32767;
 }
