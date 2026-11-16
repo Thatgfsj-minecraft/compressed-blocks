@@ -65,15 +65,25 @@ public class CompressedFurnaceMenu extends AbstractContainerMenu {
         this.acceptedInputs = this.level.recipeAccess().propertySet(RecipePropertySet.FURNACE_INPUT);
         checkContainerSize(container, CompressedFurnaceData.slotCount(this.lanes));
         checkContainerDataCount(data, CompressedFurnaceData.dataCount(this.lanes));
+        // 菜单槽列表必须按"输入区 → 燃料区 → 产出区"分区添加（quickMoveStack 与界面都按这个区间取槽），
+        // 而容器索引仍是交错布局（input=3i / fuel=3i+1 / output=3i+2），所以 Slot 构造时显式传容器索引。
         for (int lane = 0; lane < this.lanes; lane++) {
             int col = lane % 3;
             int row = lane / 3;
             this.addSlot(new InputSlot(container,
                 CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_INPUT),
                 this.inputX(col), this.inputY(row), this.tier));
+        }
+        for (int lane = 0; lane < this.lanes; lane++) {
+            int col = lane % 3;
+            int row = lane / 3;
             this.addSlot(new FuelSlot(container,
                 CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_FUEL),
                 this.fuelX(col), this.fuelY(row), this.level));
+        }
+        for (int lane = 0; lane < this.lanes; lane++) {
+            int col = lane % 3;
+            int row = lane / 3;
             this.addSlot(new FurnaceResultSlot(playerInventory.player, container,
                 CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_OUTPUT),
                 this.outputX(col), this.outputY(row)));
