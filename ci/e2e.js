@@ -284,8 +284,91 @@ function check(name, ok, detail) {
   check('pot break drops plant', await expectDrop('1x_cane'));
   check('pot break drops pot', await expectDrop('pot'));
   await cmd('kill @e[type=minecraft:item]');
-  await cmd(`setblock 4 -59 20 minecraft:air`);
-  await cmd('kill @e[type=minecraft:item]');
+  // 7) 刷石机防御式输出（issue #39）：缓存校验/方向回退/addItem 语义/兜底掉落/红石锁
+  const gpos = '10 -59 30', hpos = '10 -60 30', upos = '10 -58 30';
+  const genBuf = (nbt) => {
+    const bc = nbt.match(/BufferCount: (\d+)/);
+    if (bc) return parseInt(bc[1], 10);
+    const m = nbt.match(/Buffer: \{[^}]*count: (\d+)/);
+    return m ? parseInt(m[1], 10) : 0;
+  };
+  const resetGenArea = async () => {
+    await cmd('kill @e[type=minecraft:item]');
+    await cmd('setblock 11 -60 30 minecraft:air');
+    await cmd(`setblock ${upos} minecraft:air`);
+    await cmd(`setblock ${gpos} minecraft:air`);
+    await cmd(`setblock ${hpos} minecraft:air`);
+    await cmd('setblock 10 -61 30 minecraft:grass_block');
+  };
+  const genItems = async () => (await cmd(`data get block ${hpos} Items`)).trim();
+  const genTags = async () => (await cmd(`data get block ${gpos}`)).trim();
+
+  // 7a) 木质漏斗（用户场景）应能接住产物
+  await resetGenArea();
+  await cmd(`setblock ${hpos} ${NS}:wooden_hopper`);
+  await cmd(`setblock ${gpos} ${NS}:cobblestone_generator`);
+  await cmd('tick sprint 40t');
+  await new Promise((r) => setTimeout(r, 1600));
+  const genHop = await genItems();
+  check('generator pushes into wooden_hopper', /minecraft:cobblestone/.test(genHop) && !/Items: \[\]/.test(genHop), genHop);
+
+  // 7b) 下方木漏斗被异种物品占住 + 上方空木漏斗 → 回退到上方方向
+  await resetGenArea();
+  await cmd(`setblock ${hpos} ${NS}:wooden_hopper`);
+  await cmd(`data merge block ${hpos} {Items:[{Slot:0b,id:"minecraft:dirt",count:1}]}`);
+  await cmd(`setblock ${upos} ${NS}:wooden_hopper`);
+  await cmd(`setblock ${gpos} ${NS}:cobblestone_generator`);
+  await cmd('tick sprint 40t');
+  await new Promise((r) => setTimeout(r, 1600));
+  const genUp = await cmd(`data get block ${upos} Items`);
+  const genDown = await genItems();
+  check('generator falls back to other direction', /minecraft:cobblestone/.test(genUp) && !/dirt,.*minecraft:cobblestone/.test(genDown), `up=${genUp.trim()} | down=${genDown}`);
+
+  // 7c) 红石锁死（相邻红石块 → enabled=false）的漏斗不接收，产物留在缓冲
+  await resetGenArea();
+  await cmd(`setblock ${hpos} ${NS}:wooden_hopper`);
+  await cmd('setblock 11 -60 30 minecraft:redstone_block');
+  await cmd(`setblock ${gpos} ${NS}:cobblestone_generator`);
+  await cmd('tick sprint 40t');
+  await new Promise((r) => setTimeout(r, 1400));
+  const lockedItems = await genItems();
+  const lockedBuf = genBuf(await genTags());
+  check('redstone-locked hopper receives nothing', /Items: \[\]/.test(lockedItems) || lockedItems.endsWith('[]'), lockedItems);
+  check('redstone-locked hopper leaves buffer', lockedBuf > 0, `buffer=${lockedBuf}`);
+
+  // 7d) 目标被移除/替换为非容器后自动重扫；放回漏斗继续进物
+  await resetGenArea();
+  await cmd(`setblock ${hpos} ${NS}:wooden_hopper`);
+  await cmd(`setblock ${gpos} ${NS}:cobblestone_generator`);
+  await cmd('tick sprint 40t');
+  await new Promise((r) => setTimeout(r, 1400));
+  const rescanBefore = await genItems();
+  await cmd(`setblock ${hpos} minecraft:stone`);
+  await cmd('tick sprint 30t');
+  await new Promise((r) => setTimeout(r, 900));
+  await cmd(`setblock ${hpos} ${NS}:wooden_hopper`);
+  await cmd('tick sprint 40t');
+  await new Promise((r) => setTimeout(r, 1400));
+  const rescanAfter = await genItems();
+  check('generator rescans after target replaced', /minecraft:cobblestone/.test(rescanAfter), `before=${rescanBefore} after=${rescanAfter}`);
+
+  // 7e) 全方向堵死 + 缓冲达上限 → 产物以掉落物弹到机器上方
+  await resetGenArea();
+  await cmd(`setblock ${hpos} ${NS}:wooden_hopper`);
+  await cmd(`data merge block ${hpos} {Items:[{Slot:0b,id:"minecraft:cobblestone",count:64}]}`);
+  await cmd(`setblock ${gpos} ${NS}:cobblestone_generator`);
+  await cmd(`data merge block ${gpos} {Buffer:{id:"minecraft:cobblestone",count:64},Progress:19}`);
+  await cmd('tick sprint 10t');
+  await new Promise((r) => setTimeout(r, 600));
+  const overflowEntity = '@e[type=minecraft:item,x=10,y=-59,z=30,distance=..5,limit=1]';
+  const overflowDropId = await cmd(`data get entity ${overflowEntity} Item.id`);
+  check('generator drops overflow above when full', /minecraft:cobblestone/.test(overflowDropId), overflowDropId.trim());
+  const overflowCount = await cmd(`data get entity ${overflowEntity} Item.count`);
+  check('generator overflow drop keeps count', /: 64$/.test(overflowCount.trim()), overflowCount.trim());
+  const overflowBuf = await cmd(`data get block ${gpos}`);
+  const overflowBufCount = genBuf(overflowBuf);
+  check('generator overflow drop empties buffer', overflowBufCount < 8, `buffer=${overflowBufCount}`);
+  await resetGenArea();
 
   await cmd('stop');
   rcon.destroy();
