@@ -97,8 +97,9 @@ public class CompressedFurnaceBlockEntity extends AbstractFurnaceBlockEntity {
                     return 0;
                 }
                 if (index == CompressedFurnaceData.litIndex(lanes)) {
-                    // 燃烧池剩余 tick：界面据此显示剩余秒数；short 上限内 clamp
-                    return Mth.clamp(litTime, 0, CompressedFurnaceData.MAX_DATA_VALUE);
+                    // 燃烧池剩余时间：以 2 tick 为单位上传（燃料已 ×2，最长 40000 tick → 20000 ≤ short 上限），
+                    // 客户端按 value/10.0 秒显示
+                    return Mth.clamp((litTime + 1) / 2, 0, CompressedFurnaceData.MAX_DATA_VALUE);
                 }
                 int lane = index / 2;
                 if ((index & 1) == 0) {
@@ -350,7 +351,8 @@ public class CompressedFurnaceBlockEntity extends AbstractFurnaceBlockEntity {
             if (fuel.isEmpty()) {
                 continue;
             }
-            int duration = fuels.burnDuration(fuel);
+            // 压缩熔炉的燃料燃烧时间 = 原版 ×2（用户 2026-11-17 要求）
+            int duration = fuels.burnDuration(fuel) * 2;
             if (duration <= 0) {
                 continue;
             }
@@ -367,7 +369,6 @@ public class CompressedFurnaceBlockEntity extends AbstractFurnaceBlockEntity {
     }
 
     public static void serverTick(ServerLevel level, BlockPos pos, BlockState state, CompressedFurnaceBlockEntity be) {
-        boolean wasLit = be.isLitNow();
         boolean changed = false;
         int lanes = be.lanes;
 
@@ -423,11 +424,14 @@ public class CompressedFurnaceBlockEntity extends AbstractFurnaceBlockEntity {
             }
         }
 
-        // 5) LIT 聚合 + 比较器/邻居刷新（setChanged 内部会 updateNeighbourForOutputSignal）
+        // 5) LIT 聚合：每 tick 以"当前真实方块状态"为准校正（不用 tick 入口的快照 state，
+        //    防止外部把 LIT 改回 false 后一直显示熄灭）＋比较器/邻居刷新
         boolean litNow = be.litTime > 0;
-        if (wasLit != litNow) {
-            state = state.setValue(AbstractFurnaceBlock.LIT, litNow);
-            level.setBlock(pos, state, 3);
+        BlockState current = level.getBlockState(pos);
+        boolean stateLit = current.hasProperty(AbstractFurnaceBlock.LIT)
+            && current.getValue(AbstractFurnaceBlock.LIT);
+        if (stateLit != litNow) {
+            level.setBlock(pos, current.setValue(AbstractFurnaceBlock.LIT, litNow), 3);
             changed = true;
         }
         if (changed) {
