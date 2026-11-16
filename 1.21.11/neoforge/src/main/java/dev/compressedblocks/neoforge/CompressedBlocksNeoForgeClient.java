@@ -38,6 +38,7 @@ public class CompressedBlocksNeoForgeClient {
         event.register(CompressedFurnaceMenus.MENU_1X, CompressedFurnaceScreen::new);
         event.register(CompressedFurnaceMenus.MENU_2X, CompressedFurnaceScreen::new);
         event.register(CompressedFurnaceMenus.MENU_3X, CompressedFurnaceScreen::new);
+        event.register(CompressedFurnaceMenus.MENU_4X, CompressedFurnaceScreen::new);
     }
 
     @SubscribeEvent
