@@ -96,10 +96,12 @@ public class CompressedFurnaceBlockEntity extends AbstractFurnaceBlockEntity {
                 if (index < 0 || index >= CompressedFurnaceData.dataCount(lanes)) {
                     return 0;
                 }
-                if (index == CompressedFurnaceData.litIndex(lanes)) {
-                    // 燃烧池剩余时间：以 2 tick 为单位上传（燃料已 ×2，最长 40000 tick → 20000 ≤ short 上限），
-                    // 客户端按 value/10.0 秒显示
-                    return Mth.clamp((litTime + 1) / 2, 0, CompressedFurnaceData.MAX_DATA_VALUE);
+                if (index == CompressedFurnaceData.litLowIndex(lanes)) {
+                    // 燃烧池剩余 tick 低 15 位（高位见下一槽）；支持数天/数年级燃料
+                    return litTime & (CompressedFurnaceData.DATA_CHUNK - 1);
+                }
+                if (index == CompressedFurnaceData.litHighIndex(lanes)) {
+                    return litTime >> 15;
                 }
                 int lane = index / 2;
                 if ((index & 1) == 0) {

@@ -55,10 +55,13 @@ public final class CompressedFurnaceData {
         return containerSlot / SLOTS_PER_LANE;
     }
 
-    /** 菜单数据槽数量：2N + 1。 */
+    /** 菜单数据槽数量：2N + 2（进度/活跃 2N 个 + 燃烧池剩余 tick 低/高各 1）。 */
     public static int dataCount(int lanes) {
-        return 2 * lanes + 1;
+        return 2 * lanes + 2;
     }
+
+    /** 单槽数据最大跨度（short 传输）。 */
+    public static final int DATA_CHUNK = 1 << 15;
 
     /** 2i：lane i 进度千分比（0..1000）。 */
     public static int progressIndex(int lane) {
@@ -70,9 +73,14 @@ public final class CompressedFurnaceData {
         return 2 * lane + 1;
     }
 
-    /** 2N：全机共享燃烧池剩余 tick（用于界面显示"xx.xs"；网络包为 short，值需 clamp 到 32767）。 */
-    public static int litIndex(int lanes) {
+    /** 2N：燃烧池剩余 tick 的低 15 位（配合 litHighIndex 还原完整 tick，支持数天~数年级燃料）。 */
+    public static int litLowIndex(int lanes) {
         return 2 * lanes;
+    }
+
+    /** 2N+1：燃烧池剩余 tick 的高位。 */
+    public static int litHighIndex(int lanes) {
+        return 2 * lanes + 1;
     }
 
     /** ContainerData 经 short 传输，单值上限。 */

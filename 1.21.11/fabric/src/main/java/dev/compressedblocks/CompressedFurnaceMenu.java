@@ -187,14 +187,31 @@ public class CompressedFurnaceMenu extends AbstractContainerMenu {
         return this.data.get(CompressedFurnaceData.activeIndex(lane)) != 0;
     }
 
-    /** 燃烧池剩余时间（单位：2 tick，服务端上传时已 ÷2 以适配 short）。 */
+    /** 燃烧池剩余 tick（低 15 位 + 高位，完整值；支持数天~数年级燃料）。 */
     public int litTicks() {
-        return this.data.get(CompressedFurnaceData.litIndex(this.lanes));
+        int low = this.data.get(CompressedFurnaceData.litLowIndex(this.lanes));
+        int high = this.data.get(CompressedFurnaceData.litHighIndex(this.lanes));
+        return low + high * CompressedFurnaceData.DATA_CHUNK;
     }
 
-    /** 燃烧池剩余秒数（界面显示 "xx.xs"）：1 单位 = 2 tick = 0.1 秒。 */
+    /** 燃烧池剩余秒数。 */
     public float litSeconds() {
-        return this.litTicks() / 10.0F;
+        return this.litTicks() / 20.0F;
+    }
+
+    /** 燃烧池剩余时间自适应文本：<60s → "45.6s"；<60min → "12.3m"；<24h → "1.5h"；否则 "3.2天"。 */
+    public String burnTimeText() {
+        float seconds = this.litSeconds();
+        if (seconds < 60.0F) {
+            return String.format(java.util.Locale.ROOT, "%.1fs", seconds);
+        }
+        if (seconds < 3600.0F) {
+            return String.format(java.util.Locale.ROOT, "%.1fm", seconds / 60.0F);
+        }
+        if (seconds < 86400.0F) {
+            return String.format(java.util.Locale.ROOT, "%.1fh", seconds / 3600.0F);
+        }
+        return String.format(java.util.Locale.ROOT, "%.1f天", seconds / 86400.0F);
     }
 
     public boolean isLit() {
