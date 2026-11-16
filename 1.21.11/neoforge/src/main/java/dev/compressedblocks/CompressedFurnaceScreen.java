@@ -50,13 +50,18 @@ public class CompressedFurnaceScreen extends AbstractContainerScreen<CompressedF
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
-        // 每路烧炼进度：画在物品之上（同原版耐久条位置），避免被物品图标遮住
+        // 每路烧炼进度：画在物品之上（同原版耐久条位置），避免被物品图标遮住。
+        // 只有该路真的在烧（进度 > 0）时才画，空闲的路不留多余横线。
         for (int lane = 0; lane < this.menu.lanes(); lane++) {
+            float progress = this.menu.cookProgress(lane);
+            if (progress <= 0.0F) {
+                continue;
+            }
             Slot input = this.menu.getSlot(lane);
             drawBar(graphics,
                 this.leftPos + input.x + LANE_BAR_X_OFFSET,
                 this.topPos + input.y + LANE_BAR_Y_OFFSET,
-                LANE_BAR_WIDTH, LANE_BAR_HEIGHT, this.menu.cookProgress(lane), BAR_PROGRESS);
+                LANE_BAR_WIDTH, LANE_BAR_HEIGHT, progress, BAR_PROGRESS);
         }
         this.renderTooltip(graphics, mouseX, mouseY);
     }
