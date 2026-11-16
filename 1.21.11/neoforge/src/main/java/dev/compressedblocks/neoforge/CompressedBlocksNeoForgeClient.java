@@ -2,6 +2,8 @@ package dev.compressedblocks.neoforge;
 
 import dev.compressedblocks.CompressedBlocks;
 import dev.compressedblocks.CompressedChestRenderer;
+import dev.compressedblocks.CompressedFurnaceMenus;
+import dev.compressedblocks.CompressedFurnaceScreen;
 import dev.compressedblocks.CompressedPotRenderer;
 import dev.compressedblocks.CompressedShulkerRenderer;
 import dev.compressedblocks.ScrollingContainerScreen;
@@ -33,6 +35,9 @@ public class CompressedBlocksNeoForgeClient {
         event.register(CompressedBlocks.SHULKER_MENU_TYPE, ScrollingContainerScreen::new);
         event.register(CompressedBlocks.WOODEN_HOPPER_MENU_TYPE, WoodenHopperScreen::new);
         event.register(CompressedBlocks.COMPRESSED_WOODEN_HOPPER_MENU_TYPE, WoodenHopperScreen::new);
+        event.register(CompressedFurnaceMenus.MENU_1X, CompressedFurnaceScreen::new);
+        event.register(CompressedFurnaceMenus.MENU_2X, CompressedFurnaceScreen::new);
+        event.register(CompressedFurnaceMenus.MENU_3X, CompressedFurnaceScreen::new);
     }
 
     @SubscribeEvent

@@ -71,6 +71,12 @@ public class CompressedFurnaceBlock extends AbstractFurnaceBlock {
     }
 
     @Override
+    protected int getAnalogOutputSignal(BlockState state, Level level, BlockPos pos, Direction direction) {
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        return blockEntity instanceof CompressedFurnaceBlockEntity furnace ? furnace.getComparatorOutput() : 0;
+    }
+
+    @Override
     public void animateTick(BlockState state, Level level, BlockPos pos, RandomSource random) {
         if (!state.getValue(LIT)) {
             return;

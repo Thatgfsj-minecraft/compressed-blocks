@@ -2,6 +2,7 @@ package dev.compressedblocks.neoforge;
 
 import dev.compressedblocks.CobblestoneGeneratorBlockEntity;
 import dev.compressedblocks.CompressedBlocks;
+import dev.compressedblocks.CompressedFurnaceMenus;
 import dev.compressedblocks.CompressedHooks;
 import dev.compressedblocks.CompressedPotBlockEntity;
 import java.util.HashSet;
@@ -145,6 +146,10 @@ public class CompressedBlocksNeoForge {
                 helper.register(CompressedBlocks.id("wooden_hopper"), CompressedBlocks.WOODEN_HOPPER_MENU_TYPE);
                 helper.register(CompressedBlocks.id("compressed_wooden_hopper"),
                     CompressedBlocks.COMPRESSED_WOODEN_HOPPER_MENU_TYPE);
+                // 压缩熔炉并行多路：3 个菜单类型（1x/2x/3x，4x 复用 3x）
+                helper.register(CompressedBlocks.id("compressed_furnace_1x"), CompressedFurnaceMenus.MENU_1X);
+                helper.register(CompressedBlocks.id("compressed_furnace_2x"), CompressedFurnaceMenus.MENU_2X);
+                helper.register(CompressedBlocks.id("compressed_furnace_3x"), CompressedFurnaceMenus.MENU_3X);
             });
         } else if (event.getRegistryKey() == Registries.CREATIVE_MODE_TAB) {
             // "压缩盆栽"栏由附属 mod 独有
