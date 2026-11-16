@@ -118,10 +118,13 @@ public class CompressedFurnaceScreen extends AbstractContainerScreen<CompressedF
         }
     }
 
-    /** 右向箭头：杆 + 两级箭头。 */
+    /** 右向箭头：杆 + 三角箭头（完整形状，不再缺角）。 */
     private static void drawArrow(GuiGraphics graphics, int x, int y) {
-        graphics.fill(x, y + 2, x + ARROW_W - 2, y + 3, EDGE_DARK);
-        graphics.fill(x + ARROW_W - 2, y, x + ARROW_W - 1, y + 5, EDGE_DARK);
-        graphics.fill(x + ARROW_W - 1, y + 1, x + ARROW_W, y + 4, EDGE_DARK);
+        // 杆：1px 高
+        graphics.fill(x, y + 3, x + 6, y + 4, EDGE_DARK);
+        // 箭头主体：3×5
+        graphics.fill(x + 6, y + 1, x + 9, y + 6, EDGE_DARK);
+        // 箭头尖：2×3
+        graphics.fill(x + 9, y + 2, x + 11, y + 5, EDGE_DARK);
     }
 }

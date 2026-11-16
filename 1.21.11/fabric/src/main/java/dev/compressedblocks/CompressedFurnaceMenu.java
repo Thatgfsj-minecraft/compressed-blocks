@@ -187,14 +187,14 @@ public class CompressedFurnaceMenu extends AbstractContainerMenu {
         return this.data.get(CompressedFurnaceData.activeIndex(lane)) != 0;
     }
 
-    /** 燃烧池剩余 tick。 */
+    /** 燃烧池剩余时间（单位：2 tick，服务端上传时已 ÷2 以适配 short）。 */
     public int litTicks() {
         return this.data.get(CompressedFurnaceData.litIndex(this.lanes));
     }
 
-    /** 燃烧池剩余秒数（界面显示 "xx.xs"）。 */
+    /** 燃烧池剩余秒数（界面显示 "xx.xs"）：1 单位 = 2 tick = 0.1 秒。 */
     public float litSeconds() {
-        return this.litTicks() / 20.0F;
+        return this.litTicks() / 10.0F;
     }
 
     public boolean isLit() {
