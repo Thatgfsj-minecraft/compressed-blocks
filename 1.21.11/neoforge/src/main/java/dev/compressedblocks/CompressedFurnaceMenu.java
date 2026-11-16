@@ -128,13 +128,28 @@ public class CompressedFurnaceMenu extends AbstractContainerMenu {
         return BODY_TOP + this.bodyHeight() + 14;
     }
 
-    /** 燃烧剩余时间文字锚点（相对面板左上角；原燃烧条位置改用文字）。 */
-    public int burnInfoX() {
-        return LEFT_X;
+    /** 左侧区块（A 输入区 / C 燃料区）宽度：3 个槽列。 */
+    public int leftBlockWidth() {
+        return 54;
+    }
+
+    /** 燃烧剩余时间文字的水平中心（相对面板）：A/C 区块居中。 */
+    public int burnInfoCenterX() {
+        return LEFT_X + 27;
     }
 
     public int burnInfoY() {
         return TOP_Y + ROW_PITCH * this.rows - 1;
+    }
+
+    /** 产出箭头：水平居中于 A/C 区块与 D 产出区之间的空隙。 */
+    public int arrowX() {
+        return (LEFT_X + this.leftBlockWidth() + OUT_X) / 2 - 5;
+    }
+
+    /** 产出箭头：垂直中心 = A 顶 到 C 底 的正中。 */
+    public int arrowCenterY() {
+        return TOP_Y + ROW_PITCH * this.rows + 4;
     }
 
     private int inputX(int col) {
