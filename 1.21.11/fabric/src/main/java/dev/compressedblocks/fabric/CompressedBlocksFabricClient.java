@@ -2,6 +2,8 @@ package dev.compressedblocks.fabric;
 
 import dev.compressedblocks.CompressedBlocks;
 import dev.compressedblocks.CompressedChestRenderer;
+import dev.compressedblocks.CompressedFurnaceMenus;
+import dev.compressedblocks.CompressedFurnaceScreen;
 import dev.compressedblocks.CompressedPotRenderer;
 import dev.compressedblocks.CompressedShulkerRenderer;
 import dev.compressedblocks.ScrollingContainerScreen;
@@ -24,6 +26,9 @@ public class CompressedBlocksFabricClient implements ClientModInitializer {
         MenuScreens.register(CompressedBlocks.SHULKER_MENU_TYPE, ScrollingContainerScreen::new);
         MenuScreens.register(CompressedBlocks.WOODEN_HOPPER_MENU_TYPE, WoodenHopperScreen::new);
         MenuScreens.register(CompressedBlocks.COMPRESSED_WOODEN_HOPPER_MENU_TYPE, WoodenHopperScreen::new);
+        MenuScreens.register(CompressedFurnaceMenus.MENU_1X, CompressedFurnaceScreen::new);
+        MenuScreens.register(CompressedFurnaceMenus.MENU_2X, CompressedFurnaceScreen::new);
+        MenuScreens.register(CompressedFurnaceMenus.MENU_3X, CompressedFurnaceScreen::new);
         for (Block block : CompressedBlocks.SAPLING_BLOCKS) {
             BlockRenderLayerMap.putBlocks(ChunkSectionLayer.CUTOUT, block);
         }

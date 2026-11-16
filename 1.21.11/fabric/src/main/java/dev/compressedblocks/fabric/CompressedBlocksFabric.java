@@ -1,6 +1,7 @@
 package dev.compressedblocks.fabric;
 
 import dev.compressedblocks.CompressedBlocks;
+import dev.compressedblocks.CompressedFurnaceMenus;
 import dev.compressedblocks.CompressedHooks;
 import dev.compressedblocks.CobblestoneGeneratorBlockEntity;
 import dev.compressedblocks.CompressedPotBlockEntity;
@@ -87,6 +88,13 @@ public class CompressedBlocksFabric implements ModInitializer {
             CompressedBlocks.WOODEN_HOPPER_MENU_TYPE);
         Registry.register(BuiltInRegistries.MENU, CompressedBlocks.id("compressed_wooden_hopper"),
             CompressedBlocks.COMPRESSED_WOODEN_HOPPER_MENU_TYPE);
+        // 压缩熔炉并行多路：3 个菜单类型（1x/2x/3x，4x 复用 3x）
+        Registry.register(BuiltInRegistries.MENU, CompressedBlocks.id("compressed_furnace_1x"),
+            CompressedFurnaceMenus.MENU_1X);
+        Registry.register(BuiltInRegistries.MENU, CompressedBlocks.id("compressed_furnace_2x"),
+            CompressedFurnaceMenus.MENU_2X);
+        Registry.register(BuiltInRegistries.MENU, CompressedBlocks.id("compressed_furnace_3x"),
+            CompressedFurnaceMenus.MENU_3X);
         // 挂载 Fabric Transfer API：使抽屉、管道、漏斗盆栽等自动化设施原生支持存取
         ItemStorage.SIDED.registerForBlockEntity(
             (be, side) -> InventoryStorage.of(be, side), CompressedBlocks.CHEST_TYPE);

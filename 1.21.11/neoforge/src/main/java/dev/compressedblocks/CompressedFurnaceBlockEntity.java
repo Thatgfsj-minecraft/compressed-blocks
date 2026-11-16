@@ -1,14 +1,18 @@
 package dev.compressedblocks;
 
+import java.util.Arrays;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.NonNullList;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.FurnaceMenu;
+import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -19,40 +23,124 @@ import net.minecraft.world.item.crafting.SingleRecipeInput;
 import net.minecraft.world.item.crafting.SmeltingRecipe;
 import net.minecraft.world.level.block.AbstractFurnaceBlock;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
+import net.minecraft.world.level.block.entity.FuelValues;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 /**
- * 四阶压缩熔炉方块实体：
- * 1重（1x）：3x 速度，权限原版 + 1~3 重；
- * 2重（2x）：9x 速度，权限原版 + 1~6 重；
- * 3重（3x）：27x 速度，权限原版 + 1~9 重；
- * 4重（4x）：81x 极致速度，全通烧炼。
+ * 压缩熔炉方块实体（并行多路版）。
  *
- * 燃料消耗与收益模型：
- * 燃烧时间按真实秒数（tick 数）结算，不惩罚性缩减燃料寿命，产出效率等比提升；
- * 空转保护：无待烧物时降速为 1x 消耗，不提前引燃新燃料，防止燃料浪费。
+ * <p>每档槽位：1 重 3 入/3 燃/3 出（N=3）、2 重 6/6/6、3/4 重 9/9/9。
+ * 每路独立配方缓存与进度（O(1) 批量结算，避免 81x 档位下每 tick 数百次配方 assemble），
+ * 但整机共享一个 litTime 燃烧池：燃料按 lane 索引升序消耗（fuel_0 -> fuel_1 -> ...），
+ * 按真实 tick 燃烧（不加速燃料消耗），因此档位越高单位燃料的产出越高。保留空转保护：
+ * 没有任何一路可烧时不会点燃新燃料。</p>
+ *
+ * <p>容器槽交错布局见 {@link CompressedFurnaceData}；菜单数据槽 2N+1（进度千分比、
+ * 活跃标志、燃烧池千分比），全部 <= 1000，天然满足数据包 short 传输范围。</p>
  */
 public class CompressedFurnaceBlockEntity extends AbstractFurnaceBlockEntity {
     private final int tier;
-    private final RecipeManager.CachedCheck<SingleRecipeInput, SmeltingRecipe> quickCheck =
-        RecipeManager.createCheck(RecipeType.SMELTING);
+    private final int lanes;
+    private final int cookSpeedMilli;
+    /** 每路已烧进度（milli tick）。 */
+    private final int[] cookTime;
+    /** 每路当前配方总时长（milli tick，0 = 无有效配方）。 */
+    private final int[] cookTotal;
+    /** 全机共享燃烧池（真实 tick）。 */
+    private int litTime;
+    private int litTotal;
+    /** 每 tick 复用的临时快照，避免每 tick 分配。 */
+    private final boolean[] laneReady;
+    private final ItemStack[] laneResult;
+    private final RecipeHolder<SmeltingRecipe>[] laneRecipe;
+    private final RecipeManager.CachedCheck<SingleRecipeInput, SmeltingRecipe>[] checks;
+    private final int[] slotsUp;
+    private final int[] slotsSide;
+    private final int[] slotsDown;
+    private final ContainerData menuData;
 
+    @SuppressWarnings("unchecked")
     public CompressedFurnaceBlockEntity(BlockPos pos, BlockState state, int tier) {
         super(CompressedBlocks.FURNACE_TYPE[tier - 1], pos, state, RecipeType.SMELTING);
         this.tier = tier;
+        this.lanes = CompressedFurnaceData.lanesForTier(tier);
+        this.cookSpeedMilli = CompressedFurnaceData.cookSpeedMilli(tier);
+        this.cookTime = new int[this.lanes];
+        this.cookTotal = new int[this.lanes];
+        this.laneReady = new boolean[this.lanes];
+        this.laneResult = new ItemStack[this.lanes];
+        Arrays.fill(this.laneResult, ItemStack.EMPTY);
+        this.laneRecipe = new RecipeHolder[this.lanes];
+        // 父类构造器先建了 3 格 items；这里整表替换为 3N 格（getContainerSize() 返回 items.size()）
+        this.items = NonNullList.withSize(CompressedFurnaceData.slotCount(this.lanes), ItemStack.EMPTY);
+        this.checks = (RecipeManager.CachedCheck<SingleRecipeInput, SmeltingRecipe>[])
+            new RecipeManager.CachedCheck<?, ?>[this.lanes];
+        for (int i = 0; i < this.lanes; i++) {
+            // CachedCheck 只缓存 1 条 lastRecipe，必须每路一个，否则互相踩缓存导致全表扫描
+            this.checks[i] = RecipeManager.createCheck(RecipeType.SMELTING);
+        }
+        this.slotsUp = new int[this.lanes];
+        this.slotsSide = new int[this.lanes];
+        this.slotsDown = new int[this.lanes * 2];
+        for (int i = 0; i < this.lanes; i++) {
+            this.slotsUp[i] = CompressedFurnaceData.slot(i, CompressedFurnaceData.ROLE_INPUT);
+            this.slotsSide[i] = CompressedFurnaceData.slot(i, CompressedFurnaceData.ROLE_FUEL);
+            this.slotsDown[i] = CompressedFurnaceData.slot(i, CompressedFurnaceData.ROLE_OUTPUT);
+            this.slotsDown[this.lanes + i] = CompressedFurnaceData.slot(i, CompressedFurnaceData.ROLE_FUEL);
+        }
+        this.menuData = new ContainerData() {
+            @Override
+            public int get(int index) {
+                if (index < 0 || index >= CompressedFurnaceData.dataCount(lanes)) {
+                    return 0;
+                }
+                if (index == CompressedFurnaceData.litIndex(lanes)) {
+                    return litPermille();
+                }
+                int lane = index / 2;
+                if ((index & 1) == 0) {
+                    return progressPermille(lane);
+                }
+                return laneReady[lane] ? 1 : 0;
+            }
+
+            @Override
+            public void set(int index, int value) {
+                // 服务端只读；客户端菜单写入的是自己的哑数据，不会回到这里
+            }
+
+            @Override
+            public int getCount() {
+                return CompressedFurnaceData.dataCount(lanes);
+            }
+        };
     }
 
     public int tier() {
         return this.tier;
     }
 
-    public int getSpeed() {
-        return switch (this.tier) {
+    public int lanes() {
+        return this.lanes;
+    }
+
+    public int cookSpeedMilli() {
+        return this.cookSpeedMilli;
+    }
+
+    public ContainerData menuData() {
+        return this.menuData;
+    }
+
+    /** 档位可烧的压缩等级上限：1 重 <=3、2 重 <=6、3 重 <=9、4 重全通。 */
+    public static int maxLevelForTier(int tier) {
+        return switch (tier) {
             case 1 -> 3;
-            case 2 -> 9;
-            case 3 -> 27;
-            case 4 -> 81;
-            default -> 1;
+            case 2 -> 6;
+            case 3 -> 9;
+            default -> Integer.MAX_VALUE;
         };
     }
 
@@ -78,156 +166,283 @@ public class CompressedFurnaceBlockEntity extends AbstractFurnaceBlockEntity {
         return 0;
     }
 
+    public static boolean isItemAllowed(int tier, ItemStack stack) {
+        return levelOfItem(stack) <= maxLevelForTier(tier);
+    }
+
     public boolean isItemAllowed(ItemStack stack) {
-        int level = levelOfItem(stack);
-        int maxAllowed = switch (this.tier) {
-            case 1 -> 3;
-            case 2 -> 6;
-            case 3 -> 9;
-            default -> Integer.MAX_VALUE;
-        };
-        return level <= maxAllowed;
+        return isItemAllowed(this.tier, stack);
     }
 
     @Override
     protected Component getDefaultName() {
-        return Component.translatable("container.compressedblocks." + CompressedBlocks.LEVEL_PREFIX[this.tier - 1] + "_compressed_furnace");
+        return Component.translatable("container.compressedblocks."
+            + CompressedBlocks.LEVEL_PREFIX[this.tier - 1] + "_compressed_furnace");
     }
 
     @Override
     protected AbstractContainerMenu createMenu(int id, Inventory playerInventory) {
-        return new FurnaceMenu(id, playerInventory, this, this.dataAccess);
+        return new CompressedFurnaceMenu(CompressedFurnaceMenus.forTier(this.tier), id, playerInventory,
+            this, this.menuData, this.tier);
     }
 
     @Override
     public boolean canPlaceItem(int slot, ItemStack stack) {
-        if (slot == 2) {
+        int role = CompressedFurnaceData.roleOf(slot);
+        if (role == CompressedFurnaceData.ROLE_OUTPUT) {
             return false;
         }
-        if (slot == 1) {
+        if (role == CompressedFurnaceData.ROLE_FUEL) {
             return (this.level != null && this.level.fuelValues().isFuel(stack)) || stack.is(Items.BUCKET);
         }
         return isItemAllowed(stack);
     }
 
-    public boolean isLit() {
-        return this.dataAccess.get(0) > 0;
+    @Override
+    public int[] getSlotsForFace(Direction side) {
+        if (side == Direction.DOWN) {
+            return this.slotsDown;
+        }
+        return side == Direction.UP ? this.slotsUp : this.slotsSide;
     }
 
-    private boolean canBurn(RegistryAccess registryAccess, RecipeHolder<SmeltingRecipe> recipe, ItemStack input) {
-        if (input.isEmpty() || !isItemAllowed(input) || recipe == null) {
+    @Override
+    public boolean canTakeItemThroughFace(int slot, ItemStack stack, Direction side) {
+        if (side == Direction.DOWN) {
+            int role = CompressedFurnaceData.roleOf(slot);
+            if (role == CompressedFurnaceData.ROLE_OUTPUT) {
+                return true;
+            }
+            if (role == CompressedFurnaceData.ROLE_FUEL) {
+                return stack.is(Items.WATER_BUCKET) || stack.is(Items.BUCKET);
+            }
             return false;
         }
-        ItemStack result = recipe.value().assemble(new SingleRecipeInput(input), registryAccess);
-        if (result.isEmpty()) {
-            return false;
-        }
-        ItemStack resultSlot = this.items.get(2);
-        if (resultSlot.isEmpty()) {
-            return true;
-        }
-        if (!ItemStack.isSameItemSameComponents(resultSlot, result)) {
-            return false;
-        }
-        return resultSlot.getCount() + result.getCount() <= Math.min(this.getMaxStackSize(), resultSlot.getMaxStackSize());
-    }
-
-    private boolean burn(RegistryAccess registryAccess, RecipeHolder<SmeltingRecipe> recipe, ItemStack input) {
-        if (recipe == null || !canBurn(registryAccess, recipe, input)) {
-            return false;
-        }
-        ItemStack result = recipe.value().assemble(new SingleRecipeInput(input), registryAccess);
-        ItemStack resultSlot = this.items.get(2);
-        if (resultSlot.isEmpty()) {
-            this.items.set(2, result.copy());
-        } else if (ItemStack.isSameItemSameComponents(resultSlot, result)) {
-            resultSlot.grow(result.getCount());
-        }
-        input.shrink(1);
         return true;
     }
 
-    public static void serverTick(ServerLevel level, BlockPos pos, BlockState state, CompressedFurnaceBlockEntity be) {
-        boolean wasLit = be.isLit();
-        boolean changed = false;
-
-        // 燃料时间自然按真实 tick 递减（1x 速度扣减，使玩家获得完整的提速收益与空转保护）
-        if (be.isLit()) {
-            int litTime = be.dataAccess.get(0);
-            be.dataAccess.set(0, litTime - 1);
+    @Override
+    public void setItem(int slot, ItemStack stack) {
+        ItemStack previous = this.items.get(slot);
+        this.items.set(slot, stack);
+        stack.limitSize(this.getMaxStackSize(stack));
+        if (CompressedFurnaceData.roleOf(slot) == CompressedFurnaceData.ROLE_INPUT
+            && !ItemStack.isSameItemSameComponents(previous, stack)) {
+            // 输入换了东西：该路进度清零（父类对槽 0 的同款语义，这里按 lane 生效）
+            int lane = CompressedFurnaceData.laneOf(slot);
+            this.cookTime[lane] = 0;
+            this.cookTotal[lane] = 0;
         }
+        this.setChanged();
+    }
 
-        ItemStack input = be.items.get(0);
-        ItemStack fuel = be.items.get(1);
-        boolean hasInput = !input.isEmpty() && be.isItemAllowed(input);
-        boolean hasFuel = !fuel.isEmpty();
+    public boolean isLitNow() {
+        return this.litTime > 0;
+    }
 
-        RecipeHolder<SmeltingRecipe> recipe = null;
-        if (hasInput) {
-            recipe = be.quickCheck.getRecipeFor(new SingleRecipeInput(input), level).orElse(null);
+    private int progressPermille(int lane) {
+        int total = this.cookTotal[lane];
+        if (total <= 0) {
+            return 0;
         }
-        boolean canBurn = be.canBurn(level.registryAccess(), recipe, input);
+        return Mth.clamp((int) ((long) this.cookTime[lane] * 1000L / total), 0, 1000);
+    }
 
-        if (!be.isLit()) {
-            if (hasFuel && canBurn) {
-                int duration = be.getBurnDuration(level.fuelValues(), fuel);
-                if (duration > 0) {
-                    be.dataAccess.set(0, duration);
-                    be.dataAccess.set(1, duration);
-                    changed = true;
-                    Item fuelItem = fuel.getItem();
-                    fuel.shrink(1);
-                    if (fuel.isEmpty()) {
-                        be.items.set(1, fuelItem.getCraftingRemainder());
-                    }
-                }
-            }
+    private int litPermille() {
+        if (this.litTotal <= 0) {
+            return 0;
         }
+        return Mth.clamp((int) ((long) this.litTime * 1000L / this.litTotal), 0, 1000);
+    }
 
-        int speed = be.getSpeed();
-        int cookTimer = be.dataAccess.get(2);
-        int recipeTotal = recipe != null ? recipe.value().cookingTime() : 200;
-        be.dataAccess.set(3, recipeTotal);
-        int cookTotal = recipeTotal;
+    /** 产出槽还能接收多少件 result（0 = 接不住）。 */
+    private int outputCapacity(int outputSlot, ItemStack result) {
+        ItemStack out = this.items.get(outputSlot);
+        if (out.isEmpty()) {
+            return result.getMaxStackSize();
+        }
+        if (!ItemStack.isSameItemSameComponents(out, result)) {
+            return 0;
+        }
+        return Math.max(0, out.getMaxStackSize() - out.getCount());
+    }
 
-        if (be.isLit() && canBurn) {
-            cookTimer += speed;
-            while (cookTimer >= cookTotal && canBurn) {
-                cookTimer -= cookTotal;
-                if (be.burn(level.registryAccess(), recipe, input)) {
-                    be.setRecipeUsed(recipe);
-                    changed = true;
-                }
-                input = be.items.get(0);
-                if (input.isEmpty() || !be.isItemAllowed(input)) {
-                    recipe = null;
-                    canBurn = false;
-                } else {
-                    recipe = be.quickCheck.getRecipeFor(new SingleRecipeInput(input), level).orElse(null);
-                    canBurn = be.canBurn(level.registryAccess(), recipe, input);
-                }
-            }
-            if (!canBurn && cookTimer > 0) {
-                cookTimer = 0;
-            }
-            be.dataAccess.set(2, cookTimer);
+    private boolean canAcceptResult(int outputSlot, ItemStack result) {
+        return outputCapacity(outputSlot, result) > 0;
+    }
+
+    private void growOutput(int outputSlot, ItemStack result, int count) {
+        ItemStack out = this.items.get(outputSlot);
+        if (out.isEmpty()) {
+            this.items.set(outputSlot, result.copyWithCount(count));
         } else {
-            // 空转保护 / 无待烧物：平滑降温
-            if (cookTimer > 0) {
-                cookTimer = Math.max(0, cookTimer - 2);
-                be.dataAccess.set(2, cookTimer);
+            out.grow(count);
+        }
+    }
+
+    /** 比较器输出：只统计 N 个产出槽，避免 27 格稀释（与原版单槽熔炉同量级）。 */
+    public int getComparatorOutput() {
+        float sum = 0.0F;
+        for (int lane = 0; lane < this.lanes; lane++) {
+            ItemStack out = this.items.get(CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_OUTPUT));
+            if (out.isEmpty()) {
+                continue;
+            }
+            sum += (float) out.getCount() / (float) out.getMaxStackSize();
+        }
+        return Mth.lerpDiscrete(sum / this.lanes, 0, 15);
+    }
+
+    @Override
+    protected void saveAdditional(ValueOutput out) {
+        super.saveAdditional(out);
+        out.putIntArray("CookTime", this.cookTime);
+        out.putIntArray("CookTotal", this.cookTotal);
+        out.putInt("LitTime", this.litTime);
+        out.putInt("LitTotal", this.litTotal);
+    }
+
+    @Override
+    protected void loadAdditional(ValueInput in) {
+        super.loadAdditional(in);
+        int[] savedCookTime = in.getIntArray("CookTime").orElse(null);
+        if (savedCookTime == null) {
+            // 0.3.4 及更早的单槽存档：3 格 Items 已由交错布局落到 lane 0，进度单位是 tick -> milli
+            this.cookTime[0] = in.getShortOr("cooking_time_spent", (short) 0) * CompressedFurnaceData.MILLI;
+            this.cookTotal[0] = in.getShortOr("cooking_total_time", (short) 0) * CompressedFurnaceData.MILLI;
+            this.litTime = in.getShortOr("lit_time_remaining", (short) 0);
+            this.litTotal = in.getShortOr("lit_total_time", (short) 0);
+            return;
+        }
+        System.arraycopy(savedCookTime, 0, this.cookTime, 0,
+            Math.min(savedCookTime.length, this.cookTime.length));
+        int[] savedCookTotal = in.getIntArray("CookTotal").orElse(new int[0]);
+        System.arraycopy(savedCookTotal, 0, this.cookTotal, 0,
+            Math.min(savedCookTotal.length, this.cookTotal.length));
+        this.litTime = in.getIntOr("LitTime", 0);
+        this.litTotal = in.getIntOr("LitTotal", 0);
+    }
+
+    /** 消耗燃料池：按 lane 索引升序找第一个可烧燃料。 */
+    private static boolean ignite(CompressedFurnaceBlockEntity be, FuelValues fuels) {
+        for (int lane = 0; lane < be.lanes; lane++) {
+            int fuelSlot = CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_FUEL);
+            ItemStack fuel = be.items.get(fuelSlot);
+            if (fuel.isEmpty()) {
+                continue;
+            }
+            int duration = fuels.burnDuration(fuel);
+            if (duration <= 0) {
+                continue;
+            }
+            be.litTime = duration;
+            be.litTotal = duration;
+            Item item = fuel.getItem();
+            fuel.shrink(1);
+            if (fuel.isEmpty()) {
+                be.items.set(fuelSlot, item.getCraftingRemainder());
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public static void serverTick(ServerLevel level, BlockPos pos, BlockState state, CompressedFurnaceBlockEntity be) {
+        boolean wasLit = be.isLitNow();
+        boolean changed = false;
+        int lanes = be.lanes;
+
+        // 1) 共享燃烧池按真实 tick 递减（不随速度加速，档位越高燃料效率越高）
+        if (be.litTime > 0) {
+            be.litTime--;
+            changed = true;
+        }
+
+        // 2) 每路配方/输出快照（一次 assemble，避免每件重算）
+        FuelValues fuels = level.fuelValues();
+        RegistryAccess registries = level.registryAccess();
+        boolean anyCanSmelt = false;
+        for (int lane = 0; lane < lanes; lane++) {
+            int inputSlot = CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_INPUT);
+            ItemStack input = be.items.get(inputSlot);
+            RecipeHolder<SmeltingRecipe> recipe = null;
+            ItemStack result = ItemStack.EMPTY;
+            if (!input.isEmpty() && be.isItemAllowed(input)) {
+                recipe = be.checks[lane].getRecipeFor(new SingleRecipeInput(input), level).orElse(null);
+                if (recipe != null) {
+                    result = recipe.value().assemble(new SingleRecipeInput(input), registries);
+                }
+            }
+            boolean ready = recipe != null && !result.isEmpty() && be.canAcceptResult(
+                CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_OUTPUT), result);
+            be.laneRecipe[lane] = recipe;
+            be.laneResult[lane] = ready ? result : ItemStack.EMPTY;
+            be.laneReady[lane] = ready;
+            be.cookTotal[lane] = ready ? recipe.value().cookingTime() * CompressedFurnaceData.MILLI : 0;
+            anyCanSmelt |= ready;
+        }
+
+        // 3) 空转保护：只有至少一路可烧且燃烧池为空时才点燃新燃料
+        if (be.litTime == 0 && anyCanSmelt && ignite(be, fuels)) {
+            changed = true;
+        }
+
+        // 4) 各路独立推进（O(1) 批量结算）
+        boolean lit = be.litTime > 0;
+        for (int lane = 0; lane < lanes; lane++) {
+            if (lit && be.laneReady[lane]) {
+                be.cookLane(lane);
+                changed = true;
+            } else if (lit) {
+                if (be.cookTime[lane] != 0) {
+                    be.cookTime[lane] = 0;
+                    changed = true;
+                }
+            } else if (be.cookTime[lane] > 0) {
+                // 未点燃：原版同款平滑降温（BURN_COOL_SPEED = 2 tick）
+                be.cookTime[lane] = Math.max(0, be.cookTime[lane] - 2 * CompressedFurnaceData.MILLI);
+                changed = true;
             }
         }
 
-        boolean isLitNow = be.isLit();
-        if (wasLit != isLitNow) {
-            changed = true;
-            state = state.setValue(AbstractFurnaceBlock.LIT, isLitNow);
+        // 5) LIT 聚合 + 比较器/邻居刷新（setChanged 内部会 updateNeighbourForOutputSignal）
+        boolean litNow = be.litTime > 0;
+        if (wasLit != litNow) {
+            state = state.setValue(AbstractFurnaceBlock.LIT, litNow);
             level.setBlock(pos, state, 3);
+            changed = true;
         }
-
         if (changed) {
             setChanged(level, pos, state);
+        }
+    }
+
+    private void cookLane(int lane) {
+        int total = this.cookTotal[lane];
+        ItemStack result = this.laneResult[lane];
+        RecipeHolder<SmeltingRecipe> recipe = this.laneRecipe[lane];
+        if (total <= 0 || result.isEmpty() || recipe == null) {
+            return;
+        }
+        this.cookTime[lane] += this.cookSpeedMilli;
+        int produced = this.cookTime[lane] / total;
+        if (produced <= 0) {
+            return;
+        }
+        int outputSlot = CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_OUTPUT);
+        int inputSlot = CompressedFurnaceData.slot(lane, CompressedFurnaceData.ROLE_INPUT);
+        ItemStack input = this.items.get(inputSlot);
+        int count = Math.min(produced, Math.min(this.outputCapacity(outputSlot, result), input.getCount()));
+        if (count <= 0) {
+            // 输出满/输入空：与原版一致，进度清零（点燃中的燃料继续烧完）
+            this.cookTime[lane] = 0;
+            return;
+        }
+        this.cookTime[lane] -= count * total;
+        this.growOutput(outputSlot, result, count);
+        input.shrink(count);
+        for (int i = 0; i < count; i++) {
+            this.setRecipeUsed(recipe);
         }
     }
 }
