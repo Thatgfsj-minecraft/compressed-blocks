@@ -183,6 +183,32 @@ function check(name, ok, detail) {
   await cmd('kill @e[type=minecraft:item]');
   await cmd('setblock 2 -60 20 minecraft:air');
 
+  // 3b) 压缩熔炉挖掘门（issue #36）：与原版 minecraft:furnace 一致 —— 任意等级镐（含木镐）都能挖掉
+  //     并掉落本体，因此只能出现在 #mineable/pickaxe，绝不能进 needs_stone/iron/diamond_tool。
+  //     注意：不能拿 /loot ... mine <tool> 判等级门 —— 该命令只做战利品表求值，
+  //     不校验"正确工具"（requiresCorrectToolForDrops 是 playerDestroy 路径的判定），
+  //     原版铁矿空手 /loot 也一样掉 Raw Iron。等级门只能用方块标签断言。
+  for (const tier of ['1x', '2x', '3x', '4x']) {
+    const furnaceId = `${tier}_compressed_furnace`;
+    await cmd(`setblock 2 -60 20 ${NS}:${furnaceId}`);
+    const inPickaxe = await cmd('execute if block 2 -60 20 #minecraft:mineable/pickaxe');
+    check(`furnace ${furnaceId} in #mineable/pickaxe`, /Test passed/.test(inPickaxe), inPickaxe.trim());
+    for (const tag of ['needs_stone_tool', 'needs_iron_tool', 'needs_diamond_tool']) {
+      const gated = await cmd(`execute if block 2 -60 20 #minecraft:${tag}`);
+      check(`furnace ${furnaceId} not in #${tag}`, /Test failed/.test(gated), gated.trim());
+    }
+  }
+  await cmd('setblock 2 -60 20 minecraft:air');
+  // 战利品表冒烟：压缩熔炉破坏必掉本体（与原版 3.5 硬度、无 noLootTable 一致）
+  await cmd('kill @e[type=minecraft:item]');
+  await cmd(`setblock 2 -60 20 ${NS}:1x_compressed_furnace`);
+  await cmd('setblock 2 -60 20 minecraft:air destroy');
+  const furnaceDrop = await cmd(
+    'data get entity @e[type=minecraft:item,x=2,y=-59,z=20,distance=..3,limit=1,sort=nearest] Item.id');
+  check('furnace break drops itself',
+    furnaceDrop.includes(`"${NS}:1x_compressed_furnace"`), furnaceDrop.trim());
+  await cmd('kill @e[type=minecraft:item]');
+
   // 4) 全矩阵物品：盔甲架主手换装 + 读 id 断言（全部 1549 个物品）。
   //    组件数值（耐久 9ⁿ / unbreakable / 速度阶梯 / 护甲防御 / 食物数值）已由服务端
   //    SELF-TEST 权威覆盖，这里验证"物品存在 + 可装备 + 组件补丁可写"。
