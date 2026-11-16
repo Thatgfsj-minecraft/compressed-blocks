@@ -39,7 +39,13 @@ const TOOL_LINES = ['cobblestone', 'wood'];
 
 // 与 CompressedBlocks.java 一致的期望值
 const BASE_DUR = { cobblestone: 131, wood: 59 };
-const SPEED_LADDER = [6.0, 8.0, 12.0, 18.0, 27.0, 40.5, 60.75, 91.125, 136.6875];
+// 挖掘速度阶梯按线分开（组件数值由服务端 SELF-TEST 权威覆盖，这里保留逐档期望值作对拍基准）
+const SPEED_LADDER = {
+  // 石线：一重 6.0（铁）、二重 8.0（钻）、三重 12.0（金），四重起 ×1.5 逐级连乘
+  cobblestone: [6.0, 8.0, 12.0, 18.0, 27.0, 40.5, 60.75, 91.125, 136.6875],
+  // 木线 = 石线 × 0.95（木线整体定位在石线之下）
+  wood: [5.7, 7.6, 11.4, 17.1, 25.65, 38.475, 57.7125, 86.56875, 129.853125],
+};
 const UNBREAKABLE_FROM = 6;
 const ARMOR_BASE = { helmet: 2, chestplate: 6, leggings: 5, boots: 2 };
 
