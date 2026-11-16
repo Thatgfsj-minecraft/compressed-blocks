@@ -20,21 +20,40 @@ import net.minecraft.world.level.Level;
  * 2N..3N-1 产出、随后 27 格背包 + 9 格快捷栏。容器索引仍是交错布局（见
  * {@link CompressedFurnaceData}），Slot 构造时显式传入容器索引。</p>
  *
- * <p>布局：1 重为「左列上 3 输入 / 下 3 燃料、右列 3 产出」（面板 176x154）；
- * 2/3/4 重为三列区网格（面板 176x154 / 176x174）。进度与燃烧池经 ContainerData(2N+1)
- * 同步：2i 进度千分比、2i+1 活跃标志、2N 燃烧池千分比。</p>
+ * <p>版面（面板宽固定 176，行数 R = N/3 = 1/2/3）：</p>
+ * <pre>
+ * 左上：输入区 3 列 × R 行
+ * 左中：燃烧进度条（整机共享燃烧池）
+ * 左下：燃料区 3 列 × R 行（从左上到右下消耗）
+ * 右侧：产出区 3 列 × R 行（类似箱子，自动按同类堆叠；垂直居中于燃烧条）
+ * </pre>
+ * <p>1 重只有 1 行、2 重 2 行、3/4 重 3 行，低档位不绘制多余行，面板高度随行数变化。
+ * 进度与燃烧池经 ContainerData(2N+1) 同步：2i 进度千分比、2i+1 活跃标志、2N 燃烧池千分比。</p>
  */
 public class CompressedFurnaceMenu extends AbstractContainerMenu {
     private static final int PANEL_W = 176;
     private static final int BODY_TOP = 17;
-    private static final int ROW_H = 20;
+    /** 行距：槽位 18 + 2px 每路进度条余量。 */
+    private static final int ROW_PITCH = 20;
+    /** 左侧（输入/燃料）3 个槽位列的起点。 */
+    private static final int LEFT_X = 8;
+    /** 右侧产出 3 个槽位列的起点。 */
+    private static final int OUT_X = 118;
+    /** 首行槽位 y（相对面板）。 */
+    private static final int TOP_Y = 18;
+    /** 输入区与燃料区之间的燃烧进度条。 */
+    public static final int BURN_BAR_HEIGHT = 5;
+    /** 燃烧条与燃料区之间的间距。 */
+    private static final int BURN_BAR_GAP = 10;
+    /** 燃烧条宽度 = 3 个槽位列。 */
+    private static final int BURN_BAR_WIDTH = 54;
 
     private final Container container;
     private final ContainerData data;
     private final int tier;
     private final int lanes;
-    /** 1 重：左列上 3 输入 / 下 3 燃料、右列 3 产出。 */
-    private final boolean splitLayout;
+    /** 输入/燃料/产出各自的网格行数（1/2/3）。 */
+    private final int rows;
     private final Level level;
     private final RecipePropertySet acceptedInputs;
 
@@ -43,7 +62,7 @@ public class CompressedFurnaceMenu extends AbstractContainerMenu {
         super(type, id);
         this.tier = tier;
         this.lanes = CompressedFurnaceData.lanesForTier(tier);
-        this.splitLayout = tier == 1;
+        this.rows = (this.lanes + 2) / 3;
         this.container = container;
         this.data = data;
         this.level = playerInventory.player.level();
@@ -77,18 +96,18 @@ public class CompressedFurnaceMenu extends AbstractContainerMenu {
         return this.lanes;
     }
 
-    public boolean splitLayout() {
-        return this.splitLayout;
+    public int rows() {
+        return this.rows;
     }
 
-    /** 面板宽度固定 176（可继续借用原版 generic_54 的顶边/背包区贴图）。 */
+    /** 面板宽度固定 176（借用原版 generic_54 的顶边/背包区贴图）。 */
     public int imageWidth() {
         return PANEL_W;
     }
 
-    /** 物品区高度：1 重 2 行（左右分区），其余按 R = N/3 行、行距 20。 */
+    /** 物品区高度：输入 R 行 + 燃烧条 + 燃料 R 行 + 底部留白。 */
     public int bodyHeight() {
-        return this.splitLayout ? 2 * ROW_H : ROW_H * ((this.lanes + 2) / 3);
+        return (TOP_Y + ROW_PITCH * this.rows * 2 + BURN_BAR_GAP + 8) - BODY_TOP;
     }
 
     public int imageHeight() {
@@ -103,28 +122,46 @@ public class CompressedFurnaceMenu extends AbstractContainerMenu {
         return BODY_TOP + this.bodyHeight() + 14;
     }
 
+    /** 燃烧进度条（相对面板左上角）：x / y / 宽 / 高。 */
+    public int burnBarX() {
+        return LEFT_X;
+    }
+
+    public int burnBarY() {
+        return TOP_Y + ROW_PITCH * this.rows + 1;
+    }
+
+    public int burnBarWidth() {
+        return BURN_BAR_WIDTH;
+    }
+
+    public int burnBarHeight() {
+        return BURN_BAR_HEIGHT;
+    }
+
     private int inputX(int col) {
-        return (this.splitLayout ? 8 : 6) + 18 * col;
+        return LEFT_X + 18 * col;
     }
 
     private int inputY(int row) {
-        return 18 + (this.splitLayout ? 0 : ROW_H * row);
+        return TOP_Y + ROW_PITCH * row;
     }
 
     private int fuelX(int col) {
-        return (this.splitLayout ? 8 : 62) + 18 * col;
+        return LEFT_X + 18 * col;
     }
 
     private int fuelY(int row) {
-        return this.splitLayout ? 38 : 18 + ROW_H * row;
+        return TOP_Y + ROW_PITCH * this.rows + BURN_BAR_GAP + ROW_PITCH * row;
     }
 
     private int outputX(int col) {
-        return (this.splitLayout ? 116 : 118) + 18 * col;
+        return OUT_X + 18 * col;
     }
 
     private int outputY(int row) {
-        return this.splitLayout ? 28 : 18 + ROW_H * row;
+        // 产出区垂直居中于燃烧条
+        return TOP_Y + ROW_PITCH * this.rows + 3 - (ROW_PITCH * this.rows) / 2 + ROW_PITCH * row;
     }
 
     // ---------------------------------------------------------------- 进度读取
