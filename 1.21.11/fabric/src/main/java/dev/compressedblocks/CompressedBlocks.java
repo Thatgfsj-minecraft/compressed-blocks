@@ -83,8 +83,11 @@ public final class CompressedBlocks {
         "Sextuple Compressed", "Septuple Compressed", "Octuple Compressed", "Nonuple Compressed"
     };
 
-    /** 挖掘速度阶梯：一重=铁 6.0、二重=钻 8.0、三重=金 12.0，四重起 ×1.5 逐级连乘。 */
-    private static final float[] SPEED = {6.0F, 8.0F, 12.0F, 18.0F, 27.0F, 40.5F, 60.75F, 91.125F, 136.6875F};
+    /** 石线挖掘速度阶梯：一重=铁 6.0、二重=钻 8.0、三重=金 12.0，四重起 ×1.5 逐级连乘。 */
+    private static final float[] STONE_SPEED = {6.0F, 8.0F, 12.0F, 18.0F, 27.0F, 40.5F, 60.75F, 91.125F, 136.6875F};
+
+    /** 木线挖掘速度阶梯 = 石线 × 0.95（木线整体定位于石线之下，但仍远快于原版木工具）。 */
+    private static final float[] WOOD_SPEED = {5.7F, 7.6F, 11.4F, 17.1F, 25.65F, 38.475F, 57.7125F, 86.56875F, 129.853125F};
 
     // ------------------------------------------------------------------ 储存方块
 
@@ -540,8 +543,8 @@ public final class CompressedBlocks {
         return (int) (base * pow9(level));
     }
 
-    /** 挖掘等级阶梯：7 重=铁、8 重=钻石、9 重=下界合金；其余保持原版石级/木级。 */
-    private static TagKey<Block> incorrectTagFor(int level, boolean stone) {
+    /** 石线挖掘等级阶梯：1~6 重保持原版石级，7 重=铁、8 重=钻石、9 重=下界合金。 */
+    private static TagKey<Block> stoneIncorrectTag(int level) {
         if (level >= 9) {
             return BlockTags.INCORRECT_FOR_NETHERITE_TOOL;
         }
@@ -551,19 +554,38 @@ public final class CompressedBlocks {
         if (level == 7) {
             return BlockTags.INCORRECT_FOR_IRON_TOOL;
         }
-        return stone ? BlockTags.INCORRECT_FOR_STONE_TOOL : BlockTags.INCORRECT_FOR_WOODEN_TOOL;
+        return BlockTags.INCORRECT_FOR_STONE_TOOL;
+    }
+
+    /**
+     * 木线挖掘等级阶梯：木线 = 原版木工具的压缩版，整体比石线低一级 ——
+     * 1~6 重保持原版木级，7 重=石级、8 重=铁级、9 重=钻石级。
+     */
+    private static TagKey<Block> woodIncorrectTag(int level) {
+        if (level >= 9) {
+            return BlockTags.INCORRECT_FOR_DIAMOND_TOOL;
+        }
+        if (level == 8) {
+            return BlockTags.INCORRECT_FOR_IRON_TOOL;
+        }
+        if (level == 7) {
+            return BlockTags.INCORRECT_FOR_STONE_TOOL;
+        }
+        return BlockTags.INCORRECT_FOR_WOODEN_TOOL;
     }
 
     private static Item buildTool(ToolLine line, int level, int toolIndex, String name) {
         boolean stone = line.kind() == ToolKind.STONE;
+        float[] speedLadder = stone ? STONE_SPEED : WOOD_SPEED;
+        float speed = speedLadder[level - 1];
         float[] stats = line.stats()[toolIndex];
         // 全部工具：总伤害（含玩家基础 1 点）= 对应原版工具 × 1.6^重（×2 太夸张，用户定档 1.6）
         float bonus = (1.0F + stats[0] + line.damageBonus()) * (float) Math.pow(1.6, level)
             - 1.0F - stats[0];
         ToolMaterial material = new ToolMaterial(
-            incorrectTagFor(level, stone),
+            stone ? stoneIncorrectTag(level) : woodIncorrectTag(level),
             durabilityFor(level, line.kind()),
-            SPEED[level - 1],
+            speed,
             bonus,
             line.enchantability(),
             TagKey.create(Registries.ITEM, id("repair_" + line.key() + "_tool_" + LEVEL_PREFIX[level - 1]))
@@ -586,7 +608,7 @@ public final class CompressedBlocks {
             CompressedHooks.registerLevel9Tool(item);
         }
         double damage = stats[0] + bonus;
-        TOOL_REGS.add(new ToolReg(name, item, durabilityFor(level, line.kind()), SPEED[level - 1], unbreakable, damage));
+        TOOL_REGS.add(new ToolReg(name, item, durabilityFor(level, line.kind()), speed, unbreakable, damage));
         return item;
     }
 
@@ -1161,6 +1183,12 @@ public final class CompressedBlocks {
         return TagKey.create(Registries.ITEM, Identifier.withDefaultNamespace(path));
     }
 
+    private static void assertTierTag(List<String> errors, String name, TagKey<Block> got, TagKey<Block> want) {
+        if (!got.equals(want)) {
+            errors.add(name + " incorrectBlocksForDrops " + got.location() + " != " + want.location());
+        }
+    }
+
     private static void assertTier(List<String> errors, String name, Block state, boolean expectHarvest) {
         Item found = null;
         for (ItemReg e : ITEMS) {
@@ -1368,13 +1396,51 @@ public final class CompressedBlocks {
                 errors.add(f.name() + " saturation " + food.saturation() + " != " + f.saturation());
             }
         }
-        // 挖掘等级阶梯：6x 仍为石级，7x=铁，8x/9x=钻石级及以上
+        // 石线挖掘等级阶梯：6x 仍为石级，7x=铁，8x/9x=钻石级及以上
         assertTier(errors, "1x_cobblestone_pickaxe", Blocks.DIAMOND_ORE, false);
         assertTier(errors, "6x_cobblestone_pickaxe", Blocks.DIAMOND_ORE, false);
         assertTier(errors, "7x_cobblestone_pickaxe", Blocks.DIAMOND_ORE, true);
         assertTier(errors, "7x_cobblestone_pickaxe", Blocks.OBSIDIAN, false);
         assertTier(errors, "8x_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
         assertTier(errors, "9x_cobblestone_pickaxe", Blocks.OBSIDIAN, true);
+        // 木线挖掘等级阶梯：整体比石线低一级 —— 7 重=石级、8 重=铁级、9 重=钻石级
+        // 1.21.11 原版标签（实读服务端数据包）：iron_ore ∈ #needs_stone_tool；
+        // gold_ore/diamond_ore ∈ #needs_iron_tool；obsidian/ancient_debris ∈ #needs_diamond_tool
+        assertTier(errors, "1x_wood_pickaxe", Blocks.IRON_ORE, false);
+        assertTier(errors, "6x_wood_pickaxe", Blocks.IRON_ORE, false);
+        assertTier(errors, "7x_wood_pickaxe", Blocks.IRON_ORE, true);
+        assertTier(errors, "7x_wood_pickaxe", Blocks.GOLD_ORE, false);
+        assertTier(errors, "8x_wood_pickaxe", Blocks.GOLD_ORE, true);
+        assertTier(errors, "8x_wood_pickaxe", Blocks.DIAMOND_ORE, true);
+        assertTier(errors, "8x_wood_pickaxe", Blocks.OBSIDIAN, false);
+        assertTier(errors, "9x_wood_pickaxe", Blocks.OBSIDIAN, true);
+        // 远古残骸在 1.21.11 属于 #needs_diamond_tool（钻石级即可挖）；原版没有下界合金专属方块，
+        // 钻石级与下界合金级功能等价，故两条线九重都能挖远古残骸，差异只在 7/8 重。
+        assertTier(errors, "9x_wood_pickaxe", Blocks.ANCIENT_DEBRIS, true);
+        assertTier(errors, "9x_cobblestone_pickaxe", Blocks.ANCIENT_DEBRIS, true);
+        // 挖掘等级阶梯身份断言：逐级比对 incorrectBlocksForDrops 标签对象（不依赖原版标签内容，防阶梯回退）
+        List<TagKey<Block>> stoneWant = List.of(
+            BlockTags.INCORRECT_FOR_STONE_TOOL, BlockTags.INCORRECT_FOR_STONE_TOOL,
+            BlockTags.INCORRECT_FOR_STONE_TOOL, BlockTags.INCORRECT_FOR_STONE_TOOL,
+            BlockTags.INCORRECT_FOR_STONE_TOOL, BlockTags.INCORRECT_FOR_STONE_TOOL,
+            BlockTags.INCORRECT_FOR_IRON_TOOL, BlockTags.INCORRECT_FOR_DIAMOND_TOOL,
+            BlockTags.INCORRECT_FOR_NETHERITE_TOOL);
+        List<TagKey<Block>> woodWant = List.of(
+            BlockTags.INCORRECT_FOR_WOODEN_TOOL, BlockTags.INCORRECT_FOR_WOODEN_TOOL,
+            BlockTags.INCORRECT_FOR_WOODEN_TOOL, BlockTags.INCORRECT_FOR_WOODEN_TOOL,
+            BlockTags.INCORRECT_FOR_WOODEN_TOOL, BlockTags.INCORRECT_FOR_WOODEN_TOOL,
+            BlockTags.INCORRECT_FOR_STONE_TOOL, BlockTags.INCORRECT_FOR_IRON_TOOL,
+            BlockTags.INCORRECT_FOR_DIAMOND_TOOL);
+        for (int lv = 1; lv <= LEVELS; lv++) {
+            String prefix = LEVEL_PREFIX[lv - 1];
+            assertTierTag(errors, prefix + "_cobblestone_pickaxe", stoneIncorrectTag(lv), stoneWant.get(lv - 1));
+            assertTierTag(errors, prefix + "_wood_pickaxe", woodIncorrectTag(lv), woodWant.get(lv - 1));
+            // 速度阶梯：木线 = 石线 × 0.95（独立复算，防止两张表抄写漂移）
+            if (Math.abs(WOOD_SPEED[lv - 1] - STONE_SPEED[lv - 1] * 0.95F) > 0.001F) {
+                errors.add(prefix + " wood speed " + WOOD_SPEED[lv - 1]
+                    + " != stone*0.95 " + (STONE_SPEED[lv - 1] * 0.95F));
+            }
+        }
         // 效果阶梯抽查：7/8/9 重 → 护腿抗性 1/2/3 级，6 重及以下无效果
         if (resistanceAmplifier(7) != 0 || resistanceAmplifier(8) != 1
             || resistanceAmplifier(9) != 2
