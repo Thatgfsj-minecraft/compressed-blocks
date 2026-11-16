@@ -85,14 +85,14 @@ public class CompressedFurnaceScreen extends AbstractContainerScreen<CompressedF
             Slot slot = this.menu.getSlot(i);
             drawSlot(graphics, this.leftPos + slot.x, this.topPos + slot.y);
         }
-        // 整机共享燃烧池剩余时间（原中间燃烧条位置，空出来只放文字）
+        // 整机共享燃烧池剩余时间（原中间燃烧条位置，空出来只放文字；水平居中于 A/C 区块）
         String burnText = String.format(Locale.ROOT, "%.1fs", this.menu.litSeconds());
-        graphics.drawString(this.font, burnText,
-            this.leftPos + this.menu.burnInfoX(), this.topPos + this.menu.burnInfoY(),
-            TEXT_DARK, false);
-        // 产出方向箭头
-        int arrowX = this.leftPos + ARROW_X;
-        int arrowY = this.topPos + this.menu.burnInfoY() + 2;
+        int burnTextX = this.leftPos + this.menu.burnInfoCenterX() - this.font.width(burnText) / 2;
+        graphics.drawString(this.font, burnText, burnTextX,
+            this.topPos + this.menu.burnInfoY(), TEXT_DARK, false);
+        // 产出方向箭头：水平居中于 A/C 与 D 之间，垂直居中于 A/C/D 整体
+        int arrowX = this.leftPos + this.menu.arrowX();
+        int arrowY = this.topPos + this.menu.arrowCenterY() - 2;
         drawArrow(graphics, arrowX, arrowY);
         // 背包区
         graphics.blit(RenderPipelines.GUI_TEXTURED, BACKGROUND,
