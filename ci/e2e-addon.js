@@ -1,15 +1,15 @@
-// 压缩方块 0.4.0 附属 mod（compressedblockspot）E2E：RCON 服务端权威断言 + 本地资源/版本断言。
+// 压缩方块 0.4.1 附属 mod（compressedblockspot）E2E：RCON 服务端权威断言 + 本地资源/版本断言。
 //
 // 【服务端前置】测试服 mods/ 必须同时放入：
-//   1) 主 mod：compressedblocks-fabric-1.21.11-0.4.0.jar
-//   2) 附属 mod：compressedblockspot-fabric-1.21.11-0.4.0.jar
+//   1) 主 mod：compressedblocks-fabric-1.21.11-0.4.1.jar
+//   2) 附属 mod：compressedblockspot-fabric-1.21.11-0.4.1.jar
 //   3) Fabric API（如 fabric-api-0.141.6+1.21.11.jar）
 //   4) Carpet（可选但建议）：用例 D 需要在线玩家才能执行 `recipe give <targets> <recipe>`
 //      —— RCON 控制台不是玩家，@s / @a 会先报 "No player was found"。装了 Carpet 时脚本用
 //      `/player <bot> spawn` 造一个假人；没有 Carpet 时自动降级为「直接读 recipe JSON」（SKIP，不计失败）。
 //   服务端需 enable-rcon=true、rcon.password=testpass（端口用 RCON_PORT 覆盖）；
 //   建议 level-type=minecraft:flat（脚本在 y=-64 做基岩探针），并允许 forceload。
-//   版本必须成对：主 mod 与附属 mod 同为 0.4.0（附属依赖 compressedblocks >=0.4.0 <0.5.0）。
+//   版本必须成对：主 mod 与附属 mod 同为 0.4.1（附属依赖 compressedblocks >=0.4.1 <0.5.0）。
 //
 // 【用法】
 //   node ci/e2e-addon.js                  # 连 127.0.0.1:25576（RCON_PORT / RCON_HOST / RCON_PASS 可覆盖）
@@ -25,13 +25,15 @@
 //     → 每箱恰好 2 个 compressedblocks:Nx_cobblestone，且箱内无其它物品（防隔壁方块/容器串味）
 //   C 原版级：compressedblocks:cobblestone_generator 同样 40t → 箱内恰好 2 个 minecraft:cobblestone
 //   D 配方：live = recipe give/take 假人看返回文本；file = 读 addon recipe JSON（产物 id/数量/原料）
-//   E 版本：主/附 4 个 build.gradle 解析到 0.4.0；附属 fabric.mod.json 依赖 ">=0.4.0 <0.5.0"、
-//     neoforge.mods.toml 依赖 "[0.4.0,0.5.0)"；主/附版本必须相同
+//   E 版本：主/附 4 个 build.gradle 解析到 0.4.1；附属 fabric.mod.json 依赖 ">=0.4.1 <0.5.0"、
+//     neoforge.mods.toml 依赖 "[0.4.1,0.5.0)"；主/附版本必须相同
 //   F 附属资源：9 档 blockstate/items/模型（parent 链与贴图引用可解析）/战利品表/双语名/
 //     创造栏 lang/挖掘标签文件；live 额外用 setblock ... destroy 断言每档战利品掉自身
 //
 // 【时间确定性】generator 用例前 `tick freeze`，`tick sprint 40t` 精确跑 40 tick，最后 `tick unfreeze`；
 // 这样即使测试服没进入空服暂停（或有人在线）也不会多产，避免「恰好 2 个」抖动。
+// fresh world（首次生成区块）先按 9 台机器坐标逐点探针 + 一次 5t 短促活，避免区块首载少 tick
+// 导致 B 用例个别档位只收到 1 个产物。
 //
 // 【待确认假设】recipe id 与资源路径集中在下面常量，以 PR-2 最终实现为准：
 //   合成 compressedblockspot:Nx_cobblestone_generator（1x = 9 个主 mod 原版级刷石机
@@ -54,9 +56,9 @@ const RECIPE_MODE = (process.env.RECIPE_MODE || 'auto').toLowerCase();
 // 命名空间：附属 compressedblockspot，主 mod compressedblocks
 const MAIN_NS = 'compressedblocks';
 const ADDON_NS = 'compressedblockspot';
-const VERSION = '0.4.0';
-const DEP_FABRIC = '>=0.4.0 <0.5.0';
-const DEP_NEOFORGE = '[0.4.0,0.5.0)';
+const VERSION = '0.4.1';
+const DEP_FABRIC = '>=0.4.1 <0.5.0';
+const DEP_NEOFORGE = '[0.4.1,0.5.0)';
 const LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const GEN = 'cobblestone_generator';
 const addonGen = (n) => `${ADDON_NS}:${n}x_${GEN}`;
@@ -579,7 +581,8 @@ function caseFfiles() {
         check(`F ${where} 挖掘标签含 ${addonGen(n)}`, values.includes(addonGen(n)), values.join(', ').slice(0, 200));
       }
     }
-    // 5) 双语名 + 创造栏 lang（0.4.0 附属两栏：压缩拓展方块 / 压缩拓展工具）
+    // 5) 双语名 + 创造栏 lang（0.4.0 起附属两栏：压缩拓展方块 / 压缩拓展工具；
+    //    0.4.1 起 addon_tools 另含 10 件主 mod 超模机器）
     for (const lang of ['en_us', 'zh_cn']) {
       const langFile = path.join(resRoot, 'assets', ADDON_NS, 'lang', `${lang}.json`);
       if (!isFile(langFile)) {
@@ -660,6 +663,20 @@ function finish(tag) {
     check('探针：测试区 -64 层是基岩（超平坦世界）', /Test passed/.test(probe), probe);
     const probeNeg = await cmd(`execute if block ${AREA.x0} -64 ${AREA.z} minecraft:stone`);
     check('探针：负断言可用', /Test failed/.test(probeNeg), probeNeg);
+    // fresh world 首次生成：先按 9 档机器/箱子所在区块逐点探针，强制区块完成生成，否则后续
+    // tick sprint 期间个别区块的方块实体会少 tick（曾导致 B 用例 4x~9x 只收到 1 个产物）。
+    for (const n of LEVELS) {
+      const x = AREA.x0 + (n - 1) * AREA.step;
+      await cmd(`execute if block ${x} -64 ${AREA.z} minecraft:bedrock`);
+    }
+    // 再放一次 5t 短促活（此时还没放机器，不影响产物计数），让刚加载的区块/方块实体完成首 tick。
+    // 必须等 sprint 真正跑完再 freeze：sprint 结束时会恢复「请求前」的 frozen 状态，
+    // 若在 sprint 中途 freeze，结束时会把 freeze 撤销掉。
+    await cmd('tick sprint 5t');
+    for (let i = 0; i < 40; i++) {
+      if (!/The game is sprinting/i.test(await cmd('tick query'))) break;
+      await sleep(100);
+    }
     // 冻结 tick：保证下面的 tick sprint 40t 精确 = 2 个产物（不受空服暂停/在线玩家影响）
     await cmd('tick freeze');
 

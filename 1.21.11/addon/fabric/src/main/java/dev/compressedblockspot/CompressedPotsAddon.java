@@ -49,6 +49,13 @@ public final class CompressedPotsAddon {
 
     public static ItemSink ITEM_SINK;
 
+    /** 0.4.1 起由附属 addon_tools 展示的主 mod 超模机器（固定展示顺序）。 */
+    private static final String[] MAIN_TAB_MACHINES = {
+        "1x_compressed_furnace", "2x_compressed_furnace", "3x_compressed_furnace", "4x_compressed_furnace",
+        "1x_compressed_hopper", "2x_compressed_hopper", "3x_compressed_hopper",
+        "1x_compressed_wooden_hopper", "2x_compressed_wooden_hopper", "3x_compressed_wooden_hopper",
+    };
+
     public static final List<Block> BLOCKS = new ArrayList<>();
 
     private static final String[] POT_IDS = {"compressed_pot", "compressed_hopper_pot"};
@@ -149,6 +156,13 @@ public final class CompressedPotsAddon {
             .title(Component.translatable("itemGroup." + MOD_ID + ".addon_tools"))
             .icon(() -> new ItemStack(GENERATOR_BLOCKS.get(GENERATOR_BLOCKS.size() - 1)))
             .displayItems((parameters, output) -> {
+                // 0.4.1 起主 mod 压缩熔炉 / 压缩铁漏斗 / 1~3 重压缩木漏斗只在附属 addon_tools 展示
+                for (String machine : MAIN_TAB_MACHINES) {
+                    ItemStack stack = mainItem(machine);
+                    if (!stack.isEmpty()) {
+                        output.accept(stack);
+                    }
+                }
                 output.accept(COMPRESSED_POT);
                 output.accept(HOPPER_POT);
                 for (AddonCobblestoneGeneratorBlock block : GENERATOR_BLOCKS) {

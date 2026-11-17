@@ -81,8 +81,8 @@ public final class CompressedBlocks {
 
     public enum ToolKind { STONE, WOOD }
 
-    /** 创造物品栏落位。 */
-    public enum Tab { BLOCKS, TOOLS, INGREDIENTS, FOOD, POTS }
+    /** 创造物品栏落位；ADDON 仅附属 mod 栏（addon_tools）展示，主 mod 自身不渲染。 */
+    public enum Tab { BLOCKS, TOOLS, INGREDIENTS, FOOD, ADDON }
 
     /**
      * 储存方块材料（key/英文名/声音/地图色/是否需要正确工具/发光/原版硬度）。
@@ -620,7 +620,8 @@ public final class CompressedBlocks {
         .build();
 
     // "压缩盆栽"创造栏由附属 mod compressedblockspot 独有（含压缩甘蔗/树苗的扫描展示），
-    // 主 mod 不再注册 TAB_POTS；Tab.POTS 项仅作归档，附属在场时由附属栏呈现。
+    // 主 mod 不再注册 TAB_POTS；Tab.ADDON 项仅作归档（仅附属 mod 栏展示，主 mod 自身不渲染），
+    // 附属在场时由附属栏呈现。
 
     // ------------------------------------------------------------------ 自检
 

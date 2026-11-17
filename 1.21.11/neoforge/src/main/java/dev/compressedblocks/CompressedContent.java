@@ -108,7 +108,7 @@ final class CompressedContent {
                         .useBlockDescriptionPrefix(),
                     level, false, enName);
                 BLOCKS.add(new BlockReg(name, block, name));
-                ITEMS.add(new ItemReg(name, item, Tab.POTS, true));
+                ITEMS.add(new ItemReg(name, item, Tab.ADDON, true));
                 SAPLING_BLOCKS.add(block);
             }
         }
@@ -220,7 +220,8 @@ final class CompressedContent {
             ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
             GENERATOR_BLOCKS.add(block);
         }
-        // 5f. 压缩熔炉（4 个压缩等级）：单路 2x/3x/6x/27x、整机 6x/18x/54x/243x 与阶梯权限
+        // 5f. 压缩熔炉（4 个压缩等级）：单路 2x/3x/6x/27x、整机 6x/18x/54x/243x 与阶梯权限；
+        // 0.4.1 起超模机器只在附属 addon_tools 展示
         for (int tier = 1; tier <= FURNACE_TIERS; tier++) {
             String name = LEVEL_PREFIX[tier - 1] + "_compressed_furnace";
             CompressedFurnaceBlock block = new CompressedFurnaceBlock(tier,
@@ -236,10 +237,11 @@ final class CompressedContent {
                     .setId(ResourceKey.create(Registries.ITEM, id(name)))
                     .useBlockDescriptionPrefix());
             BLOCKS.add(new BlockReg(name, block, name));
-            ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
+            ITEMS.add(new ItemReg(name, item, Tab.ADDON, true));
             FURNACE_BLOCKS.add(block);
         }
-        // 5g. 压缩漏斗（3 个压缩等级）：16 / 64 / 576 传输速率，9 格槽位
+        // 5g. 压缩漏斗（3 个压缩等级）：16 / 64 / 576 传输速率，9 格槽位；
+        // 0.4.1 起超模机器只在附属 addon_tools 展示
         for (int tier = 1; tier <= HOPPER_TIERS; tier++) {
             String name = LEVEL_PREFIX[tier - 1] + "_compressed_hopper";
             CompressedHopperBlock block = new CompressedHopperBlock(tier,
@@ -255,10 +257,11 @@ final class CompressedContent {
                     .setId(ResourceKey.create(Registries.ITEM, id(name)))
                     .useBlockDescriptionPrefix());
             BLOCKS.add(new BlockReg(name, block, name));
-            ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
+            ITEMS.add(new ItemReg(name, item, Tab.ADDON, true));
             HOPPER_BLOCKS.add(block);
         }
-        // 5h. 木质漏斗体系（4 个等级）：基础木漏斗（速度为原版一半），以及一至三重压缩木漏斗（速度对应压缩铁漏斗的一半）
+        // 5h. 木质漏斗体系（4 个等级）：基础木漏斗（速度为原版一半），以及一至三重压缩木漏斗（速度对应压缩铁漏斗的一半）；
+        // 0.4.1 起超模机器只在附属 addon_tools 展示（基础木漏斗仍留主 mod）
         for (int tier = 0; tier < WOODEN_HOPPER_TIERS; tier++) {
             String name = tier == 0 ? "wooden_hopper" : LEVEL_PREFIX[tier - 1] + "_compressed_wooden_hopper";
             float blast = tier == 0 ? 3.0F : STORAGE_BLAST;
@@ -274,7 +277,7 @@ final class CompressedContent {
                     .setId(ResourceKey.create(Registries.ITEM, id(name)))
                     .useBlockDescriptionPrefix());
             BLOCKS.add(new BlockReg(name, block, name));
-            ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
+            ITEMS.add(new ItemReg(name, item, tier == 0 ? Tab.TOOLS : Tab.ADDON, true));
             WOODEN_HOPPER_BLOCKS.add(block);
         }
         // 5e. 压缩箱子/压缩潜影盒（单一等级）：243 格滚动存储，压缩工具栏；
@@ -553,7 +556,7 @@ final class CompressedContent {
                 .useBlockDescriptionPrefix(),
             level, LEVEL_EN_PREFIX[level - 1] + " " + enName);
         BLOCKS.add(new BlockReg(name, block, name));
-        ITEMS.add(new ItemReg(name, item, Tab.POTS, true));
+        ITEMS.add(new ItemReg(name, item, Tab.ADDON, true));
         CANE_BLOCKS.add(block);
     }
 }
