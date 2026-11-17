@@ -6,7 +6,7 @@ license="GPL-3.0"
 modId="compressedblockspot"
 version="${version}"
 displayName="Compressed Pots"
-description='''压缩方块附属：压缩盆栽与压缩漏斗盆栽。深色陶盆，可种压缩作物/树苗/甘蔗，压缩土壤按等级差提速。'''
+description='''压缩方块附属：压缩盆栽、压缩漏斗盆栽与 1~9 重压缩刷石机。深色陶盆，可种压缩作物/树苗/甘蔗，压缩土壤按等级差提速；压缩刷石机 1~9 重每秒产出对应压缩等级的圆石。'''
 authors="Thatgfsj"
 
 [[dependencies.compressedblockspot]]
@@ -26,6 +26,6 @@ side="BOTH"
 [[dependencies.compressedblockspot]]
 modId="compressedblocks"
 type="required"
-versionRange="[0.3.0,)"
+versionRange="[0.4.0,0.5.0)"
 ordering="NONE"
 side="BOTH"

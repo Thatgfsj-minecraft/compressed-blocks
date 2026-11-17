@@ -3,11 +3,16 @@ plugins {
     id 'net.neoforged.moddev' version '2.0.147'
 }
 
-version = '0.3.2'
+version = '0.4.0'
 group = 'dev.compressedblockspot'
 
 base {
     archivesName = 'compressedblockspot-neoforge-1.21.11'
+}
+
+dependencies {
+    // 主 mod 构建产物（Mojmap 名，NeoForge 端无需 dev 重映射）
+    compileOnly files("../../neoforge/build/libs/compressedblocks-neoforge-1.21.11-${project.main_mod_version}.jar")
 }
 
 java {

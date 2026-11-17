@@ -434,6 +434,41 @@ def gen_gunpowder_base():
     return base
 
 
+def generator_textures(tier):
+    """刷石机贴图（tier = 压缩等级 1..9）：返回 (side, top, bottom) 三张 16×16 图。
+
+    整体三层结构——顶面纯木板、底面纯铁；侧面木头(0..5)+原石红石斑(5..11)+铁(11..16)；
+    压缩等级 ≥2 时上下加黑边。主 mod 三档（原版级 = 1 / 2x = 2 / 3x = 3）与附属 1~9 重共用本函数，
+    保证两边同一压缩等级的压缩环与配色完全一致。
+    """
+    cobble = load_base("block/cobblestone")
+    red = load_base("block/redstone_block")
+    red_avg = avg_color(red)
+    iron = load_base("block/iron_block")
+    wood = load_base("block/oak_planks")
+    img = cobble.copy()
+    pxi = img.load()
+    for x, y in ((2, 3), (3, 2), (12, 4), (13, 3), (4, 12), (3, 13), (11, 13), (12, 12),
+                 (7, 5), (8, 5), (7, 10), (8, 10), (5, 7), (5, 8), (10, 7), (10, 8)):
+        pxi[x, y] = (int(red_avg[0]), int(red_avg[1]), int(red_avg[2]), 255)
+    for x, y in ((1, 1), (14, 1), (1, 14), (14, 14), (7, 1), (8, 14), (1, 7), (14, 8)):
+        iron_px = iron.getpixel((x % 16, y % 16))
+        pxi[x, y] = (iron_px[0], iron_px[1], iron_px[2], 255)
+    # 侧面：上层木头（向下延伸 5px）、下层铁（向上延伸 5px）
+    img.paste(wood.crop((0, 0, 16, 5)), (0, 0))
+    img.paste(iron.crop((0, 0, 16, 5)), (0, 11))
+    if tier >= 2:
+        # 压缩档：上下黑边
+        for x in range(SIZE):
+            pxi[x, 0] = (10, 10, 10, 255)
+            pxi[x, 15] = (10, 10, 10, 255)
+    side = gen_block_tex(img, tier, gray=False)
+    # 顶/底面：纯木板 / 纯铁，压缩环自带黑边
+    top = gen_block_tex(wood.copy(), tier, gray=False)
+    bottom = gen_block_tex(iron.copy(), tier, gray=False)
+    return side, top, bottom
+
+
 def gen_cane_tex(center_img, level):
     """压缩甘蔗：有核心方块时，核心颜色与甘蔗本来的绿按连续小像素段混排（几个像素连着一段），
     保留甘蔗明暗；无核心 = 纯甘蔗皮。变黑：纯甘蔗每层 5%（9 层=45%），方块甘蔗每层 5%（L1 不变，9 层=40%）。"""
@@ -710,28 +745,12 @@ def main():
     block_tex["pot_hopper_side"] = hop
     block_tex["pot_hopper_bottom"] = gen_block_tex(iron_pot.copy(), 1, gray=False)
 
-    # 刷石机（主 mod 只保留原版级 1 档）：整体三层结构——顶面纯木板、底面纯铁；侧面木头(0..5)+
-    # 原石红石斑(5..11)+铁(11..16)。1~9 重压缩刷石机已迁往附属 mod compressedblockspot。
-    cobble = load_base("block/cobblestone")
-    red = load_base("block/redstone_block")
-    red_avg = avg_color(red)
-    iron = load_base("block/iron_block")
-    wood = load_base("block/oak_planks")
-    img = cobble.copy()
-    pxi = img.load()
-    for x, y in ((2, 3), (3, 2), (12, 4), (13, 3), (4, 12), (3, 13), (11, 13), (12, 12),
-                 (7, 5), (8, 5), (7, 10), (8, 10), (5, 7), (5, 8), (10, 7), (10, 8)):
-        pxi[x, y] = (int(red_avg[0]), int(red_avg[1]), int(red_avg[2]), 255)
-    for x, y in ((1, 1), (14, 1), (1, 14), (14, 14), (7, 1), (8, 14), (1, 7), (14, 8)):
-        iron_px = iron.getpixel((x % 16, y % 16))
-        pxi[x, y] = (iron_px[0], iron_px[1], iron_px[2], 255)
-    # 侧面：上层木头（向下延伸 5px）、下层铁（向上延伸 5px）
-    img.paste(wood.crop((0, 0, 16, 5)), (0, 0))
-    img.paste(iron.crop((0, 0, 16, 5)), (0, 11))
-    block_tex["cobblestone_generator"] = gen_block_tex(img, 1, gray=False)
-    # 顶/底面：纯木板 / 纯铁
-    block_tex["cobblestone_generator_top"] = gen_block_tex(wood.copy(), 1, gray=False)
-    block_tex["cobblestone_generator_bottom"] = gen_block_tex(iron.copy(), 1, gray=False)
+    # 刷石机（主 mod 只保留原版级 1 档）：贴图逻辑与附属 1~9 重共用 generator_textures(tier)，
+    # 1~9 重压缩刷石机已迁往附属 mod compressedblockspot。
+    side, top, bottom = generator_textures(1)
+    block_tex["cobblestone_generator"] = side
+    block_tex["cobblestone_generator_top"] = top
+    block_tex["cobblestone_generator_bottom"] = bottom
 
     # 压缩熔炉（4 个压缩等级）：正（灭）、正（亮）、侧、顶/底，加压缩环
     furnace_front = load_base("block/furnace_front")

@@ -3,7 +3,7 @@
   "id": "compressedblockspot",
   "version": "${version}",
   "name": "Compressed Pots",
-  "description": "压缩方块附属：压缩盆栽与压缩漏斗盆栽。深色陶盆，可种压缩作物/树苗/甘蔗，压缩土壤按等级差提速。",
+  "description": "压缩方块附属：压缩盆栽、压缩漏斗盆栽与 1~9 重压缩刷石机。深色陶盆，可种压缩作物/树苗/甘蔗，压缩土壤按等级差提速；压缩刷石机 1~9 重每秒产出对应压缩等级的圆石。",
   "authors": [
     "Thatgfsj"
   ],
@@ -23,6 +23,6 @@
     "fabric-api": "*",
     "minecraft": ">=1.21.11 <1.21.12",
     "java": ">=21",
-    "compressedblocks": ">=0.3.0 <0.4.0"
+    "compressedblocks": ">=0.4.0 <0.5.0"
   }
 }
