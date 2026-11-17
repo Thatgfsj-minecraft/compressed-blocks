@@ -199,9 +199,9 @@ final class CompressedContent {
             BLOCKS.add(new BlockReg(name, block, name));
             ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
         }
-        // 5d. 刷石机（3 档）：tier = 产物压缩等级（0 = 原石，1 = 1x，2 = 2x），每秒产出 1 个压入下方容器
-        String[] generatorTiers = {"cobblestone_generator", "2x_cobblestone_generator",
-            "3x_cobblestone_generator"};
+        // 5d. 刷石机（主 mod 只保留原版级）：tier = 产物压缩等级（0 = 原石），每秒产出 1 个压入下方容器
+        //     1~9 重压缩刷石机在附属 mod compressedblockspot，主 mod 不再注册
+        String[] generatorTiers = {"cobblestone_generator"};
         for (int i = 0; i < generatorTiers.length; i++) {
             String name = generatorTiers[i];
             CobblestoneGeneratorBlock block = new CobblestoneGeneratorBlock(i,
