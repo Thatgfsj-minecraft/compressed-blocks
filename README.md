@@ -73,6 +73,30 @@ Thatgfsj-minecraft 组织出品，开发约定见 [mc-mod-dev-skill](https://git
 
 核算方法：按 `CompressedContent.init()` 各注册循环的条数逐项累加；`assets/compressedblocks/blockstates/` 目录文件数 = 1326，与方块总数交叉验证；`CompressedSelfTest` 硬断言 1326 方块 / 1563 物品，E2E 启动日志的 `SELF-TEST PASS` 会打印实际注册数。
 
+## 资源生成
+
+仓库里的贴图与全部 JSON 资源都由 `scripts/` 下的生成器产出。**四步流水线顺序敏感**，一键入口：
+
+```bash
+./scripts/gen_all.sh              # 在仓库任意位置执行
+./scripts/gen_all.sh --target 1.21.11   # 额外参数透传给 gen_resources.py
+```
+
+| 步骤 | 脚本 | 产物 |
+| --- | --- | --- |
+| 1 | `scripts/gen_assets.py` | `assets/compressedblocks/textures/**` 全部贴图（方块 / 物品 / 盔甲 / 实体 / 容器 GUI） |
+| 2 | `scripts/gen_resources.py` | blockstate、方块与物品模型、`items/` 物品模型定义、配方、战利品表、标签、双语语言、装备资产 |
+| 3 | `scripts/gen_hopper_assets.py` | 1~3 重压缩铁漏斗：贴图、模型、blockstate、items、配方、语言与标签条目 |
+| 4 | `scripts/gen_wooden_hopper_assets.py` | 木质漏斗 + 1~3 重压缩木质漏斗：同上，另含战利品表 |
+
+- **为什么不能跳步**：第 2 步会清空它自己拥有的生成目录（`assets/compressedblocks` 下除 `textures/` 与本脚本保留白名单之外，以及 `data/` 下 `compressedblocks` / `minecraft` / `c` / `ftbultimine` 四个命名空间），第 3、4 步再把漏斗的资产、配方、战利品表、语言与标签条目补回去。只跑前两步会让漏斗资源丢失——这正是 `gen_all.sh` 存在的理由。
+- **幂等验收**：跑完 `git status --short` 必须为空。生成器只写真正变化的内容（贴图逐像素比较；清理只碰自己的产物），重跑不会制造无意义 diff。若出现 diff，说明生成器与仓库内容不同步：改生成器，不要手改生成出来的文件。
+- **不要手工编辑**生成目录中的文件——除两个手写模型模板 `assets/compressedblocks/models/block/template_hopper.json` 与 `template_hopper_side.json`（`gen_resources.py` 的保留白名单会保住它们）之外，其余文件下次生成即被覆盖。
+- **loader 专属文件**：`data/neoforge/data_maps/item/furnace_fuels.json`（燃料数据图）不归生成器所有，既不生成、也不会被清理。
+- **依赖**：Python 3 + Pillow + numpy。贴图基元缓存在 `_asset-src/vanilla/`、树特征模板在 `_asset-src/vanilla-data/`（均不入库）；漏斗贴图另需原版 jar（跑过一次 Gradle 构建后 Loom 缓存里就有，也可用环境变量 `MC_JAR` 指定）。
+- **分级定义单一来源**：`scripts/hopper_tiers.py`——漏斗 id 与中英文名由三个脚本共用，新增漏斗档位只改这里。
+- 提交前自查：`./scripts/gen_all.sh && git status --short` 为空，即资源与生成器同步。「构建 / 测试」小节里那条只列前两个脚本的旧提示以本节为准。
+
 ## 构建 / 测试
 
 ```bash
