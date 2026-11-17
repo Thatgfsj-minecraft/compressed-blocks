@@ -1,0 +1,775 @@
+{
+  "values": {
+    "compressedblocks:1x_acacia_log": {
+      "burn_time": 1500
+    },
+    "compressedblocks:1x_acacia_sapling": {
+      "burn_time": 500
+    },
+    "compressedblocks:1x_birch_log": {
+      "burn_time": 1500
+    },
+    "compressedblocks:1x_birch_sapling": {
+      "burn_time": 500
+    },
+    "compressedblocks:1x_cherry_log": {
+      "burn_time": 1500
+    },
+    "compressedblocks:1x_cherry_sapling": {
+      "burn_time": 500
+    },
+    "compressedblocks:1x_compressed_wooden_hopper": {
+      "burn_time": 1500
+    },
+    "compressedblocks:1x_dark_oak_log": {
+      "burn_time": 1500
+    },
+    "compressedblocks:1x_dark_oak_sapling": {
+      "burn_time": 500
+    },
+    "compressedblocks:1x_jungle_log": {
+      "burn_time": 1500
+    },
+    "compressedblocks:1x_jungle_sapling": {
+      "burn_time": 500
+    },
+    "compressedblocks:1x_mangrove_log": {
+      "burn_time": 1500
+    },
+    "compressedblocks:1x_mangrove_sapling": {
+      "burn_time": 500
+    },
+    "compressedblocks:1x_oak_log": {
+      "burn_time": 1500
+    },
+    "compressedblocks:1x_oak_sapling": {
+      "burn_time": 500
+    },
+    "compressedblocks:1x_pale_oak_log": {
+      "burn_time": 1500
+    },
+    "compressedblocks:1x_pale_oak_sapling": {
+      "burn_time": 500
+    },
+    "compressedblocks:1x_spruce_log": {
+      "burn_time": 1500
+    },
+    "compressedblocks:1x_spruce_sapling": {
+      "burn_time": 500
+    },
+    "compressedblocks:1x_stick": {
+      "burn_time": 500
+    },
+    "compressedblocks:1x_wood_axe": {
+      "burn_time": 1000
+    },
+    "compressedblocks:1x_wood_boots": {
+      "burn_time": 1000
+    },
+    "compressedblocks:1x_wood_chestplate": {
+      "burn_time": 1000
+    },
+    "compressedblocks:1x_wood_helmet": {
+      "burn_time": 1000
+    },
+    "compressedblocks:1x_wood_hoe": {
+      "burn_time": 1000
+    },
+    "compressedblocks:1x_wood_leggings": {
+      "burn_time": 1000
+    },
+    "compressedblocks:1x_wood_pickaxe": {
+      "burn_time": 1000
+    },
+    "compressedblocks:1x_wood_shovel": {
+      "burn_time": 1000
+    },
+    "compressedblocks:1x_wood_sword": {
+      "burn_time": 1000
+    },
+    "compressedblocks:2x_acacia_log": {
+      "burn_time": 7500
+    },
+    "compressedblocks:2x_acacia_sapling": {
+      "burn_time": 2500
+    },
+    "compressedblocks:2x_birch_log": {
+      "burn_time": 7500
+    },
+    "compressedblocks:2x_birch_sapling": {
+      "burn_time": 2500
+    },
+    "compressedblocks:2x_cherry_log": {
+      "burn_time": 7500
+    },
+    "compressedblocks:2x_cherry_sapling": {
+      "burn_time": 2500
+    },
+    "compressedblocks:2x_compressed_wooden_hopper": {
+      "burn_time": 7500
+    },
+    "compressedblocks:2x_dark_oak_log": {
+      "burn_time": 7500
+    },
+    "compressedblocks:2x_dark_oak_sapling": {
+      "burn_time": 2500
+    },
+    "compressedblocks:2x_jungle_log": {
+      "burn_time": 7500
+    },
+    "compressedblocks:2x_jungle_sapling": {
+      "burn_time": 2500
+    },
+    "compressedblocks:2x_mangrove_log": {
+      "burn_time": 7500
+    },
+    "compressedblocks:2x_mangrove_sapling": {
+      "burn_time": 2500
+    },
+    "compressedblocks:2x_oak_log": {
+      "burn_time": 7500
+    },
+    "compressedblocks:2x_oak_sapling": {
+      "burn_time": 2500
+    },
+    "compressedblocks:2x_pale_oak_log": {
+      "burn_time": 7500
+    },
+    "compressedblocks:2x_pale_oak_sapling": {
+      "burn_time": 2500
+    },
+    "compressedblocks:2x_spruce_log": {
+      "burn_time": 7500
+    },
+    "compressedblocks:2x_spruce_sapling": {
+      "burn_time": 2500
+    },
+    "compressedblocks:2x_stick": {
+      "burn_time": 2500
+    },
+    "compressedblocks:2x_wood_axe": {
+      "burn_time": 5000
+    },
+    "compressedblocks:2x_wood_boots": {
+      "burn_time": 5000
+    },
+    "compressedblocks:2x_wood_chestplate": {
+      "burn_time": 5000
+    },
+    "compressedblocks:2x_wood_helmet": {
+      "burn_time": 5000
+    },
+    "compressedblocks:2x_wood_hoe": {
+      "burn_time": 5000
+    },
+    "compressedblocks:2x_wood_leggings": {
+      "burn_time": 5000
+    },
+    "compressedblocks:2x_wood_pickaxe": {
+      "burn_time": 5000
+    },
+    "compressedblocks:2x_wood_shovel": {
+      "burn_time": 5000
+    },
+    "compressedblocks:2x_wood_sword": {
+      "burn_time": 5000
+    },
+    "compressedblocks:3x_acacia_log": {
+      "burn_time": 37500
+    },
+    "compressedblocks:3x_acacia_sapling": {
+      "burn_time": 12500
+    },
+    "compressedblocks:3x_birch_log": {
+      "burn_time": 37500
+    },
+    "compressedblocks:3x_birch_sapling": {
+      "burn_time": 12500
+    },
+    "compressedblocks:3x_cherry_log": {
+      "burn_time": 37500
+    },
+    "compressedblocks:3x_cherry_sapling": {
+      "burn_time": 12500
+    },
+    "compressedblocks:3x_compressed_wooden_hopper": {
+      "burn_time": 37500
+    },
+    "compressedblocks:3x_dark_oak_log": {
+      "burn_time": 37500
+    },
+    "compressedblocks:3x_dark_oak_sapling": {
+      "burn_time": 12500
+    },
+    "compressedblocks:3x_jungle_log": {
+      "burn_time": 37500
+    },
+    "compressedblocks:3x_jungle_sapling": {
+      "burn_time": 12500
+    },
+    "compressedblocks:3x_mangrove_log": {
+      "burn_time": 37500
+    },
+    "compressedblocks:3x_mangrove_sapling": {
+      "burn_time": 12500
+    },
+    "compressedblocks:3x_oak_log": {
+      "burn_time": 37500
+    },
+    "compressedblocks:3x_oak_sapling": {
+      "burn_time": 12500
+    },
+    "compressedblocks:3x_pale_oak_log": {
+      "burn_time": 37500
+    },
+    "compressedblocks:3x_pale_oak_sapling": {
+      "burn_time": 12500
+    },
+    "compressedblocks:3x_spruce_log": {
+      "burn_time": 37500
+    },
+    "compressedblocks:3x_spruce_sapling": {
+      "burn_time": 12500
+    },
+    "compressedblocks:3x_stick": {
+      "burn_time": 12500
+    },
+    "compressedblocks:3x_wood_axe": {
+      "burn_time": 25000
+    },
+    "compressedblocks:3x_wood_boots": {
+      "burn_time": 25000
+    },
+    "compressedblocks:3x_wood_chestplate": {
+      "burn_time": 25000
+    },
+    "compressedblocks:3x_wood_helmet": {
+      "burn_time": 25000
+    },
+    "compressedblocks:3x_wood_hoe": {
+      "burn_time": 25000
+    },
+    "compressedblocks:3x_wood_leggings": {
+      "burn_time": 25000
+    },
+    "compressedblocks:3x_wood_pickaxe": {
+      "burn_time": 25000
+    },
+    "compressedblocks:3x_wood_shovel": {
+      "burn_time": 25000
+    },
+    "compressedblocks:3x_wood_sword": {
+      "burn_time": 25000
+    },
+    "compressedblocks:4x_acacia_log": {
+      "burn_time": 187500
+    },
+    "compressedblocks:4x_acacia_sapling": {
+      "burn_time": 62500
+    },
+    "compressedblocks:4x_birch_log": {
+      "burn_time": 187500
+    },
+    "compressedblocks:4x_birch_sapling": {
+      "burn_time": 62500
+    },
+    "compressedblocks:4x_cherry_log": {
+      "burn_time": 187500
+    },
+    "compressedblocks:4x_cherry_sapling": {
+      "burn_time": 62500
+    },
+    "compressedblocks:4x_dark_oak_log": {
+      "burn_time": 187500
+    },
+    "compressedblocks:4x_dark_oak_sapling": {
+      "burn_time": 62500
+    },
+    "compressedblocks:4x_jungle_log": {
+      "burn_time": 187500
+    },
+    "compressedblocks:4x_jungle_sapling": {
+      "burn_time": 62500
+    },
+    "compressedblocks:4x_mangrove_log": {
+      "burn_time": 187500
+    },
+    "compressedblocks:4x_mangrove_sapling": {
+      "burn_time": 62500
+    },
+    "compressedblocks:4x_oak_log": {
+      "burn_time": 187500
+    },
+    "compressedblocks:4x_oak_sapling": {
+      "burn_time": 62500
+    },
+    "compressedblocks:4x_pale_oak_log": {
+      "burn_time": 187500
+    },
+    "compressedblocks:4x_pale_oak_sapling": {
+      "burn_time": 62500
+    },
+    "compressedblocks:4x_spruce_log": {
+      "burn_time": 187500
+    },
+    "compressedblocks:4x_spruce_sapling": {
+      "burn_time": 62500
+    },
+    "compressedblocks:4x_stick": {
+      "burn_time": 62500
+    },
+    "compressedblocks:4x_wood_axe": {
+      "burn_time": 125000
+    },
+    "compressedblocks:4x_wood_boots": {
+      "burn_time": 125000
+    },
+    "compressedblocks:4x_wood_chestplate": {
+      "burn_time": 125000
+    },
+    "compressedblocks:4x_wood_helmet": {
+      "burn_time": 125000
+    },
+    "compressedblocks:4x_wood_hoe": {
+      "burn_time": 125000
+    },
+    "compressedblocks:4x_wood_leggings": {
+      "burn_time": 125000
+    },
+    "compressedblocks:4x_wood_pickaxe": {
+      "burn_time": 125000
+    },
+    "compressedblocks:4x_wood_shovel": {
+      "burn_time": 125000
+    },
+    "compressedblocks:4x_wood_sword": {
+      "burn_time": 125000
+    },
+    "compressedblocks:5x_acacia_log": {
+      "burn_time": 937500
+    },
+    "compressedblocks:5x_acacia_sapling": {
+      "burn_time": 312500
+    },
+    "compressedblocks:5x_birch_log": {
+      "burn_time": 937500
+    },
+    "compressedblocks:5x_birch_sapling": {
+      "burn_time": 312500
+    },
+    "compressedblocks:5x_cherry_log": {
+      "burn_time": 937500
+    },
+    "compressedblocks:5x_cherry_sapling": {
+      "burn_time": 312500
+    },
+    "compressedblocks:5x_dark_oak_log": {
+      "burn_time": 937500
+    },
+    "compressedblocks:5x_dark_oak_sapling": {
+      "burn_time": 312500
+    },
+    "compressedblocks:5x_jungle_log": {
+      "burn_time": 937500
+    },
+    "compressedblocks:5x_jungle_sapling": {
+      "burn_time": 312500
+    },
+    "compressedblocks:5x_mangrove_log": {
+      "burn_time": 937500
+    },
+    "compressedblocks:5x_mangrove_sapling": {
+      "burn_time": 312500
+    },
+    "compressedblocks:5x_oak_log": {
+      "burn_time": 937500
+    },
+    "compressedblocks:5x_oak_sapling": {
+      "burn_time": 312500
+    },
+    "compressedblocks:5x_pale_oak_log": {
+      "burn_time": 937500
+    },
+    "compressedblocks:5x_pale_oak_sapling": {
+      "burn_time": 312500
+    },
+    "compressedblocks:5x_spruce_log": {
+      "burn_time": 937500
+    },
+    "compressedblocks:5x_spruce_sapling": {
+      "burn_time": 312500
+    },
+    "compressedblocks:5x_stick": {
+      "burn_time": 312500
+    },
+    "compressedblocks:5x_wood_axe": {
+      "burn_time": 625000
+    },
+    "compressedblocks:5x_wood_boots": {
+      "burn_time": 625000
+    },
+    "compressedblocks:5x_wood_chestplate": {
+      "burn_time": 625000
+    },
+    "compressedblocks:5x_wood_helmet": {
+      "burn_time": 625000
+    },
+    "compressedblocks:5x_wood_hoe": {
+      "burn_time": 625000
+    },
+    "compressedblocks:5x_wood_leggings": {
+      "burn_time": 625000
+    },
+    "compressedblocks:5x_wood_pickaxe": {
+      "burn_time": 625000
+    },
+    "compressedblocks:5x_wood_shovel": {
+      "burn_time": 625000
+    },
+    "compressedblocks:5x_wood_sword": {
+      "burn_time": 625000
+    },
+    "compressedblocks:6x_acacia_log": {
+      "burn_time": 4687500
+    },
+    "compressedblocks:6x_acacia_sapling": {
+      "burn_time": 1562500
+    },
+    "compressedblocks:6x_birch_log": {
+      "burn_time": 4687500
+    },
+    "compressedblocks:6x_birch_sapling": {
+      "burn_time": 1562500
+    },
+    "compressedblocks:6x_cherry_log": {
+      "burn_time": 4687500
+    },
+    "compressedblocks:6x_cherry_sapling": {
+      "burn_time": 1562500
+    },
+    "compressedblocks:6x_dark_oak_log": {
+      "burn_time": 4687500
+    },
+    "compressedblocks:6x_dark_oak_sapling": {
+      "burn_time": 1562500
+    },
+    "compressedblocks:6x_jungle_log": {
+      "burn_time": 4687500
+    },
+    "compressedblocks:6x_jungle_sapling": {
+      "burn_time": 1562500
+    },
+    "compressedblocks:6x_mangrove_log": {
+      "burn_time": 4687500
+    },
+    "compressedblocks:6x_mangrove_sapling": {
+      "burn_time": 1562500
+    },
+    "compressedblocks:6x_oak_log": {
+      "burn_time": 4687500
+    },
+    "compressedblocks:6x_oak_sapling": {
+      "burn_time": 1562500
+    },
+    "compressedblocks:6x_pale_oak_log": {
+      "burn_time": 4687500
+    },
+    "compressedblocks:6x_pale_oak_sapling": {
+      "burn_time": 1562500
+    },
+    "compressedblocks:6x_spruce_log": {
+      "burn_time": 4687500
+    },
+    "compressedblocks:6x_spruce_sapling": {
+      "burn_time": 1562500
+    },
+    "compressedblocks:6x_stick": {
+      "burn_time": 1562500
+    },
+    "compressedblocks:6x_wood_axe": {
+      "burn_time": 3125000
+    },
+    "compressedblocks:6x_wood_boots": {
+      "burn_time": 3125000
+    },
+    "compressedblocks:6x_wood_chestplate": {
+      "burn_time": 3125000
+    },
+    "compressedblocks:6x_wood_helmet": {
+      "burn_time": 3125000
+    },
+    "compressedblocks:6x_wood_hoe": {
+      "burn_time": 3125000
+    },
+    "compressedblocks:6x_wood_leggings": {
+      "burn_time": 3125000
+    },
+    "compressedblocks:6x_wood_pickaxe": {
+      "burn_time": 3125000
+    },
+    "compressedblocks:6x_wood_shovel": {
+      "burn_time": 3125000
+    },
+    "compressedblocks:6x_wood_sword": {
+      "burn_time": 3125000
+    },
+    "compressedblocks:7x_acacia_log": {
+      "burn_time": 23437500
+    },
+    "compressedblocks:7x_acacia_sapling": {
+      "burn_time": 7812500
+    },
+    "compressedblocks:7x_birch_log": {
+      "burn_time": 23437500
+    },
+    "compressedblocks:7x_birch_sapling": {
+      "burn_time": 7812500
+    },
+    "compressedblocks:7x_cherry_log": {
+      "burn_time": 23437500
+    },
+    "compressedblocks:7x_cherry_sapling": {
+      "burn_time": 7812500
+    },
+    "compressedblocks:7x_dark_oak_log": {
+      "burn_time": 23437500
+    },
+    "compressedblocks:7x_dark_oak_sapling": {
+      "burn_time": 7812500
+    },
+    "compressedblocks:7x_jungle_log": {
+      "burn_time": 23437500
+    },
+    "compressedblocks:7x_jungle_sapling": {
+      "burn_time": 7812500
+    },
+    "compressedblocks:7x_mangrove_log": {
+      "burn_time": 23437500
+    },
+    "compressedblocks:7x_mangrove_sapling": {
+      "burn_time": 7812500
+    },
+    "compressedblocks:7x_oak_log": {
+      "burn_time": 23437500
+    },
+    "compressedblocks:7x_oak_sapling": {
+      "burn_time": 7812500
+    },
+    "compressedblocks:7x_pale_oak_log": {
+      "burn_time": 23437500
+    },
+    "compressedblocks:7x_pale_oak_sapling": {
+      "burn_time": 7812500
+    },
+    "compressedblocks:7x_spruce_log": {
+      "burn_time": 23437500
+    },
+    "compressedblocks:7x_spruce_sapling": {
+      "burn_time": 7812500
+    },
+    "compressedblocks:7x_stick": {
+      "burn_time": 7812500
+    },
+    "compressedblocks:7x_wood_axe": {
+      "burn_time": 15625000
+    },
+    "compressedblocks:7x_wood_boots": {
+      "burn_time": 15625000
+    },
+    "compressedblocks:7x_wood_chestplate": {
+      "burn_time": 15625000
+    },
+    "compressedblocks:7x_wood_helmet": {
+      "burn_time": 15625000
+    },
+    "compressedblocks:7x_wood_hoe": {
+      "burn_time": 15625000
+    },
+    "compressedblocks:7x_wood_leggings": {
+      "burn_time": 15625000
+    },
+    "compressedblocks:7x_wood_pickaxe": {
+      "burn_time": 15625000
+    },
+    "compressedblocks:7x_wood_shovel": {
+      "burn_time": 15625000
+    },
+    "compressedblocks:7x_wood_sword": {
+      "burn_time": 15625000
+    },
+    "compressedblocks:8x_acacia_log": {
+      "burn_time": 117187500
+    },
+    "compressedblocks:8x_acacia_sapling": {
+      "burn_time": 39062500
+    },
+    "compressedblocks:8x_birch_log": {
+      "burn_time": 117187500
+    },
+    "compressedblocks:8x_birch_sapling": {
+      "burn_time": 39062500
+    },
+    "compressedblocks:8x_cherry_log": {
+      "burn_time": 117187500
+    },
+    "compressedblocks:8x_cherry_sapling": {
+      "burn_time": 39062500
+    },
+    "compressedblocks:8x_dark_oak_log": {
+      "burn_time": 117187500
+    },
+    "compressedblocks:8x_dark_oak_sapling": {
+      "burn_time": 39062500
+    },
+    "compressedblocks:8x_jungle_log": {
+      "burn_time": 117187500
+    },
+    "compressedblocks:8x_jungle_sapling": {
+      "burn_time": 39062500
+    },
+    "compressedblocks:8x_mangrove_log": {
+      "burn_time": 117187500
+    },
+    "compressedblocks:8x_mangrove_sapling": {
+      "burn_time": 39062500
+    },
+    "compressedblocks:8x_oak_log": {
+      "burn_time": 117187500
+    },
+    "compressedblocks:8x_oak_sapling": {
+      "burn_time": 39062500
+    },
+    "compressedblocks:8x_pale_oak_log": {
+      "burn_time": 117187500
+    },
+    "compressedblocks:8x_pale_oak_sapling": {
+      "burn_time": 39062500
+    },
+    "compressedblocks:8x_spruce_log": {
+      "burn_time": 117187500
+    },
+    "compressedblocks:8x_spruce_sapling": {
+      "burn_time": 39062500
+    },
+    "compressedblocks:8x_stick": {
+      "burn_time": 39062500
+    },
+    "compressedblocks:8x_wood_axe": {
+      "burn_time": 78125000
+    },
+    "compressedblocks:8x_wood_boots": {
+      "burn_time": 78125000
+    },
+    "compressedblocks:8x_wood_chestplate": {
+      "burn_time": 78125000
+    },
+    "compressedblocks:8x_wood_helmet": {
+      "burn_time": 78125000
+    },
+    "compressedblocks:8x_wood_hoe": {
+      "burn_time": 78125000
+    },
+    "compressedblocks:8x_wood_leggings": {
+      "burn_time": 78125000
+    },
+    "compressedblocks:8x_wood_pickaxe": {
+      "burn_time": 78125000
+    },
+    "compressedblocks:8x_wood_shovel": {
+      "burn_time": 78125000
+    },
+    "compressedblocks:8x_wood_sword": {
+      "burn_time": 78125000
+    },
+    "compressedblocks:9x_acacia_log": {
+      "burn_time": 585937500
+    },
+    "compressedblocks:9x_acacia_sapling": {
+      "burn_time": 195312500
+    },
+    "compressedblocks:9x_birch_log": {
+      "burn_time": 585937500
+    },
+    "compressedblocks:9x_birch_sapling": {
+      "burn_time": 195312500
+    },
+    "compressedblocks:9x_cherry_log": {
+      "burn_time": 585937500
+    },
+    "compressedblocks:9x_cherry_sapling": {
+      "burn_time": 195312500
+    },
+    "compressedblocks:9x_dark_oak_log": {
+      "burn_time": 585937500
+    },
+    "compressedblocks:9x_dark_oak_sapling": {
+      "burn_time": 195312500
+    },
+    "compressedblocks:9x_jungle_log": {
+      "burn_time": 585937500
+    },
+    "compressedblocks:9x_jungle_sapling": {
+      "burn_time": 195312500
+    },
+    "compressedblocks:9x_mangrove_log": {
+      "burn_time": 585937500
+    },
+    "compressedblocks:9x_mangrove_sapling": {
+      "burn_time": 195312500
+    },
+    "compressedblocks:9x_oak_log": {
+      "burn_time": 585937500
+    },
+    "compressedblocks:9x_oak_sapling": {
+      "burn_time": 195312500
+    },
+    "compressedblocks:9x_pale_oak_log": {
+      "burn_time": 585937500
+    },
+    "compressedblocks:9x_pale_oak_sapling": {
+      "burn_time": 195312500
+    },
+    "compressedblocks:9x_spruce_log": {
+      "burn_time": 585937500
+    },
+    "compressedblocks:9x_spruce_sapling": {
+      "burn_time": 195312500
+    },
+    "compressedblocks:9x_stick": {
+      "burn_time": 195312500
+    },
+    "compressedblocks:9x_wood_axe": {
+      "burn_time": 390625000
+    },
+    "compressedblocks:9x_wood_boots": {
+      "burn_time": 390625000
+    },
+    "compressedblocks:9x_wood_chestplate": {
+      "burn_time": 390625000
+    },
+    "compressedblocks:9x_wood_helmet": {
+      "burn_time": 390625000
+    },
+    "compressedblocks:9x_wood_hoe": {
+      "burn_time": 390625000
+    },
+    "compressedblocks:9x_wood_leggings": {
+      "burn_time": 390625000
+    },
+    "compressedblocks:9x_wood_pickaxe": {
+      "burn_time": 390625000
+    },
+    "compressedblocks:9x_wood_shovel": {
+      "burn_time": 390625000
+    },
+    "compressedblocks:9x_wood_sword": {
+      "burn_time": 390625000
+    },
+    "compressedblocks:compressed_chest": {
+      "burn_time": 1500
+    },
+    "compressedblocks:wooden_hopper": {
+      "burn_time": 300
+    }
+  }
+}

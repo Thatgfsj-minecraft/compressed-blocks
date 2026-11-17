@@ -136,6 +136,9 @@ public class CompressedBlocksNeoForge {
                         CompressedBlocks.SHULKER_TYPE, pos, state, true),
                     CompressedBlocks.COMPRESSED_SHULKER);
                 helper.register(CompressedBlocks.id("pot"), CompressedBlocks.POT_TYPE);
+                // 修复：GENERATOR_TYPE 构造后从未注册 → NeoForge 启动/数据生成报
+                // "Some intrusive holders were not registered: BlockEntityType"（原版刷石机 BE 失效）
+                helper.register(CompressedBlocks.id("cobblestone_generator"), CompressedBlocks.GENERATOR_TYPE);
                 helper.register(CompressedBlocks.id("compressed_chest"), CompressedBlocks.CHEST_TYPE);
                 helper.register(CompressedBlocks.id("compressed_shulker_box"), CompressedBlocks.SHULKER_TYPE);
             });
