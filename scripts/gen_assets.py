@@ -882,11 +882,17 @@ def main():
             asset_io.save_png(img, os.path.join(tdir, "block", name + ".png"))
         # 主 mod 已删除 2x/3x 刷石机：清理历史遗留贴图。gen_resources 的 clean_owned_assets
         # 会跳过 textures/，所以只能由本生成器负责；exists 判断保证重复运行幂等。
-        for prefix in ("2x_", "3x_"):
-            for suffix in ("", "_top", "_bottom"):
-                stale = os.path.join(tdir, "block", f"{prefix}cobblestone_generator{suffix}.png")
-                if os.path.exists(stale):
-                    os.remove(stale)
+        # 无下划线的 2xcobblestone_generator / 3xcobblestone_generator 是 0.3.1 遗留的孤儿贴图
+        # （无模型/配方/代码引用），一并在这里清理。
+        stale_generator_tex = [
+            f"{prefix}cobblestone_generator{suffix}.png"
+            for prefix in ("2x_", "3x_")
+            for suffix in ("", "_top", "_bottom")
+        ] + [f"{prefix}cobblestone_generator.png" for prefix in ("2x", "3x")]
+        for name in stale_generator_tex:
+            stale = os.path.join(tdir, "block", name)
+            if os.path.exists(stale):
+                os.remove(stale)
         for name, img in item_tex.items():
             asset_io.save_png(img, os.path.join(tdir, "item", name + ".png"))
         for name, img in gui_tex.items():
