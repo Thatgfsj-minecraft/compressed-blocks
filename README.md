@@ -84,6 +84,8 @@ cd 1.21.11/neoforge && GRADLE_USER_HOME=<干净目录> ./gradlew build
 - 环境：Loom 1.17.21 / ModDevGradle 2.0.147 / Gradle 9.5.1 / JDK 21（版本坐标在各子项目 gradle.properties）
 - **GRADLE_USER_HOME 必须指向无 init.gradle 的干净目录**（全局阿里云镜像会破坏 NeoForge 解析）
 - 贴图与全部 JSON 由脚本生成：`python scripts/gen_assets.py && python scripts/gen_resources.py`（原版 sprite 缓存于 `_asset-src/vanilla/`，树特征模板在 `_asset-src/vanilla-data/`，均不入库）
+- **燃料数据图由 NeoForge datagen 生成**：改完 `CompressedFuels` 规则后执行 `cd 1.21.11/neoforge && ./gradlew runServerData`，产物写入 `src/generated/resources/data/neoforge/data_maps/item/furnace_fuels.json` 并入库；忘记重跑时 NeoForge 启动自检会直接报错。Fabric 端走 `FuelRegistryEvents`，同一份规则，无需生成文件
+- **双端一致性检查**：`python scripts/check_parity.py`（比较 `src/main/resources/{assets,data}` 与共享 Java 源；`src/generated` 与加载器专属目录不参与）
 - E2E：`ci/` 下的专用服 + RCON 断言（`node ci/e2e.js`，环境变量 `RCON_PORT` 指定端口），服务器启动日志搜 `SELF-TEST PASS`（服务端权威比对注册数/硬度公式/护甲属性/食物数值/标签族）
 
 ## 素材说明
