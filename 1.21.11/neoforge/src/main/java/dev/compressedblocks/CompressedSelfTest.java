@@ -257,6 +257,17 @@ final class CompressedSelfTest {
                     errors.add(t.name() + " speed " + speed + " != " + wantSpeed);
                 }
             }
+            // 跨类别速度下限：非剑工具在本类标签之外的方块（如压缩镐挖木半砖、压缩斧挖石头）
+            // 也必须按本档速度挖 —— 对应 getDestroySpeed 覆盖；tool 组件规则保持不变（掉落/等级仍按原版）
+            if (!t.name().endsWith("_sword")) {
+                for (BlockState probe : List.of(Blocks.OAK_SLAB.defaultBlockState(), Blocks.STONE.defaultBlockState())) {
+                    float got = stack.getDestroySpeed(probe);
+                    if (Math.abs(got - t.speed()) > 0.001F) {
+                        errors.add(t.name() + " cross-class speed on " + probe.getBlock()
+                            + " " + got + " != " + t.speed());
+                    }
+                }
+            }
             if (Math.abs(attackDamage(stack) - t.damage()) > 0.001) {
                 errors.add(t.name() + " attack damage " + attackDamage(stack) + " != " + t.damage());
             }
