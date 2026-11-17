@@ -222,7 +222,7 @@ final class CompressedContent {
             ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
             GENERATOR_BLOCKS.add(block);
         }
-        // 5f. 压缩熔炉（4 个压缩等级）：3x/9x/27x/81x 速度与阶梯权限
+        // 5f. 压缩熔炉（4 个压缩等级）：单路 2x/3x/6x/27x、整机 6x/18x/54x/243x 与阶梯权限
         for (int tier = 1; tier <= FURNACE_TIERS; tier++) {
             String name = LEVEL_PREFIX[tier - 1] + "_compressed_furnace";
             CompressedFurnaceBlock block = new CompressedFurnaceBlock(tier,
@@ -334,7 +334,7 @@ final class CompressedContent {
                 FOOD_REGS.add(new FoodReg(name, item, nutrition, saturation));
             }
         }
-        // 7. 压缩护甲（4 件 × 9 级）：石制，铁级基准；九重满套免疫一切伤害
+        // 7. 压缩护甲（石制 36 件 + 木质 36 件 = 4 部位 × 9 重 × 2 线，共 72 件）：铁级基准；九重石甲满套免疫一切伤害
         for (int level = 1; level <= LEVELS; level++) {
             String p = LEVEL_PREFIX[level - 1];
             long mult = level >= UNBREAKABLE_FROM ? Integer.MAX_VALUE / 16L : pow9(level);
@@ -374,7 +374,7 @@ final class CompressedContent {
             }
         }
         // 7b. 压缩木质盔甲（4 件 × 9 重）：防御/耐久与石甲相同；效果按有效重数（重数-1）结算；
-        //     不毁仍从 6 重开始；9 重木甲有效 8 重（头盔水下呼吸+夜视、护腿抗性3、胸甲飞行），无 9 重石甲的不死/急迫档
+        //     不毁仍从 6 重开始；9 重木甲有效 8 重（头盔夜视+水下呼吸、护腿抗性 II、胸甲飞行），无 9 重石甲的不死/急迫档
         for (int level = 1; level <= LEVELS; level++) {
             String p = LEVEL_PREFIX[level - 1];
             long mult = level >= UNBREAKABLE_FROM ? Integer.MAX_VALUE / 16L : pow9(level);

@@ -11,7 +11,8 @@ import net.minecraft.world.item.Item;
  *
  * <p>规则（用户 2026-11-17 定稿）：</p>
  * <ul>
- *   <li>压缩木质储存方块（压缩原木 1~9 重）：原版原木 300 tick，每重 ×5，不封顶</li>
+ *   <li>压缩木质储存方块（压缩原木 1~9 重）：原版原木 300 tick，每重 ×5（最高 5⁹；当前只有 1~9 重物品，
+ *   {@code Math.min(level, LEVELS)} 只是防御性封顶，不是可无限叠加的规则）</li>
  *   <li>木线工具 / 木制盔甲：原版木质工具 200 tick，每重 ×5</li>
  *   <li>压缩木棍：原版木棍 100 tick，每重 ×5</li>
  *   <li>压缩树苗：原版树苗 100 tick，每重 ×5（2026-11-18 用户确认加入）</li>
@@ -38,7 +39,7 @@ public final class CompressedFuels {
     /** 压缩箱子 = 5 × 箱子。 */
     public static final int COMPRESSED_CHEST = LOG_BASE * TIER_FACTOR;
     /**
-     * 规则命中的物品总数（9 木材 × (9 原木 + 9 树苗 + 9 木棍 + 9 工具 + 4 盔甲) + 4 木漏斗 + 1 压缩箱 = 257）。
+     * 规则命中的物品总数（9 树种 × (9 原木 + 9 树苗) + 9 压缩木棍 + 45 木线工具 + 36 木甲 + 4 木漏斗 + 1 压缩箱 = 257）。
      * 改动燃料规则时必须同步；SELF-TEST 用它对拍「注册进 FuelValues 的条目数」，防止静默漏注册。
      */
     public static final int EXPECTED_ITEM_COUNT = 257;

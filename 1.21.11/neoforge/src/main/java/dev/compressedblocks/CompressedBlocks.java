@@ -35,8 +35,9 @@ import org.slf4j.Logger;
  * 压缩方块核心：纯数据驱动。方块/物品实例在此集中构建，注册动作由各加载器入口完成；
  * 本类不 import 任何加载器类（组织约定：core 每版本双加载器逐字节一致）。
  *
- * 0.3.0：储存方块统一硬度 50×1.2^(重-1)、全部 1200 爆炸抗性；新增压缩护甲（九重满套免疫一切伤害
- * 且饱食度常满，溢出防御转抗性提升）、24 种建材、耕地/作物/树苗/树叶农业系统、压缩食物。
+ * 0.3.0：储存方块硬度 = 从原版硬度线性升到 9 重目标（黑曜石 200 / 硬类 150 / 软类 100），
+ * 全部 1200 爆炸抗性；新增石制与木质压缩护甲各 36 件（九重石甲满套免疫一切伤害且饱食度常满，
+ * 单件防御封顶 10、溢出丢弃）、24 种建材、耕地/作物/树苗/树叶农业系统、压缩食物。
  */
 public final class CompressedBlocks {
     public static final String MOD_ID = "compressedblocks";
@@ -65,7 +66,7 @@ public final class CompressedBlocks {
 
     // ------------------------------------------------------------------ 储存方块
 
-    /** 压缩方块硬度：黑曜石级 50 起步，每重 ×1.2（所需挖掘速度逐层上浮）。 */
+    /** 旧版硬度公式的遗留常量（0.3.0 起硬度统一走 {@link #hardnessFor}，此处仅保留兼容、无调用点）。 */
     public static final float STORAGE_HARDNESS_BASE = 50.0F;
     public static final double STORAGE_HARDNESS_STEP = 1.2;
     /** 全部压缩方块炸不毁（黑曜石级爆炸抗性）。 */
@@ -537,7 +538,6 @@ public final class CompressedBlocks {
         return sum;
     }
 
-    /** 四件全九重 = 免疫一切伤害（含 /kill）+ 饱食度常满。 */
     /** 当前穿戴件的最高重数（无穿戴 = 0）。 */
     public static int wornMaxLevel(Player player) {
         int max = 0;
@@ -561,6 +561,7 @@ public final class CompressedBlocks {
         return true;
     }
 
+    /** 四件全九重（按有效重数）= 免疫一切伤害（含 /kill）+ 饱食度常满。 */
     public static boolean hasFullLevel9Armor(Player player) {
         return fullSetAtLeast(player, LEVELS);
     }

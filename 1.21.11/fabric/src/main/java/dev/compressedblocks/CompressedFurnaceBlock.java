@@ -20,11 +20,11 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * 四阶压缩熔炉方块：
- * 1重（1x）：3x 速度，权限原版 + 1~3 重；
- * 2重（2x）：9x 速度，权限原版 + 1~6 重；
- * 3重（3x）：27x 速度，权限原版 + 1~9 重；
- * 4重（4x）：81x 极致速度，全通烧炼。
+ * 四阶压缩熔炉方块（整机吞吐 = 单路速度 × 并行路数）：
+ * 1重（1x）：3 路 × 单路 2x = 整机 6x，权限原版 + 1~3 重；
+ * 2重（2x）：6 路 × 单路 3x = 整机 18x，权限原版 + 1~6 重；
+ * 3重（3x）：9 路 × 单路 6x = 整机 54x，权限原版 + 1~9 重；
+ * 4重（4x）：9 路 × 单路 27x = 整机 243x，全通烧炼。
  */
 public class CompressedFurnaceBlock extends AbstractFurnaceBlock {
     public static final MapCodec<CompressedFurnaceBlock> CODEC = simpleCodec(props -> new CompressedFurnaceBlock(1, props));
