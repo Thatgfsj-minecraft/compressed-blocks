@@ -89,6 +89,8 @@ Thatgfsj-minecraft 组织出品，开发约定见 [mc-mod-dev-skill](https://git
 | 3 | `scripts/gen_hopper_assets.py` | 1~3 重压缩铁漏斗：贴图、模型、blockstate、items、配方、语言与标签条目 |
 | 4 | `scripts/gen_wooden_hopper_assets.py` | 木质漏斗 + 1~3 重压缩木质漏斗：同上，另含战利品表 |
 
+- **第 2 步按资源域拆分**：`scripts/gen_resources.py` 只保留 CLI、清单断言、清理调度与逐 loader 循环；共享常量/名称 helper/写出工具/所有权清理在 `scripts/res_common.py`，资产生成在 `res_assets.py`，语言在 `res_lang.py`，数据（配方/战利品表/标签/树特征）在 `res_data.py`。拆分不改变任何生成结果。
+
 - **为什么不能跳步**：第 2 步会清空它自己拥有的生成目录（`assets/compressedblocks` 下除 `textures/` 与本脚本保留白名单之外，以及 `data/` 下 `compressedblocks` / `minecraft` / `c` / `ftbultimine` 四个命名空间），第 3、4 步再把漏斗的资产、配方、战利品表、语言与标签条目补回去。只跑前两步会让漏斗资源丢失——这正是 `gen_all.sh` 存在的理由。
 - **幂等验收**：跑完 `git status --short` 必须为空。生成器只写真正变化的内容（贴图逐像素比较；清理只碰自己的产物），重跑不会制造无意义 diff。若出现 diff，说明生成器与仓库内容不同步：改生成器，不要手改生成出来的文件。
 - **不要手工编辑**生成目录中的文件——除两个手写模型模板 `assets/compressedblocks/models/block/template_hopper.json` 与 `template_hopper_side.json`（`gen_resources.py` 的保留白名单会保住它们）之外，其余文件下次生成即被覆盖。
