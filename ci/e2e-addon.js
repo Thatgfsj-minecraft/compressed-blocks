@@ -32,6 +32,8 @@
 //
 // 【时间确定性】generator 用例前 `tick freeze`，`tick sprint 40t` 精确跑 40 tick，最后 `tick unfreeze`；
 // 这样即使测试服没进入空服暂停（或有人在线）也不会多产，避免「恰好 2 个」抖动。
+// fresh world（首次生成区块）先按 9 台机器坐标逐点探针 + 一次 5t 短促活，避免区块首载少 tick
+// 导致 B 用例个别档位只收到 1 个产物。
 //
 // 【待确认假设】recipe id 与资源路径集中在下面常量，以 PR-2 最终实现为准：
 //   合成 compressedblockspot:Nx_cobblestone_generator（1x = 9 个主 mod 原版级刷石机
@@ -661,6 +663,20 @@ function finish(tag) {
     check('探针：测试区 -64 层是基岩（超平坦世界）', /Test passed/.test(probe), probe);
     const probeNeg = await cmd(`execute if block ${AREA.x0} -64 ${AREA.z} minecraft:stone`);
     check('探针：负断言可用', /Test failed/.test(probeNeg), probeNeg);
+    // fresh world 首次生成：先按 9 档机器/箱子所在区块逐点探针，强制区块完成生成，否则后续
+    // tick sprint 期间个别区块的方块实体会少 tick（曾导致 B 用例 4x~9x 只收到 1 个产物）。
+    for (const n of LEVELS) {
+      const x = AREA.x0 + (n - 1) * AREA.step;
+      await cmd(`execute if block ${x} -64 ${AREA.z} minecraft:bedrock`);
+    }
+    // 再放一次 5t 短促活（此时还没放机器，不影响产物计数），让刚加载的区块/方块实体完成首 tick。
+    // 必须等 sprint 真正跑完再 freeze：sprint 结束时会恢复「请求前」的 frozen 状态，
+    // 若在 sprint 中途 freeze，结束时会把 freeze 撤销掉。
+    await cmd('tick sprint 5t');
+    for (let i = 0; i < 40; i++) {
+      if (!/The game is sprinting/i.test(await cmd('tick query'))) break;
+      await sleep(100);
+    }
     // 冻结 tick：保证下面的 tick sprint 40t 精确 = 2 个产物（不受空服暂停/在线玩家影响）
     await cmd('tick freeze');
 
