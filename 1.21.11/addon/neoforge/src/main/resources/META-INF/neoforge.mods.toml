@@ -26,6 +26,6 @@ side="BOTH"
 [[dependencies.compressedblockspot]]
 modId="compressedblocks"
 type="required"
-versionRange="[0.4.0,0.5.0)"
+versionRange="[0.4.1,0.5.0)"
 ordering="NONE"
 side="BOTH"
