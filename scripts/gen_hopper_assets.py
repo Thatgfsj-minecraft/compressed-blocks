@@ -15,11 +15,16 @@ import json
 import zipfile
 from PIL import Image
 
-REPO_ROOT = "/home/thatgfsj/AIagent/minecraft/compressed-blocks"
-sys.path.append(os.path.join(REPO_ROOT, "scripts"))
+# 仓库根按脚本位置推断（以前写死绝对路径，在 worktree/别的机器上会写进错误的仓库）
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+import asset_io
 import gen_assets
+import hopper_tiers
 
-JAR = "/home/thatgfsj/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged/1.21.11-loom.mappings.1_21_11.layered+hash.2198-v2/minecraft-merged-1.21.11-loom.mappings.1_21_11.layered+hash.2198-v2.jar"
+# 原版贴图源：环境变量 MC_JAR 或 Loom 缓存（见 asset_io.find_minecraft_jar）
+JAR = asset_io.find_minecraft_jar()
 
 with zipfile.ZipFile(JAR) as z:
     top_base = Image.open(z.open("assets/minecraft/textures/block/hopper_top.png")).convert("RGBA")
@@ -27,11 +32,8 @@ with zipfile.ZipFile(JAR) as z:
     inside_base = Image.open(z.open("assets/minecraft/textures/block/hopper_inside.png")).convert("RGBA")
     item_base = Image.open(z.open("assets/minecraft/textures/item/hopper.png")).convert("RGBA")
 
-TIERS = [
-    (1, "1x", "Compressed Hopper", "一重压缩漏斗"),
-    (2, "2x", "Double Compressed Hopper", "二重压缩漏斗"),
-    (3, "3x", "Triple Compressed Hopper", "三重压缩漏斗"),
-]
+# 分级定义与 gen_wooden_hopper_assets.py / gen_resources.py 共用（scripts/hopper_tiers.py）
+TIERS = hopper_tiers.IRON_HOPPERS
 
 TARGET_DIRS = [
     os.path.join(REPO_ROOT, "1.21.11", "fabric", "src", "main", "resources"),
@@ -53,18 +55,17 @@ for target in TARGET_DIRS:
     os.makedirs(tex_block_dir, exist_ok=True)
     os.makedirs(tex_item_dir, exist_ok=True)
 
-    for tier, prefix, en_name, zh_name in TIERS:
-        name = f"{prefix}_compressed_hopper"
+    for tier, name, en_name, zh_name in TIERS:
         # 贴图
         t_top = gen_assets.gen_block_tex(top_base.copy(), tier, gray=False)
         t_outside = gen_assets.gen_block_tex(outside_base.copy(), tier, gray=False)
         t_inside = gen_assets.gen_block_tex(inside_base.copy(), tier, gray=False)
         t_item = gen_assets.level_tint(item_base.copy(), tier)
 
-        t_top.save(os.path.join(tex_block_dir, f"{name}_top.png"))
-        t_outside.save(os.path.join(tex_block_dir, f"{name}_outside.png"))
-        t_inside.save(os.path.join(tex_block_dir, f"{name}_inside.png"))
-        t_item.save(os.path.join(tex_item_dir, f"{name}.png"))
+        asset_io.save_png(t_top, os.path.join(tex_block_dir, f"{name}_top.png"))
+        asset_io.save_png(t_outside, os.path.join(tex_block_dir, f"{name}_outside.png"))
+        asset_io.save_png(t_inside, os.path.join(tex_block_dir, f"{name}_inside.png"))
+        asset_io.save_png(t_item, os.path.join(tex_item_dir, f"{name}.png"))
 
         # 2. 模型
         # 方块向下模型（指向模组自包含模板）
@@ -220,8 +221,8 @@ for target in TARGET_DIRS:
         with open(pickaxe_tag_path, "r", encoding="utf-8") as f:
             tag_data = json.load(f)
         vals = tag_data.get("values", [])
-        for _, p, _, _ in TIERS:
-            h_id = f"compressedblocks:{p}_compressed_hopper"
+        for _, name, _, _ in TIERS:
+            h_id = f"compressedblocks:{name}"
             if h_id not in vals:
                 vals.append(h_id)
         tag_data["values"] = sorted(vals)
@@ -232,8 +233,8 @@ for target in TARGET_DIRS:
         with open(iron_tool_tag_path, "r", encoding="utf-8") as f:
             tag_data = json.load(f)
         vals = tag_data.get("values", [])
-        for _, p, _, _ in TIERS:
-            h_id = f"compressedblocks:{p}_compressed_hopper"
+        for _, name, _, _ in TIERS:
+            h_id = f"compressedblocks:{name}"
             if h_id not in vals:
                 vals.append(h_id)
         tag_data["values"] = sorted(vals)
@@ -244,18 +245,18 @@ for target in TARGET_DIRS:
     if os.path.exists(zh_path):
         with open(zh_path, "r", encoding="utf-8") as f:
             zh_data = json.load(f)
-        for _, p, _, zh_name in TIERS:
-            zh_data[f"block.compressedblocks.{p}_compressed_hopper"] = zh_name
-            zh_data[f"container.compressedblocks.{p}_compressed_hopper"] = zh_name
+        for _, name, _, zh_name in TIERS:
+            zh_data[f"block.compressedblocks.{name}"] = zh_name
+            zh_data[f"container.compressedblocks.{name}"] = zh_name
         dump_json(zh_path, zh_data)
 
     en_path = os.path.join(assets_dir, "lang", "en_us.json")
     if os.path.exists(en_path):
         with open(en_path, "r", encoding="utf-8") as f:
             en_data = json.load(f)
-        for _, p, en_name, _ in TIERS:
-            en_data[f"block.compressedblocks.{p}_compressed_hopper"] = en_name
-            en_data[f"container.compressedblocks.{p}_compressed_hopper"] = en_name
+        for _, name, en_name, _ in TIERS:
+            en_data[f"block.compressedblocks.{name}"] = en_name
+            en_data[f"container.compressedblocks.{name}"] = en_name
         dump_json(en_path, en_data)
 
 print("Generated all hopper assets, models, blockstates, recipes, tags and lang successfully!")

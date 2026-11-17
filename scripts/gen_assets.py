@@ -19,6 +19,8 @@ import sys
 
 from PIL import Image, ImageDraw
 
+import asset_io  # 同目录：原版 jar 定位 + 幂等写 PNG
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 VANILLA = os.path.join(ROOT, "_asset-src", "vanilla")
@@ -146,6 +148,36 @@ COMPAT_COLORS = {
     "lumium": (238, 226, 130),
     "terrasteel": (96, 196, 96),
     "elementium": (188, 118, 176),
+}
+
+# 金属噪点底图的随机种子（每材质一个，9 级共用）。
+# 以前是 hash(key) & 0xFFFF：字符串 hash 受 PYTHONHASHSEED 随机化影响，每次运行噪点都变，
+# 重跑一次就改掉 396 张贴图（像素不同、肉眼几乎无感）——这是"生成器不幂等"的一半来源。
+# 这里冻结首次入库贴图所用的种子，保证重新生成与仓库内容逐像素一致；新增材质时随便挑个
+# 固定值（如 crc32(key) & 0xFFFF）即可，但一旦入库就不要再改。
+COMPAT_NOISE_SEED = {
+    "tin": 8185,
+    "lead": 10886,
+    "zinc": 37479,
+    "plastic": 30116,
+    "silver": 20117,
+    "nickel": 13756,
+    "bronze": 15376,
+    "brass": 3046,
+    "electrum": 53641,
+    "invar": 9031,
+    "constantan": 55218,
+    "steel": 46734,
+    "manasteel": 48212,
+    "uranium": 48656,
+    "osmium": 23083,
+    "signalum": 65345,
+    "enderium": 16359,
+    "refined_obsidian": 63215,
+    "refined_glowstone": 25467,
+    "lumium": 36501,
+    "terrasteel": 34842,
+    "elementium": 33734,
 }
 
 
@@ -721,10 +753,12 @@ def main():
         block_tex[f"{prefix}compressed_furnace_top"] = gen_block_tex(furnace_top.copy(), tier, gray=False)
 
     # 压缩金属包：金属噪点条纹 + 压缩环，9 级
+    # 种子必须固定：以前用 hash(key) & 0xFFFF，受 PYTHONHASHSEED 随机化影响，
+    # 每次运行噪点都不同，等于每次生成都改掉 396 张贴图。下面冻结首次入库时的种子。
     for key, base_rgb in COMPAT_COLORS.items():
         for _, prefix, _, _ in LEVELS:
             block_tex[f"{prefix}_{key}_block"] = gen_metal_tex(
-                base_rgb, int(prefix[:-1]), seed=hash(key) & 0xFFFF)
+                base_rgb, int(prefix[:-1]), seed=COMPAT_NOISE_SEED[key])
 
     # 压缩箱子/压缩潜影盒：原版实体贴图（entity/chest、entity/shulker）裁面合成 + 1px 黑边（压缩标识）
     chest_src = Image.open(os.path.join(ROOT, "_asset-src", "vanilla", "entity", "chest",
@@ -852,25 +886,15 @@ def main():
         tdir = os.path.join(args.out_root, rel, "src", "main", "resources",
                             "assets", "compressedblocks", "textures")
         for name, img in block_tex.items():
-            p = os.path.join(tdir, "block", name + ".png")
-            os.makedirs(os.path.dirname(p), exist_ok=True)
-            img.save(p)
+            asset_io.save_png(img, os.path.join(tdir, "block", name + ".png"))
         for name, img in item_tex.items():
-            p = os.path.join(tdir, "item", name + ".png")
-            os.makedirs(os.path.dirname(p), exist_ok=True)
-            img.save(p)
+            asset_io.save_png(img, os.path.join(tdir, "item", name + ".png"))
         for name, img in gui_tex.items():
-            p = os.path.join(tdir, "gui", name + ".png")
-            os.makedirs(os.path.dirname(p), exist_ok=True)
-            img.save(p)
+            asset_io.save_png(img, os.path.join(tdir, "gui", name + ".png"))
         for name, img in entity_tex.items():
-            p = os.path.join(tdir, "entity", name + ".png")
-            os.makedirs(os.path.dirname(p), exist_ok=True)
-            img.save(p)
+            asset_io.save_png(img, os.path.join(tdir, "entity", name + ".png"))
         for name, img in armor_layer_tex.items():
-            p = os.path.join(tdir, "entity", "equipment", name + ".png")
-            os.makedirs(os.path.dirname(p), exist_ok=True)
-            img.save(p)
+            asset_io.save_png(img, os.path.join(tdir, "entity", "equipment", name + ".png"))
         print(f"wrote textures into {sub}")
 
     icon = block_tex["9x_cobblestone"].resize((128, 128), Image.NEAREST)

@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """压缩方块 mod 资源生成器：blockstate/模型/物品模型定义/配方/战利品表/标签/语言文件/装备资产。
-输出必须与仓库内容逐字节一致：重跑本脚本后 git status 应保持为空。
-生成前会清空各子项目的 assets/compressedblocks 与 data（生成目录整体归本脚本所有）。
+输出必须与仓库内容逐字节一致：重跑 scripts/gen_all.sh（本脚本只是其中的第 2 步）后 git status 应保持为空。
+
+清理边界（合作式所有权）：本脚本只清理**自己产出**的内容——
+  * assets/compressedblocks 下除 textures/ 与本脚本保留白名单（手写模板 + 漏斗资产）之外的条目；
+  * data/ 下本脚本拥有的命名空间（compressedblocks / minecraft / c / ftbultimine）。
+loader 专属命名空间（如 neoforge/data_maps 的燃料数据图）与其它模组命名空间一律不碰。
 
 命名规则（与 CompressedBlocks.java 严格一致）：
   储存方块 <prefix>_<mat>            43 材料含 24 新建材
@@ -20,11 +24,30 @@ import re
 import shutil
 from pathlib import Path
 
+import hopper_tiers  # 同目录：漏斗分级定义，lang/标签与两个漏斗生成器共用
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 NS = "compressedblocks"
 VANILLA_DATA = os.path.join(ROOT, "_asset-src", "vanilla-data")
 LEGACY = False  # 1.21.1 冻结在 0.2.0，不再生成
+
+# ---------------------------------------------------------------- 清理边界
+# 本脚本拥有的 data 命名空间：只有这些会在生成前被清空重建。
+# neoforge/（loader 专属 data map：燃料图）以及其它模组命名空间不在其列，永不删除。
+OWNED_DATA_NAMESPACES = (NS, "minecraft", "c", "ftbultimine")
+
+# 生成目录里**不属于**本脚本的资产，清理时必须原样保留：
+#   * template_hopper / template_hopper_side —— 手写自包含模型模板（本脚本不产出）；
+#   * 1~3 重压缩铁漏斗、木质漏斗与 1~3 重压缩木质漏斗 —— 由 gen_hopper_assets.py /
+#     gen_wooden_hopper_assets.py 生成 blockstates/items/models 全套。
+# 少列一个名字，单独跑本脚本就会把它们的文件当"遗留文件"删掉；新增漏斗品牌时记得同步这里。
+PRESERVED_ASSET_STEMS = frozenset(
+    # 手写自包含模型模板（本脚本不产出，两个漏斗生成器引用它当 parent）
+    {"template_hopper", "template_hopper_side"}
+    # 漏斗全套资产（blockstates/items/models）：分级定义见 scripts/hopper_tiers.py
+    | {name for _tier, name, _en, _zh in hopper_tiers.ALL_HOPPERS}
+)
 
 LEVELS = [
     ("1x", "Compressed", "压缩"),
@@ -185,6 +208,84 @@ def dump(path, obj, indent=None):
 def dump_text(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     Path(path).write_text(text, encoding="utf-8", newline="\n")
+
+
+def dump_pretty(path, obj):
+    """缩进 2 的标准 JSON（与仓库里手写/其它生成器的 pretty 文件逐字节一致）。"""
+    text = json.dumps(obj, ensure_ascii=False, indent=2) + "\n"
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    Path(path).write_text(text, encoding="utf-8", newline="\n")
+
+
+def dump_hopper_tag(path, obj):
+    """漏斗生成器会重写这几张标签，且它们是最后写入者：indent=2、末尾不补换行。
+    本脚本也按同一格式写，否则单独跑本脚本就会产生纯格式 diff。"""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    Path(path).write_text(json.dumps(obj, ensure_ascii=False, indent=2),
+                          encoding="utf-8", newline="\n")
+
+
+def is_preserved_asset(rel_path):
+    """rel_path 相对 assets/compressedblocks；_side 变体归一化到主干名再比对。"""
+    stem = os.path.basename(rel_path)
+    if stem.endswith(".json"):
+        stem = stem[:-len(".json")]
+    if stem.endswith("_side"):
+        stem = stem[:-len("_side")]
+    return stem in PRESERVED_ASSET_STEMS
+
+
+def is_preserved_data(rel_path):
+    """data/ 下的保留判定：漏斗的配方/战利品表归两个漏斗生成器所有（unpack_ 前缀是拆解配方）。"""
+    stem = os.path.basename(rel_path)
+    if stem.endswith(".json"):
+        stem = stem[:-len(".json")]
+    if stem.startswith("unpack_"):
+        stem = stem[len("unpack_"):]
+    if stem.endswith("_side"):
+        stem = stem[:-len("_side")]
+    return stem in PRESERVED_ASSET_STEMS
+
+
+def clean_owned_data(data):
+    """清空本脚本拥有的 data 命名空间，但保留两个漏斗生成器的配方/战利品表。
+    loader 专属命名空间（neoforge/）根本不在 OWNED_DATA_NAMESPACES 里，永不触碰。"""
+    for ns in OWNED_DATA_NAMESPACES:
+        root = os.path.join(data, ns)
+        if not os.path.isdir(root):
+            continue
+        for dirpath, _dirnames, filenames in os.walk(root, topdown=False):
+            for name in filenames:
+                path = os.path.join(dirpath, name)
+                if is_preserved_data(os.path.relpath(path, data)):
+                    continue
+                os.remove(path)
+            if dirpath != root and not os.listdir(dirpath):
+                os.rmdir(dirpath)
+        if not os.listdir(root):
+            os.rmdir(root)
+
+
+def clean_owned_assets(res):
+    """清空本脚本拥有的资产目录：textures/ 归 gen_assets.py 整目录跳过，
+    PRESERVED_ASSET_STEMS 里的文件（手写模板 + 漏斗资产）保留。"""
+    for entry in sorted(os.listdir(res)):
+        if entry == "textures":
+            continue
+        full = os.path.join(res, entry)
+        if not os.path.isdir(full):
+            os.remove(full)  # icon.png：本脚本重新写出
+            continue
+        for dirpath, _dirnames, filenames in os.walk(full, topdown=False):
+            for name in filenames:
+                path = os.path.join(dirpath, name)
+                if is_preserved_asset(os.path.relpath(path, res)):
+                    continue
+                os.remove(path)
+            if dirpath != full and not os.listdir(dirpath):
+                os.rmdir(dirpath)
+        if not os.listdir(full):
+            os.rmdir(full)
 
 
 def storage_materials():
@@ -703,11 +804,16 @@ def gen_lang(res):
     zh["itemGroup.compressedblocks.food"] = "压缩食物"
     en["itemGroup.compressedblocks.pots"] = "Compressed Pots"
     zh["itemGroup.compressedblocks.pots"] = "压缩盆栽"
-    # lang 用带空格的分隔符，与仓库既有格式一致（json.dumps 默认 separator）
-    dump_text(f"{res}/lang/en_us.json",
-              json.dumps(dict(sorted(en.items())), ensure_ascii=False, indent=2) + "\n")
-    dump_text(f"{res}/lang/zh_cn.json",
-              json.dumps(dict(sorted(zh.items())), ensure_ascii=False, indent=2) + "\n")
+    # 漏斗条目：与两个漏斗生成器共用同一份分级定义，追加在排序内容之后
+    # （漏斗生成器也是这个顺序、这个位置追加的），末尾不补换行（它们是最后写入者）。
+    for lang_name, table in (("en_us", en), ("zh_cn", zh)):
+        data = dict(sorted(table.items()))
+        for _tier, name, en_name, zh_name in hopper_tiers.ALL_HOPPERS:
+            label = en_name if lang_name == "en_us" else zh_name
+            data[f"block.{NS}.{name}"] = label
+            data[f"container.{NS}.{name}"] = label
+        dump_text(f"{res}/lang/{lang_name}.json",
+                  json.dumps(data, ensure_ascii=False, indent=2))
 
 
 # ---------------------------------------------------------------- data
@@ -1069,21 +1175,31 @@ def gen_data(data):
         target = {"stone": stone_tool, "iron": iron_tool, "diamond": diamond_tool}[m[3]]
         target += [f"{NS}:{n}" for n in compat_names() if n.endswith(f"_{m[0]}_block")]
     logs = [f"{NS}:{p}_{w[0]}_log" for w in WOODS for p in LV]
-    for tag, values in [("mineable/pickaxe", pickaxe),
-                        ("mineable/axe", [f"{NS}:{n}" for n in pot_names()] + [f"{NS}:compressed_chest"]),
-                        ("needs_stone_tool", stone_tool), ("needs_iron_tool", iron_tool),
+    # 漏斗的采掘标签值也在这里写（漏斗生成器会重写同样内容），保证单独跑本脚本不丢条目
+    iron_hoppers = [f"{NS}:{name}" for _t, name, _e, _z in hopper_tiers.IRON_HOPPERS]
+    wooden_hoppers = [f"{NS}:{name}" for _t, name, _e, _z in hopper_tiers.WOODEN_HOPPERS]
+    for tag, values in [("mineable/pickaxe", pickaxe + iron_hoppers),
+                        ("mineable/axe", [f"{NS}:{n}" for n in pot_names()]
+                         + [f"{NS}:compressed_chest"] + wooden_hoppers),
+                        ("needs_stone_tool", stone_tool), ("needs_iron_tool", iron_tool + iron_hoppers),
                         ("needs_diamond_tool", diamond_tool),
                         ("logs", logs), ("logs_that_burn", logs),
                         ("leaves", [f"{NS}:{n}" for n in leaves_names()]),
                         ("saplings", [f"{NS}:{n}" for n in sapling_names()]),
                         ("crops", [f"{NS}:{n}" for n in crop_block_names()]),
                         ("shulker_boxes", [f"{NS}:compressed_shulker_box"])]:
-        dump(f"{data}/minecraft/tags/block/{tag}.json", {"replace": False, "values": sorted(values)})
+        tag_obj = {"replace": False, "values": sorted(values)}
+        if tag in ("mineable/pickaxe", "mineable/axe", "needs_iron_tool"):
+            dump_hopper_tag(f"{data}/minecraft/tags/block/{tag}.json", tag_obj)
+        else:
+            dump(f"{data}/minecraft/tags/block/{tag}.json", tag_obj)
     # 压缩潜影盒进原版 shulker_boxes 物品标签（原版/mod 按 item 标签识别潜影盒）
     dump(f"{data}/minecraft/tags/item/shulker_boxes.json",
          {"replace": False, "values": [f"{NS}:compressed_shulker_box"]})
-    dump(f"{data}/ftbultimine/tags/block/single_crop_harvesting_blacklist.json",
-         {"replace": False, "values": [f"{NS}:compressed_pot", f"{NS}:compressed_hopper_pot"]})
+    # FTB Ultimine 单作物收割黑名单：id 必须与 pot_names() 一致（本体是 pot / hopper_pot，
+    # 压缩盆栽在附属 mod），格式跟仓库现有文件一样是 pretty。
+    dump_pretty(f"{data}/ftbultimine/tags/block/single_crop_harvesting_blacklist.json",
+                {"replace": False, "values": [f"{NS}:{n}" for n in pot_names()]})
     # 基础工具/盔甲标签覆盖：进原版 #pickaxes…/#enchantable/*，附魔修复自动生效
     tool_tag_values = {
         "pickaxes": [f"{NS}:{n}" for n in tool_names() if n.endswith("_pickaxe")],
@@ -1253,22 +1369,20 @@ def main():
             continue
         res = f"{sub}/src/main/resources/assets/{NS}"
         data = f"{sub}/src/main/resources/data"
-        # 生成目录整体归本脚本所有：先清空再生成，避免 0.2.0 遗留文件。
-        # textures/ 例外——归 gen_assets.py 所有，只清本脚本拥有的条目。
-        if os.environ.get("NO_CLEAN") != "1" and os.path.isdir(res):
-            for entry in os.listdir(res):
-                if entry == "textures":
-                    continue
-                full = os.path.join(res, entry)
-                try:
-                    shutil.rmtree(full, ignore_errors=True) if os.path.isdir(full) else os.remove(full)
-                except OSError:
-                    pass
+        # loader 专属 data map（燃料图）不归本脚本所有，清理前后都必须在
+        fuel_map = os.path.join(data, "neoforge", "data_maps", "item", "furnace_fuels.json")
+        had_fuel_map = os.path.exists(fuel_map)
+        # 只清本脚本自己的产物：资产走保留白名单，data 走命名空间清单。
+        # 以前的 shutil.rmtree(data) 会把 neoforge/ 燃料图与漏斗资产一起删掉。
         if os.environ.get("NO_CLEAN") != "1":
-            shutil.rmtree(data, ignore_errors=True)
+            if os.path.isdir(res):
+                clean_owned_assets(res)
+            clean_owned_data(data)
         gen_assets(res)
         gen_lang(res)
         gen_data(data)
+        if had_fuel_map and not os.path.exists(fuel_map):
+            raise SystemExit(f"ERROR: 生成过程误删了 loader 专属燃料数据图：{fuel_map}")
         if not os.path.isdir(f"{res}/textures"):
             raise SystemExit(f"ERROR: {res}/textures 不存在——先跑 gen_assets.py 再跑本脚本")
         print(f"generated resources into {sub}")
