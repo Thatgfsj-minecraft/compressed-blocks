@@ -6,11 +6,12 @@ import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.SimpleContainerData;
 
 /**
- * 压缩熔炉的 3 个菜单类型（N = 3 / 6 / 9；4 重复用 N=9）。
+ * 压缩熔炉的 4 个独立菜单类型（MENU_1X / MENU_2X / MENU_3X / MENU_4X；N = 3 / 6 / 9 / 9）。
  *
- * <p>工厂只拿得到 (id, inventory)，所以客户端用哑 SimpleContainer(3N) + SimpleContainerData(2N+1)
+ * <p>工厂只拿得到 (id, inventory)，所以客户端用哑 SimpleContainer(3N) + SimpleContainerData(2N+2)
  * 建菜单；真实槽位内容与进度由原版槽位同步与 data slots 同步（与仓库 WoodenHopper/滚动容器同款范式）。
- * tier 决定槽位布局（1 重左右分区，其余 3 列网格），tier4 与 tier3 布局一致。</p>
+ * tier 决定槽位布局（1 重左右分区，其余 3 列网格），tier4 布局与 tier3 一致但类型独立，
+ * 使客户端输入槽校验按 tier=4 放行全部等级。</p>
  */
 public final class CompressedFurnaceMenus {
     public static final MenuType<CompressedFurnaceMenu> MENU_1X = new MenuType<>(

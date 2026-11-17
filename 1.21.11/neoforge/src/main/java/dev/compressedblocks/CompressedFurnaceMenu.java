@@ -28,7 +28,8 @@ import net.minecraft.world.level.Level;
  * 右侧：产出区 3 列 × R 行（类似箱子，自动按同类堆叠；垂直居中于燃烧条）
  * </pre>
  * <p>1 重只有 1 行、2 重 2 行、3/4 重 3 行，低档位不绘制多余行，面板高度随行数变化。
- * 进度与燃烧池经 ContainerData(2N+1) 同步：2i 进度千分比、2i+1 活跃标志、2N 燃烧池千分比。</p>
+ * 进度与燃烧池经 ContainerData(2N+2) 同步：2i 进度千分比、2i+1 活跃标志、2N/2N+1 为燃烧池剩余
+ * tick 的低 15 位/高位（单槽 ≤ 32767）。</p>
  */
 public class CompressedFurnaceMenu extends AbstractContainerMenu {
     private static final int PANEL_W = 176;
