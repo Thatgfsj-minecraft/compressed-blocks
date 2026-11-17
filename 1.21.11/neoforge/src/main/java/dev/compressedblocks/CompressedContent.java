@@ -9,10 +9,8 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.Unit;
 import net.minecraft.world.food.FoodProperties;
-import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ShovelItem;
 import net.minecraft.world.item.ToolMaterial;
 import net.minecraft.world.item.equipment.ArmorMaterial;
 import net.minecraft.world.item.equipment.ArmorType;
@@ -481,11 +479,12 @@ final class CompressedContent {
         }
         boolean unbreakable = level >= UNBREAKABLE_FROM;
         Item item = switch (TOOLS[toolIndex]) {
-            case "pickaxe" -> new Item(props.pickaxe(material, stats[0], stats[1]));
+            // 镐/斧/锹/锄：额外叠加「任意方块至少按本档速度挖」的跨类别速度下限（剑保持原版，不参与挖掘速度）
+            case "pickaxe" -> new CompressedToolItem(props.pickaxe(material, stats[0], stats[1]), speed);
             case "sword" -> new Item(props.sword(material, stats[0], stats[1]));
-            case "axe" -> new AxeItem(material, stats[0], stats[1], props);
-            case "shovel" -> new ShovelItem(material, stats[0], stats[1], props);
-            case "hoe" -> new CompressedHoeItem(material, stats[0], stats[1], level, props);
+            case "axe" -> new CompressedAxeItem(material, stats[0], stats[1], speed, props);
+            case "shovel" -> new CompressedShovelItem(material, stats[0], stats[1], speed, props);
+            case "hoe" -> new CompressedHoeItem(material, stats[0], stats[1], level, speed, props);
             default -> throw new IllegalStateException("unknown tool: " + TOOLS[toolIndex]);
         };
         if (level == LEVELS) {

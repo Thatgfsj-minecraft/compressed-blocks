@@ -8,6 +8,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.HoeItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ToolMaterial;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
@@ -15,18 +16,29 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.core.Direction;
 
-/** 压缩锄：锄 N 级压缩泥土需要 N 级或以上的压缩锄头；等级不足时给出彩色英文提示。原版锄地行为不受影响。 */
+/**
+ * 压缩锄：锄 N 级压缩泥土需要 N 级或以上的压缩锄头；等级不足时给出彩色英文提示。原版锄地行为不受影响。
+ *
+ * <p>同时叠加跨类别挖掘速度下限：任意方块至少按本档速度挖（掉落与等级仍由原版 minecraft:tool 规则判定）。
+ */
 public class CompressedHoeItem extends HoeItem {
     private final int level;
+    private final float miningSpeed;
 
     public CompressedHoeItem(ToolMaterial material, float attackDamage, float attackSpeed, int level,
-                             Item.Properties props) {
+                             float miningSpeed, Item.Properties props) {
         super(material, attackDamage, attackSpeed, props);
         this.level = level;
+        this.miningSpeed = miningSpeed;
     }
 
     public int level() {
         return this.level;
+    }
+
+    @Override
+    public float getDestroySpeed(ItemStack stack, BlockState state) {
+        return Math.max(super.getDestroySpeed(stack, state), this.miningSpeed);
     }
 
     @Override
