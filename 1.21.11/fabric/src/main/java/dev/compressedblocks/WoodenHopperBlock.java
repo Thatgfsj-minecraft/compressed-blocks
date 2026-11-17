@@ -68,6 +68,8 @@ public class WoodenHopperBlock extends HopperBlock {
     @Override
     public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
         if (!level.isClientSide() && level.getBlockEntity(pos) instanceof WoodenHopperBlockEntity hopper) {
+            // 老存档溢出先迁移，避免把 pending 留在将被移除的方块实体里
+            hopper.flushLegacyOverflow(level);
             Containers.dropContents(level, pos, hopper);
         }
         return super.playerWillDestroy(level, pos, state, player);
@@ -76,6 +78,8 @@ public class WoodenHopperBlock extends HopperBlock {
     @Override
     public void destroy(LevelAccessor level, BlockPos pos, BlockState state) {
         if (level instanceof Level lvl && !lvl.isClientSide() && lvl.getBlockEntity(pos) instanceof WoodenHopperBlockEntity hopper) {
+            // 老存档溢出先迁移，避免把 pending 留在将被移除的方块实体里
+            hopper.flushLegacyOverflow(lvl);
             Containers.dropContents(lvl, pos, hopper);
         }
         super.destroy(level, pos, state);

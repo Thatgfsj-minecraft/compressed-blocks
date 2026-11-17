@@ -6,21 +6,29 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.ItemStackWithSlot;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.item.component.Tool;
 import net.minecraft.world.item.enchantment.Enchantable;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.TagValueOutput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 import static dev.compressedblocks.CompressedBlocks.*;
 
@@ -356,12 +364,108 @@ final class CompressedSelfTest {
             || resistanceAmplifier(6) != -1 || resistanceAmplifier(5) != -1) {
             errors.add("armor effect ladder wrong");
         }
+        selfTestHopperOverflow(errors, level);
         selfTestCompat(errors);
         if (errors.isEmpty()) {
             LOGGER.info("SELF-TEST PASS: blocks={} items={} ({} tools, {} armor, {} food)",
                 BLOCKS.size(), ITEMS.size(), TOOL_REGS.size(), ARMOR_REGS.size(), FOOD_REGS.size());
         } else {
             throw new IllegalStateException("SELF-TEST FAILED: " + String.join("; ", errors));
+        }
+    }
+
+    /**
+     * 老存档 9 格缩容迁移自检：手工构造 0.3.4 开发窗口（11-14 21:20 ～ 11-15 12:57）写出的 9 格 Items，
+     * 走 BlockEntity.loadStatic 真实加载路径（不写世界、不 tick）：
+     * 加载期 level 必须为 null（旧实现根因），溢出先进入 pending；假 sink 调 flushOverflow 后
+     * 可视槽保留 1/3 格、余量 8/6 堆依次交给 sink，二次 flush 不再重复掉落。
+     */
+    private static void selfTestHopperOverflow(List<String> errors, ServerLevel level) {
+        int before = errors.size();
+        Item[] visibleItems = {Items.STONE, Items.DIRT, Items.COBBLESTONE};
+        Item[] overflowItems = {Items.OAK_PLANKS, Items.IRON_INGOT, Items.GOLD_INGOT,
+            Items.DIAMOND, Items.EMERALD, Items.REDSTONE, Items.LAPIS_LAZULI, Items.COAL};
+        int[] wantPending = {8, 6, 6, 6};
+        for (int tier = 0; tier < WOODEN_HOPPER_TIERS; tier++) {
+            int size = tier == 0 ? WoodenHopperBlockEntity.BASE_CONTAINER_SIZE
+                : WoodenHopperBlockEntity.COMPRESSED_CONTAINER_SIZE;
+            BlockState state = WOODEN_HOPPER_BLOCKS.get(tier).defaultBlockState();
+            TagValueOutput out = TagValueOutput.createWithContext(
+                ProblemReporter.DISCARDING, level.registryAccess());
+            BlockEntity.addEntityType(out, WOODEN_HOPPER_TYPE[tier]);
+            ValueOutput.TypedOutputList<ItemStackWithSlot> items =
+                out.list(ContainerHelper.TAG_ITEMS, ItemStackWithSlot.CODEC);
+            for (int slot = 0; slot < 9; slot++) {
+                boolean visible = slot < size;
+                Item item = visible ? visibleItems[slot] : overflowItems[slot - size];
+                items.add(new ItemStackWithSlot(slot, new ItemStack(item, visible ? 64 : 1)));
+            }
+            CompoundTag tag = out.buildResult();
+            BlockEntity loaded = BlockEntity.loadStatic(CHECK_POS, state, tag, level.registryAccess());
+            if (!(loaded instanceof WoodenHopperBlockEntity hopper)) {
+                errors.add("hopper overflow tier " + tier + ": loadStatic returned " + loaded);
+                continue;
+            }
+            if (hopper.getLevel() != null) {
+                errors.add("hopper overflow tier " + tier + ": loadStatic set level (根因未复现)");
+            }
+            if (hopper.pendingOverflowCount() != wantPending[tier]) {
+                errors.add("hopper overflow tier " + tier + " pending "
+                    + hopper.pendingOverflowCount() + " != " + wantPending[tier]);
+            }
+            List<ItemStack> dropped = new ArrayList<>();
+            hopper.flushOverflow(dropped::add);
+            for (int slot = 0; slot < size; slot++) {
+                ItemStack kept = hopper.getItem(slot);
+                if (kept.getItem() != visibleItems[slot] || kept.getCount() != 64) {
+                    errors.add("hopper overflow tier " + tier + " slot " + slot + " kept " + kept);
+                }
+            }
+            if (dropped.size() != wantPending[tier]) {
+                errors.add("hopper overflow tier " + tier + " dropped " + dropped.size()
+                    + " != " + wantPending[tier]);
+            } else {
+                for (int i = 0; i < dropped.size(); i++) {
+                    ItemStack stack = dropped.get(i);
+                    if (stack.getItem() != overflowItems[i] || stack.getCount() != 1) {
+                        errors.add("hopper overflow tier " + tier + " drop " + i + " = " + stack);
+                    }
+                }
+            }
+            List<ItemStack> again = new ArrayList<>();
+            hopper.flushOverflow(again::add);
+            if (!again.isEmpty()) {
+                errors.add("hopper overflow tier " + tier + " second flush dropped " + again.size());
+            }
+            if (hopper.pendingOverflowCount() != 0) {
+                errors.add("hopper overflow tier " + tier + " pending not cleared");
+            }
+        }
+
+        // slot >= 9 的异常/未来扩容数据也不能静默丢：按同一规则进 pending，再由 flush 掉落
+        TagValueOutput extraOut = TagValueOutput.createWithContext(
+            ProblemReporter.DISCARDING, level.registryAccess());
+        BlockEntity.addEntityType(extraOut, WOODEN_HOPPER_TYPE[0]);
+        ValueOutput.TypedOutputList<ItemStackWithSlot> extraItems =
+            extraOut.list(ContainerHelper.TAG_ITEMS, ItemStackWithSlot.CODEC);
+        extraItems.add(new ItemStackWithSlot(0, new ItemStack(Items.STONE, 1)));
+        extraItems.add(new ItemStackWithSlot(9, new ItemStack(Items.DIAMOND, 1)));
+        BlockEntity extraLoaded = BlockEntity.loadStatic(CHECK_POS,
+            WOODEN_HOPPER_BLOCKS.get(0).defaultBlockState(), extraOut.buildResult(), level.registryAccess());
+        if (!(extraLoaded instanceof WoodenHopperBlockEntity extra)) {
+            errors.add("hopper overflow slot>=9: loadStatic returned " + extraLoaded);
+        } else {
+            if (extra.pendingOverflowCount() != 1) {
+                errors.add("hopper overflow slot>=9 pending " + extra.pendingOverflowCount() + " != 1");
+            }
+            List<ItemStack> extraDropped = new ArrayList<>();
+            extra.flushOverflow(extraDropped::add);
+            if (extraDropped.size() != 1 || extraDropped.get(0).getItem() != Items.DIAMOND) {
+                errors.add("hopper overflow slot>=9 dropped " + extraDropped);
+            }
+        }
+        if (errors.size() == before) {
+            LOGGER.info("SELF-TEST hopper legacy overflow PASS: pending=8/6, flush idempotent, slot>=9 kept");
         }
     }
 

@@ -1,12 +1,16 @@
 package dev.compressedblocks;
 
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.function.Consumer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.ItemStackWithSlot;
 import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
@@ -36,9 +40,6 @@ public class WoodenHopperBlockEntity extends RandomizableContainerBlockEntity im
     public static final int BASE_CONTAINER_SIZE = 1;
     /** 压缩木质漏斗（1x/2x/3x）统一容量。 */
     public static final int COMPRESSED_CONTAINER_SIZE = 3;
-    /** 缩容前（0.3.4 及更早）的统一容量，仅用于读取老存档。 */
-    private static final int LEGACY_CONTAINER_SIZE = 9;
-
     private final int tier; // 0=base, 1=1x, 2=2x, 3=3x
     private final int transferRate;
     private final int baseCooldown;
@@ -46,6 +47,8 @@ public class WoodenHopperBlockEntity extends RandomizableContainerBlockEntity im
     private final int[] slots;
     /** 构造期即有非 null 值，避免 super() 期间的容器查询触发 NPE。 */
     private NonNullList<ItemStack> items = NonNullList.withSize(BASE_CONTAINER_SIZE, ItemStack.EMPTY);
+    /** 加载期读出的老存档溢出（slot >= 当前容量），首 tick 或破坏前迁移，绝不静默丢弃。 */
+    private NonNullList<ItemStack> pendingOverflow = NonNullList.create();
     private int cooldownTime = 0;
     private long tickedGameTime = 0;
 
@@ -172,31 +175,101 @@ public class WoodenHopperBlockEntity extends RandomizableContainerBlockEntity im
     @Override
     protected void saveAdditional(ValueOutput out) {
         super.saveAdditional(out);
-        ContainerHelper.saveAllItems(out, this.items);
+        // 可视槽 + 尚未迁移的 pending 一起写回 Items（pending 占用 slot >= 当前容量）。
+        // 这样即使区块在首 tick 之前被保存/卸载，老存档的溢出也不会丢；下次加载会重新读进 pending，
+        // flush 幂等，不会重复掉落。
+        ValueOutput.TypedOutputList<ItemStackWithSlot> saved =
+            out.list(ContainerHelper.TAG_ITEMS, ItemStackWithSlot.CODEC);
+        for (int i = 0; i < this.items.size(); i++) {
+            ItemStack stack = this.items.get(i);
+            if (!stack.isEmpty()) {
+                saved.add(new ItemStackWithSlot(i, stack));
+            }
+        }
+        for (int i = 0; i < this.pendingOverflow.size(); i++) {
+            ItemStack stack = this.pendingOverflow.get(i);
+            if (!stack.isEmpty()) {
+                saved.add(new ItemStackWithSlot(this.size + i, stack));
+            }
+        }
         out.putInt("TransferCooldown", this.cooldownTime);
     }
 
     @Override
     protected void loadAdditional(ValueInput in) {
         super.loadAdditional(in);
-        // 老存档（0.3.4 及更早）统一 9 格，缩容后多出的物品掉落在漏斗上方，避免静默丢失
-        NonNullList<ItemStack> loaded = NonNullList.withSize(LEGACY_CONTAINER_SIZE, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(in, loaded);
-        this.items = NonNullList.withSize(this.size, ItemStack.EMPTY);
-        for (int i = 0; i < this.size; i++) {
-            this.items.set(i, loaded.get(i));
+        // 老存档（9 格时代）先完整读进内存：9 格只存在于 0.3.4 开发窗口（11-14 21:20 ～ 11-15 12:57），
+        // 0.3.3 及更早没有木漏斗；不能写成"0.3.4 及更早统一 9 格"。
+        // BlockEntity.loadStatic 内 this.level 仍为 null，
+        // 加载期绝不能访问世界或掉落物品（旧实现靠 this.level != null 判断，条件恒假 → 静默丢失）。
+        // 按原始 Items 列表的 Slot 分发：slot < 容量进可视槽，slot >= 容量（含 >= 9 的异常数据）
+        // 一律进 pending，空槽忽略；TreeMap 让重复 slot 后者覆盖、顺序稳定，避免手改 NBT 复制物品。
+        NonNullList<ItemStack> visible = NonNullList.withSize(this.size, ItemStack.EMPTY);
+        NonNullList<ItemStack> pending = NonNullList.create();
+        Map<Integer, ItemStack> bySlot = new TreeMap<>();
+        for (ItemStackWithSlot entry : in.listOrEmpty(ContainerHelper.TAG_ITEMS, ItemStackWithSlot.CODEC)) {
+            if (entry == null || entry.stack().isEmpty()) {
+                continue;
+            }
+            bySlot.put(entry.slot(), entry.stack());
         }
-        for (int i = this.size; i < LEGACY_CONTAINER_SIZE; i++) {
-            ItemStack overflow = loaded.get(i);
-            if (!overflow.isEmpty() && this.level != null) {
-                Block.popResource(this.level, this.worldPosition.above(), overflow);
+        for (Map.Entry<Integer, ItemStack> entry : bySlot.entrySet()) {
+            int slot = entry.getKey();
+            if (slot >= 0 && slot < this.size) {
+                visible.set(slot, entry.getValue());
+            } else if (slot >= this.size) {
+                pending.add(entry.getValue());
+            }
+            // 负 slot 非法，直接忽略（与 ContainerHelper 的 isValidInContainer 语义一致）
+        }
+        this.items = visible;
+        this.pendingOverflow = pending;
+        this.cooldownTime = in.getIntOr("TransferCooldown", 0);
+    }
+
+    /**
+     * 迁移老存档溢出：先把 pending 按堆叠上限并入可视槽，塞不下的余量交给 sink。
+     * 迁移后清空 pending 并标脏；pending 为空时直接返回，因此可重复调用（幂等）。
+     * sink 与 {@link Level} 解耦，便于自检用假 sink 验证掉落内容。
+     */
+    void flushOverflow(Consumer<ItemStack> sink) {
+        if (this.pendingOverflow.isEmpty()) {
+            return;
+        }
+        List<ItemStack> pending = this.pendingOverflow;
+        this.pendingOverflow = NonNullList.create();
+        for (ItemStack overflow : pending) {
+            if (overflow.isEmpty()) {
+                continue;
+            }
+            ItemStack remainder = HopperBlockEntity.addItem(null, this, overflow, null);
+            if (!remainder.isEmpty()) {
+                sink.accept(remainder);
             }
         }
-        this.cooldownTime = in.getIntOr("TransferCooldown", 0);
+        this.setChanged();
+    }
+
+    /** 世界侧迁移入口：可见槽塞不下的溢出掉落在漏斗上方（与原实现落点一致）。 */
+    void flushLegacyOverflow(Level level) {
+        flushOverflow(stack -> Block.popResource(level, this.worldPosition.above(), stack));
+    }
+
+    /** 自检用：当前待迁移的溢出堆数。 */
+    int pendingOverflowCount() {
+        int count = 0;
+        for (ItemStack stack : this.pendingOverflow) {
+            if (!stack.isEmpty()) {
+                count++;
+            }
+        }
+        return count;
     }
 
     public static void pushItemsTick(Level level, BlockPos pos, BlockState state,
                                      WoodenHopperBlockEntity hopper) {
+        // 老存档缩容迁移：首 tick 立即处理，先于冷却与红石锁判定，避免被锁住的漏斗永久丢失
+        hopper.flushLegacyOverflow(level);
         hopper.cooldownTime--;
         hopper.tickedGameTime = level.getGameTime();
         if (hopper.isOnCooldown()) {
