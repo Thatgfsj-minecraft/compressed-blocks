@@ -2,7 +2,7 @@
 // 物品挂到盔甲架主手后用 /data get 读 id；默认数据组件不落实体物品 NBT，改用
 // /execute if items ... *[组件=值] 逐档对拍工具挖掘速度/耐久/不可破坏与护甲最大耐久/防御属性；
 // 护甲实际防御再用僵尸 /attribute get 复核）。
-// 覆盖：方块矩阵/等级门/战利品/熔炉挖掘门/全物品清单（1563）/组件阶梯/刷石机兜底。
+// 覆盖：方块矩阵/等级门/战利品/熔炉挖掘门/全物品清单（1561）/组件阶梯/刷石机兜底。
 // 用法：服务器启动后 `node e2e.js`；结束自动 /stop，退出码 = 失败数。
 const { Rcon } = require('./rcon');
 
@@ -25,7 +25,7 @@ const STORAGE_MATS = ['cobblestone', 'stone', 'cobbled_deepslate', 'deepslate',
 // 甘蔗 = 纯甘蔗 + 每种储存材料一条线（id 材料段去掉 _block 后缀）
 const CANES = ['cane', ...STORAGE_MATS.map((m) => m.replace(/_block$/, '') + '_cane')];
 const POTS = ['pot'];
-const GENERATORS = ['cobblestone_generator', '2x_cobblestone_generator', '3x_cobblestone_generator'];
+const GENERATORS = ['cobblestone_generator'];
 const COMPAT = ['tin', 'lead', 'zinc', 'plastic', 'silver', 'nickel', 'bronze', 'brass', 'electrum',
   'invar', 'constantan', 'steel', 'manasteel', 'uranium', 'osmium', 'signalum', 'enderium',
   'refined_obsidian', 'refined_glowstone', 'lumium', 'terrasteel', 'elementium'];
@@ -124,7 +124,7 @@ const CROP_ITEMS = ['wheat', 'beetroot'].flatMap((c) => CROP_LEVELS.map((p) => `
 const ALL_ITEMS = [...STORAGE_BLOCKS, ...LEAVES, ...SAPLINGS, ...CANE_BLOCKS, ...CROP_ITEMS,
   ...POTS.flatMap((p) => [p]), ...GENERATORS, ...COMPAT_BLOCKS, ...TOOL_IDS, ...ARMOR_IDS, ...FOOD_IDS, ...PRODUCE,
   ...STICKS, ...EXTRA_SEED_ITEMS, 'compressed_chest', 'compressed_shulker_box', 'hopper_pot',
-  // 4 压缩熔炉 + 3 压缩漏斗 + 基础木漏斗/3 压缩木漏斗（此前漏登记，与 SELF-TEST 的 1563 对不上）
+  // 4 压缩熔炉 + 3 压缩漏斗 + 基础木漏斗/3 压缩木漏斗（此前漏登记，与 SELF-TEST 的 1561 对不上）
   ...LEVELS.slice(0, 4).map((p) => `${p}_compressed_furnace`),
   ...LEVELS.slice(0, 3).map((p) => `${p}_compressed_hopper`),
   'wooden_hopper', ...LEVELS.slice(0, 3).map((p) => `${p}_compressed_wooden_hopper`)];
@@ -138,8 +138,8 @@ function check(name, ok, detail) {
 }
 
 (async () => {
-  // 与 CompressedSelfTest 的 1563 条注册项一致；漏项会让下面的逐条换装断言直接少测
-  if (ALL_ITEMS.length !== 1563) throw new Error(`item list ${ALL_ITEMS.length} != 1563`);
+  // 与 CompressedSelfTest 的 1561 条注册项一致；漏项会让下面的逐条换装断言直接少测
+  if (ALL_ITEMS.length !== 1561) throw new Error(`item list ${ALL_ITEMS.length} != 1561`);
   const rcon = await new Rcon().connect(PORT, '127.0.0.1', 'testpass');
   const cmd = (c) => rcon.command(c);
 
@@ -269,7 +269,7 @@ function check(name, ok, detail) {
     furnaceDrop.includes(`"${NS}:1x_compressed_furnace"`), furnaceDrop.trim());
   await cmd('kill @e[type=minecraft:item]');
 
-  // 4) 全矩阵物品：盔甲架主手换装 + 读 id 断言（全部 1563 个物品）。
+  // 4) 全矩阵物品：盔甲架主手换装 + 读 id 断言（全部 1561 个物品）。
   //    这里验证"物品存在 + 可装备 + 组件补丁可写"；默认组件数值在 4b 逐档对拍。
   await cmd('kill @e[type=minecraft:armor_stand]');
   const summon = await cmd('summon minecraft:armor_stand 0 -60 4 {Tags:["cbprobe"],Invisible:1b,Marker:1b,NoAI:1b,Invulnerable:1b}');

@@ -97,11 +97,11 @@ final class CompressedSelfTest {
         if (itemCount != expectItems) {
             errors.add("item count " + itemCount + " != " + expectItems);
         }
-        if (BLOCKS.size() != 1326) {
-            errors.add("block registry size " + BLOCKS.size() + " != 1326");
+        if (BLOCKS.size() != 1324) {
+            errors.add("block registry size " + BLOCKS.size() + " != 1324");
         }
-        if (expectItems != 1563) {
-            errors.add("item registry size " + expectItems + " != 1563");
+        if (expectItems != 1561) {
+            errors.add("item registry size " + expectItems + " != 1561");
         }
         if (FURNACE_BLOCKS.size() != FURNACE_TIERS) {
             errors.add("furnace blocks count " + FURNACE_BLOCKS.size() + " != " + FURNACE_TIERS);

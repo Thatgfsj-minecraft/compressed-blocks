@@ -64,9 +64,7 @@ def gen_lang(res):
     zh["block." + NS + ".pot"] = "盆栽"
     en["block." + NS + ".hopper_pot"] = "Hopper Pot"
     zh["block." + NS + ".hopper_pot"] = "漏斗盆栽"
-    generator_lang = {"cobblestone_generator": ("Cobblestone Generator", "刷石机"),
-                      "2x_cobblestone_generator": ("Double Compressed Cobblestone Generator", "二重压缩刷石机"),
-                      "3x_cobblestone_generator": ("Triple Compressed Cobblestone Generator", "三重压缩刷石机")}
+    generator_lang = {"cobblestone_generator": ("Cobblestone Generator", "刷石机")}
     for name in generator_names():
         en_name, zh_name = generator_lang[name]
         en["block." + NS + "." + name] = en_name

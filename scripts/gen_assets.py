@@ -710,35 +710,28 @@ def main():
     block_tex["pot_hopper_side"] = hop
     block_tex["pot_hopper_bottom"] = gen_block_tex(iron_pot.copy(), 1, gray=False)
 
-    # 刷石机（3 压缩等级）：整体三层结构——顶面纯木板、底面纯铁；侧面木头(0..5)+
-    # 原石红石斑(5..11)+铁(11..16)；压缩等级 ≥2 上下加黑边
+    # 刷石机（主 mod 只保留原版级 1 档）：整体三层结构——顶面纯木板、底面纯铁；侧面木头(0..5)+
+    # 原石红石斑(5..11)+铁(11..16)。1~9 重压缩刷石机已迁往附属 mod compressedblockspot。
     cobble = load_base("block/cobblestone")
     red = load_base("block/redstone_block")
     red_avg = avg_color(red)
     iron = load_base("block/iron_block")
     wood = load_base("block/oak_planks")
-    for tier in (1, 2, 3):
-        prefix = ['', '2x_', '3x_'][tier - 1]
-        img = cobble.copy()
-        pxi = img.load()
-        for x, y in ((2, 3), (3, 2), (12, 4), (13, 3), (4, 12), (3, 13), (11, 13), (12, 12),
-                     (7, 5), (8, 5), (7, 10), (8, 10), (5, 7), (5, 8), (10, 7), (10, 8)):
-            pxi[x, y] = (int(red_avg[0]), int(red_avg[1]), int(red_avg[2]), 255)
-        for x, y in ((1, 1), (14, 1), (1, 14), (14, 14), (7, 1), (8, 14), (1, 7), (14, 8)):
-            iron_px = iron.getpixel((x % 16, y % 16))
-            pxi[x, y] = (iron_px[0], iron_px[1], iron_px[2], 255)
-        # 侧面：上层木头（向下延伸 5px）、下层铁（向上延伸 5px）
-        img.paste(wood.crop((0, 0, 16, 5)), (0, 0))
-        img.paste(iron.crop((0, 0, 16, 5)), (0, 11))
-        if tier >= 2:
-            # 压缩档：上下黑边
-            for x in range(SIZE):
-                pxi[x, 0] = (10, 10, 10, 255)
-                pxi[x, 15] = (10, 10, 10, 255)
-        block_tex[f"{prefix}cobblestone_generator"] = gen_block_tex(img, tier, gray=False)
-        # 顶/底面：纯木板 / 纯铁，压缩环自带黑边
-        block_tex[f"{prefix}cobblestone_generator_top"] = gen_block_tex(wood.copy(), tier, gray=False)
-        block_tex[f"{prefix}cobblestone_generator_bottom"] = gen_block_tex(iron.copy(), tier, gray=False)
+    img = cobble.copy()
+    pxi = img.load()
+    for x, y in ((2, 3), (3, 2), (12, 4), (13, 3), (4, 12), (3, 13), (11, 13), (12, 12),
+                 (7, 5), (8, 5), (7, 10), (8, 10), (5, 7), (5, 8), (10, 7), (10, 8)):
+        pxi[x, y] = (int(red_avg[0]), int(red_avg[1]), int(red_avg[2]), 255)
+    for x, y in ((1, 1), (14, 1), (1, 14), (14, 14), (7, 1), (8, 14), (1, 7), (14, 8)):
+        iron_px = iron.getpixel((x % 16, y % 16))
+        pxi[x, y] = (iron_px[0], iron_px[1], iron_px[2], 255)
+    # 侧面：上层木头（向下延伸 5px）、下层铁（向上延伸 5px）
+    img.paste(wood.crop((0, 0, 16, 5)), (0, 0))
+    img.paste(iron.crop((0, 0, 16, 5)), (0, 11))
+    block_tex["cobblestone_generator"] = gen_block_tex(img, 1, gray=False)
+    # 顶/底面：纯木板 / 纯铁
+    block_tex["cobblestone_generator_top"] = gen_block_tex(wood.copy(), 1, gray=False)
+    block_tex["cobblestone_generator_bottom"] = gen_block_tex(iron.copy(), 1, gray=False)
 
     # 压缩熔炉（4 个压缩等级）：正（灭）、正（亮）、侧、顶/底，加压缩环
     furnace_front = load_base("block/furnace_front")
@@ -876,8 +869,8 @@ def main():
     gui_tex = {"compressed_container": gui}
 
     # 459 储存 + 81 树叶 + 81 树苗 + 9 耕地 + 60 作物阶段 + 468 甘蔗 + 5 盆栽贴图
-    # + 9 刷石机（侧/顶/底） + 198 金属 + 4 箱子 + 3 潜影盒 + 16 压缩熔炉 = 1393
-    assert len(block_tex) == 1393, len(block_tex)
+    # + 3 刷石机（侧/顶/底） + 198 金属 + 4 箱子 + 3 潜影盒 + 16 压缩熔炉 = 1387
+    assert len(block_tex) == 1387, len(block_tex)
     print(f"block textures: {len(block_tex)}, item textures: {len(item_tex)}, armor layers: {len(armor_layer_tex)}")
     for sub in SUBPROJECTS:
         rel = os.path.relpath(sub, ROOT)
@@ -887,6 +880,13 @@ def main():
                             "assets", "compressedblocks", "textures")
         for name, img in block_tex.items():
             asset_io.save_png(img, os.path.join(tdir, "block", name + ".png"))
+        # 主 mod 已删除 2x/3x 刷石机：清理历史遗留贴图。gen_resources 的 clean_owned_assets
+        # 会跳过 textures/，所以只能由本生成器负责；exists 判断保证重复运行幂等。
+        for prefix in ("2x_", "3x_"):
+            for suffix in ("", "_top", "_bottom"):
+                stale = os.path.join(tdir, "block", f"{prefix}cobblestone_generator{suffix}.png")
+                if os.path.exists(stale):
+                    os.remove(stale)
         for name, img in item_tex.items():
             asset_io.save_png(img, os.path.join(tdir, "item", name + ".png"))
         for name, img in gui_tex.items():

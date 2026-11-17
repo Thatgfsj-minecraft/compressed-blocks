@@ -48,8 +48,8 @@ def main():
              + ["compressed_chest", "compressed_shulker_box"])
     assert len(storage_names()) == 459, len(storage_names())
     assert len(tool_names()) == 90, len(tool_names())
-    assert len(blocks) == 1319, len(blocks)
-    assert len(items) == 1556, len(items)
+    assert len(blocks) == 1317, len(blocks)
+    assert len(items) == 1554, len(items)
     print(f"blocks={len(blocks)} items={len(items)} (tools={len(tool_names())} armor={len(armor_names())} "
           f"saplings={len(sapling_names())} leaves={len(leaves_names())} food={len(food_names())} "
           f"canes={len(cane_names())})")

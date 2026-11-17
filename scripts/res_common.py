@@ -373,8 +373,8 @@ def pot_names():
     return ["pot", "hopper_pot"]
 
 
-# 刷石机（3 个压缩等级，每秒产出对应等级的原石/压缩原石，压入下方容器）
-GENERATOR_TIERS = ["cobblestone_generator", "2x_cobblestone_generator", "3x_cobblestone_generator"]
+# 刷石机（主 mod 只保留原版级；1~9 重压缩刷石机在附属 mod compressedblockspot）
+GENERATOR_TIERS = ["cobblestone_generator"]
 
 
 def generator_names():
