@@ -20,9 +20,13 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraft.world.level.redstone.Orientation;
 
 /**
- * 刷石机（3 个压缩等级）：每秒产出 1 个对应等级的原石/压缩原石，压入下方容器；
+ * 刷石机：每秒产出 1 个对应压缩等级的产物，压入下方容器；
  * 下方无容器时暂存在机器内（一组上限），满了就停滞。
  * 机器外形内缩 1px（非完整实心方块，下方容器露出可点）；右键直开下方容器。
+ *
+ * <p>tier = 产物压缩等级：0 = 原石，1..9 = 1x..9x 压缩圆石（主 mod 三档为 0/1/2）。
+ * 本类可由附属 mod 继承：子类覆盖 {@link #newBlockEntity} 与 {@link #getTicker}
+ * 接入自己的方块实体类型，并复用 {@link #generatorTicker(BlockEntityType, Level)}。
  */
 public class CobblestoneGeneratorBlock extends Block implements EntityBlock {
     /** 16³ 内缩 1px：不再把下方箱子整个挡在点击盲区里。 */
@@ -35,7 +39,7 @@ public class CobblestoneGeneratorBlock extends Block implements EntityBlock {
         this.tier = tier;
     }
 
-    /** 压缩等级 1-3：产物分别为原石 / 一重压缩原石 / 二重压缩原石。 */
+    /** 产物压缩等级：0 = 原石，1..9 = 1x..9x 压缩圆石。 */
     public int tier() {
         return this.tier;
     }
@@ -82,18 +86,40 @@ public class CobblestoneGeneratorBlock extends Block implements EntityBlock {
             : super.useWithoutItem(state, level, pos, player, hit);
     }
 
+    /**
+     * public 且可覆盖：附属 mod 子类返回自己的方块实体实例
+     * （用 {@code CobblestoneGeneratorBlockEntity(BlockEntityType, BlockPos, BlockState)} 构造）。
+     */
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new CobblestoneGeneratorBlockEntity(pos, state);
     }
 
-    @Override
-    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state,
-                                                                  BlockEntityType<T> type) {
-        if (level.isClientSide() || type != CompressedBlocks.GENERATOR_TYPE) {
+    /**
+     * 刷石机 ticker 工厂：客户端或类型尚未就绪（附属 mod 注册早期）返回 null，
+     * 否则返回驱动 {@link CobblestoneGeneratorBlockEntity#serverTick} 的通用 ticker。
+     * 附属 mod 子类可复用本方法接入自己的方块实体类型。
+     */
+    @SuppressWarnings("unchecked")
+    public static <T extends BlockEntity> BlockEntityTicker<T> generatorTicker(BlockEntityType<T> expected,
+                                                                               Level level) {
+        if (level.isClientSide() || expected == null) {
             return null;
         }
         return (BlockEntityTicker<T>) (BlockEntityTicker<CobblestoneGeneratorBlockEntity>)
             CobblestoneGeneratorBlockEntity::serverTick;
+    }
+
+    /**
+     * 主 mod 的 BE 类型返回 ticker，其余类型返回 null；
+     * 附属 mod 子类覆盖本方法，用自己的类型调用 {@link #generatorTicker(BlockEntityType, Level)}。
+     */
+    @Override
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state,
+                                                                  BlockEntityType<T> type) {
+        if (type != CompressedBlocks.GENERATOR_TYPE) {
+            return null;
+        }
+        return generatorTicker(type, level);
     }
 }

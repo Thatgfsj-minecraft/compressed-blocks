@@ -201,12 +201,12 @@ final class CompressedContent {
             BLOCKS.add(new BlockReg(name, block, name));
             ITEMS.add(new ItemReg(name, item, Tab.TOOLS, true));
         }
-        // 5d. 刷石机（3 压缩等级）：每秒产出 1 个对应等级原石/压缩原石，压入下方容器
+        // 5d. 刷石机（3 档）：tier = 产物压缩等级（0 = 原石，1 = 1x，2 = 2x），每秒产出 1 个压入下方容器
         String[] generatorTiers = {"cobblestone_generator", "2x_cobblestone_generator",
             "3x_cobblestone_generator"};
         for (int i = 0; i < generatorTiers.length; i++) {
             String name = generatorTiers[i];
-            CobblestoneGeneratorBlock block = new CobblestoneGeneratorBlock(i + 1,
+            CobblestoneGeneratorBlock block = new CobblestoneGeneratorBlock(i,
                 BlockBehaviour.Properties.of()
                     .setId(ResourceKey.create(Registries.BLOCK, id(name)))
                     .mapColor(MapColor.COLOR_GRAY)

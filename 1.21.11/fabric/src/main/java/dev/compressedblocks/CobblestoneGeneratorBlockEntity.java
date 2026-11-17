@@ -11,6 +11,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.HopperBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.HopperBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
@@ -37,7 +38,12 @@ import net.minecraft.world.level.storage.ValueOutput;
  *   <li>输出受阻时节流日志（约 200 tick 一条），记录原因/坐标/当前方向，便于线上定位。</li>
  * </ol>
  *
- * <p>产物随压缩等级：1 级=原石，2 级=一重压缩原石，3 级=二重压缩原石。
+ * <p>tier = 产物压缩等级：0 = 原石，1..9 = 1x..9x 压缩圆石。
+ *
+ * <p>本类供主 mod 三档刷石机与附属 mod 的 1~9 重刷石机复用：附属 mod 声明自己的
+ * {@link BlockEntityType} 后，方块实体子类用
+ * {@link #CobblestoneGeneratorBlockEntity(BlockEntityType, BlockPos, BlockState)} 构造，
+ * 方块子类覆盖 {@code newBlockEntity}/{@code getTicker} 接入。
  */
 public class CobblestoneGeneratorBlockEntity extends BlockEntity {
     /** 产出周期：20 tick = 1 秒。 */
@@ -58,17 +64,26 @@ public class CobblestoneGeneratorBlockEntity extends BlockEntity {
     /** 上次「输出受阻」日志的 gameTime，仅用于节流，不持久化。 */
     private long lastBlockedLogTick = -BLOCKED_LOG_INTERVAL;
 
+    /** 主 mod 注册的 BE 类型构造：委托到通用重载，供主 mod 三档刷石机使用。 */
     public CobblestoneGeneratorBlockEntity(BlockPos pos, BlockState state) {
-        super(CompressedBlocks.GENERATOR_TYPE, pos, state);
-        this.tier = state.getBlock() instanceof CobblestoneGeneratorBlock gen ? gen.tier() : 1;
+        this(CompressedBlocks.GENERATOR_TYPE, pos, state);
     }
 
+    /**
+     * 通用构造：附属 mod 子类传入自己的 {@link BlockEntityType} 接入独立 BE 类型。
+     * tier 从方块实例读取（方块需为 {@link CobblestoneGeneratorBlock} 或其子类，否则按 0 = 原石处理）。
+     */
+    public CobblestoneGeneratorBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
+        super(type, pos, state);
+        this.tier = state.getBlock() instanceof CobblestoneGeneratorBlock gen ? gen.tier() : 0;
+    }
+
+    /** 产物由 tier 决定：0 = 原石，N(1~9) = Nx 压缩圆石；物品缺失时回退原石。 */
     private ItemStack product() {
-        return switch (this.tier) {
-            case 3 -> itemOrCobble(CompressedBlocks.itemByName("2x_cobblestone"));
-            case 2 -> itemOrCobble(CompressedBlocks.itemByName("1x_cobblestone"));
-            default -> new ItemStack(Items.COBBLESTONE);
-        };
+        if (this.tier <= 0) {
+            return new ItemStack(Items.COBBLESTONE);
+        }
+        return itemOrCobble(CompressedBlocks.itemByName(this.tier + "x_cobblestone"));
     }
 
     private static ItemStack itemOrCobble(Item item) {
