@@ -1,5 +1,15 @@
 {
-  "itemGroup.compressedblockspot.pots":"压缩盆栽",
+  "itemGroup.compressedblockspot.addon_blocks":"压缩拓展方块",
+  "itemGroup.compressedblockspot.addon_tools":"压缩拓展工具",
   "block.compressedblockspot.compressed_pot":"压缩盆栽",
-  "block.compressedblockspot.compressed_hopper_pot":"压缩漏斗盆栽"
+  "block.compressedblockspot.compressed_hopper_pot":"压缩漏斗盆栽",
+  "block.compressedblockspot.1x_cobblestone_generator":"一重压缩刷石机",
+  "block.compressedblockspot.2x_cobblestone_generator":"二重压缩刷石机",
+  "block.compressedblockspot.3x_cobblestone_generator":"三重压缩刷石机",
+  "block.compressedblockspot.4x_cobblestone_generator":"四重压缩刷石机",
+  "block.compressedblockspot.5x_cobblestone_generator":"五重压缩刷石机",
+  "block.compressedblockspot.6x_cobblestone_generator":"六重压缩刷石机",
+  "block.compressedblockspot.7x_cobblestone_generator":"七重压缩刷石机",
+  "block.compressedblockspot.8x_cobblestone_generator":"八重压缩刷石机",
+  "block.compressedblockspot.9x_cobblestone_generator":"九重压缩刷石机"
 }

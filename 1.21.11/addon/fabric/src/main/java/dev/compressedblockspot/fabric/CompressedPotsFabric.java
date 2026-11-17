@@ -1,5 +1,6 @@
 package dev.compressedblockspot.fabric;
 
+import dev.compressedblocks.CobblestoneGeneratorBlockEntity;
 import dev.compressedblockspot.CompressedPotsAddon;
 import dev.compressedblockspot.SpotPotBlockEntity;
 import dev.compressedblockspot.SpotPotRenderer;
@@ -45,6 +46,14 @@ public class CompressedPotsFabric implements ModInitializer {
             CompressedPotsAddon.POT_TYPE = FabricBlockEntityTypeBuilder
                 .create(SpotPotBlockEntity::new,
                     CompressedPotsAddon.COMPRESSED_POT, CompressedPotsAddon.HOPPER_POT)
+                .build());
+        // 附属刷石机方块实体类型：9 台刷石机共用（tier 由方块决定），产物/输出逻辑复用主 mod 内核
+        Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE,
+            CompressedPotsAddon.id("cobblestone_generator"),
+            CompressedPotsAddon.GENERATOR_TYPE = FabricBlockEntityTypeBuilder
+                .create((pos, state) -> new CobblestoneGeneratorBlockEntity(
+                        CompressedPotsAddon.GENERATOR_TYPE, pos, state),
+                    CompressedPotsAddon.GENERATOR_BLOCKS.toArray(new Block[0]))
                 .build());
         // 保持 GENERATOR-style 无关：确保方块集合非空
         if (CompressedPotsAddon.BLOCKS.isEmpty()) {

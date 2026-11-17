@@ -1,24 +1,30 @@
 package dev.compressedblockspot;
 
+import dev.compressedblocks.CobblestoneGeneratorBlockEntity;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
-import net.minecraft.world.level.block.SoundType;
 
 /**
- * 压缩盆栽附属（compressedblockspot）：压缩盆栽 + 压缩漏斗盆栽。
- * 独立实现：通过方块 id 前缀解析压缩等级（"9x_dirt" → 9），不直接调用主 mod 类；
+ * 压缩盆栽附属（compressedblockspot）：压缩盆栽 + 压缩漏斗盆栽 + 1~9 重压缩刷石机。
+ * 盆栽独立实现：通过方块 id 前缀解析压缩等级（"9x_dirt" → 9），不直接调用主 mod 类；
  * 运行时与主 mod 通过 id/标签交互（pot 材质标签、压缩泥土/植物 id）。
  * 土壤等级每比作物高 1 级提速 5%；漏斗盆栽成熟自动收割入下方容器。
+ * 刷石机继承主 mod 内核（{@link dev.compressedblocks.CobblestoneGeneratorBlock}），只换自己的方块实体类型。
  */
 public final class CompressedPotsAddon {
     public static final String MOD_ID = "compressedblockspot";
@@ -27,6 +33,10 @@ public final class CompressedPotsAddon {
     public static SpotPotBlock COMPRESSED_POT;
     public static SpotPotBlock HOPPER_POT;
     public static BlockEntityType<SpotPotBlockEntity> POT_TYPE;
+
+    /** 附属 1~9 重压缩刷石机（tier = 产物压缩等级 1..9）与附属方块实体类型（由加载器入口构建注入）。 */
+    public static final List<AddonCobblestoneGeneratorBlock> GENERATOR_BLOCKS = new ArrayList<>();
+    public static BlockEntityType<CobblestoneGeneratorBlockEntity> GENERATOR_TYPE;
 
     /** 大容量容器插入钩子（加载器入口注入：Fabric=Transfer API），兼容储物抽屉等。 */
     public interface ItemSink {
@@ -67,6 +77,13 @@ public final class CompressedPotsAddon {
         return 0;
     }
 
+    /** 主 mod 物品查找（创造栏图标用）；缺失时返回空栈。 */
+    private static ItemStack mainItem(String path) {
+        return BuiltInRegistries.ITEM.get(Identifier.fromNamespaceAndPath(MAIN_NS, path))
+            .map(holder -> new ItemStack(holder.value()))
+            .orElse(ItemStack.EMPTY);
+    }
+
     private static void register() {
         COMPRESSED_POT = new SpotPotBlock(false, BlockBehaviour.Properties.of()
             .setId(ResourceKey.create(net.minecraft.core.registries.Registries.BLOCK, id("compressed_pot")))
@@ -91,15 +108,34 @@ public final class CompressedPotsAddon {
             Registry.register(BuiltInRegistries.ITEM, id(name), item);
             BLOCKS.add(block);
         }
-        CreativeModeTab tab = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 4)
-            .title(net.minecraft.network.chat.Component.translatable("itemGroup." + MOD_ID + ".pots"))
-            .icon(() -> new net.minecraft.world.item.ItemStack(COMPRESSED_POT))
+        // 9 台压缩刷石机：tier = n = 产物压缩等级（1x..9x 压缩圆石），复用主 mod 内核
+        for (int tier = 1; tier <= 9; tier++) {
+            String name = tier + "x_cobblestone_generator";
+            AddonCobblestoneGeneratorBlock block = new AddonCobblestoneGeneratorBlock(tier,
+                BlockBehaviour.Properties.of()
+                    .setId(ResourceKey.create(Registries.BLOCK, id(name)))
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(3.5F, 1200.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.STONE)
+                    .noOcclusion());
+            BlockItem item = new BlockItem(block,
+                new Item.Properties()
+                    .setId(ResourceKey.create(Registries.ITEM, id(name)))
+                    .useBlockDescriptionPrefix());
+            Registry.register(BuiltInRegistries.BLOCK, id(name), block);
+            Registry.register(BuiltInRegistries.ITEM, id(name), item);
+            GENERATOR_BLOCKS.add(block);
+            BLOCKS.add(block);
+        }
+        // 创造栏 5 栏（主 mod 3 栏 + 附属 2 栏）：原「压缩盆栽」栏拆成拓展方块 / 拓展工具
+        CreativeModeTab addonBlocks = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 3)
+            .title(Component.translatable("itemGroup." + MOD_ID + ".addon_blocks"))
+            .icon(() -> mainItem("9x_cane"))
             .displayItems((parameters, output) -> {
-                output.accept(COMPRESSED_POT);
-                output.accept(HOPPER_POT);
                 // 本栏仅附属安装时存在：主 mod 的压缩甘蔗/树苗也归这里展示
                 for (Item item : BuiltInRegistries.ITEM) {
-                    net.minecraft.resources.Identifier key = BuiltInRegistries.ITEM.getKey(item);
+                    Identifier key = BuiltInRegistries.ITEM.getKey(item);
                     if (key.getNamespace().equals(MAIN_NS)
                             && (key.getPath().endsWith("_cane") || key.getPath().endsWith("_sapling"))) {
                         output.accept(item);
@@ -107,12 +143,25 @@ public final class CompressedPotsAddon {
                 }
             })
             .build();
-        Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, id("pots"), tab);
+        Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, id("addon_blocks"), addonBlocks);
+
+        CreativeModeTab addonTools = CreativeModeTab.builder(CreativeModeTab.Row.TOP, 4)
+            .title(Component.translatable("itemGroup." + MOD_ID + ".addon_tools"))
+            .icon(() -> new ItemStack(GENERATOR_BLOCKS.get(GENERATOR_BLOCKS.size() - 1)))
+            .displayItems((parameters, output) -> {
+                output.accept(COMPRESSED_POT);
+                output.accept(HOPPER_POT);
+                for (AddonCobblestoneGeneratorBlock block : GENERATOR_BLOCKS) {
+                    output.accept(block);
+                }
+            })
+            .build();
+        Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, id("addon_tools"), addonTools);
     }
 
     public static void init() {
         register();
-        // POT_TYPE 由 fabric 入口经 FabricBlockEntityTypeBuilder 构建注入
+        // POT_TYPE / GENERATOR_TYPE 由 fabric 入口经 FabricBlockEntityTypeBuilder 构建注入
     }
 
     private CompressedPotsAddon() {

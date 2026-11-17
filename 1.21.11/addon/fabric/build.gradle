@@ -6,7 +6,7 @@ loom {
     accessWidenerPath = file('src/main/resources/compressedblockspot.aw')
 }
 
-version = '0.3.2'
+version = '0.4.0'
 group = 'dev.compressedblockspot'
 
 base {
@@ -22,6 +22,8 @@ dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings loom.officialMojangMappings()
     modImplementation "net.fabricmc:fabric-loader:${project.fabric_loader_version}"
+    // 主 mod dev jar（Mojmap 名）：build/libs 是 intermediary 重映射产物，编译时找不到方法名
+    compileOnly files("../../fabric/build/devlibs/compressedblocks-fabric-1.21.11-${project.main_mod_version}-dev.jar")
     def apiRoot = '../../fabric/.gradle/loom-cache/remapped_mods/remapped/net/fabricmc/fabric-api'
     implementation files(apiRoot + '/fabric-object-builder-api-v1-4abd26ae/21.1.40+4fc5413f3e/fabric-object-builder-api-v1-4abd26ae-21.1.40+4fc5413f3e.jar')
     compileOnly files(apiRoot + '/fabric-rendering-v1-4abd26ae/16.2.10+0290ad933e/fabric-rendering-v1-4abd26ae-16.2.10+0290ad933e.jar')

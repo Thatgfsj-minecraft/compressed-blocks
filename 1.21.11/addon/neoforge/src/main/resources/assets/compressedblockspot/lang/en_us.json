@@ -1,5 +1,15 @@
 {
-  "itemGroup.compressedblockspot.pots":"Compressed Pots",
-  "block.compressedblockspot.compressed_pot":"Compressed Pot",
-  "block.compressedblockspot.compressed_hopper_pot":"Compressed Hopper Pot"
+  "itemGroup.compressedblockspot.addon_blocks":"Addon Blocks",
+  "itemGroup.compressedblockspot.addon_tools":"Addon Tools",
+  "block.compressedblockspot.compressed_pot":"Pot",
+  "block.compressedblockspot.compressed_hopper_pot":"Compressed Hopper Pot",
+  "block.compressedblockspot.1x_cobblestone_generator":"1x Compressed Cobblestone Generator",
+  "block.compressedblockspot.2x_cobblestone_generator":"2x Compressed Cobblestone Generator",
+  "block.compressedblockspot.3x_cobblestone_generator":"3x Compressed Cobblestone Generator",
+  "block.compressedblockspot.4x_cobblestone_generator":"4x Compressed Cobblestone Generator",
+  "block.compressedblockspot.5x_cobblestone_generator":"5x Compressed Cobblestone Generator",
+  "block.compressedblockspot.6x_cobblestone_generator":"6x Compressed Cobblestone Generator",
+  "block.compressedblockspot.7x_cobblestone_generator":"7x Compressed Cobblestone Generator",
+  "block.compressedblockspot.8x_cobblestone_generator":"8x Compressed Cobblestone Generator",
+  "block.compressedblockspot.9x_cobblestone_generator":"9x Compressed Cobblestone Generator"
 }

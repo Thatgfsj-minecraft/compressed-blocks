@@ -108,6 +108,18 @@ cd 1.21.11/neoforge && GRADLE_USER_HOME=<干净目录> ./gradlew build
 # 产物：build/libs/compressedblocks-<loader>-<mc版本>-<version>.jar
 ```
 
+- **附属 mod（compressedblockspot）必须先构建主 mod**：附属没有自己的主 mod 源码，编译时直接引用主 mod 构建产物——
+  Fabric 用 `1.21.11/fabric/build/devlibs/compressedblocks-fabric-1.21.11-<版本>-dev.jar`（Mojmap 名；
+  `build/libs` 里是 intermediary 重映射产物，编译会找不到方法名），NeoForge 用
+  `1.21.11/neoforge/build/libs/compressedblocks-neoforge-1.21.11-<版本>.jar`。版本由附属各端
+  `gradle.properties` 的 `main_mod_version` 对齐，主 mod 版本变化时要同步改。
+  ```bash
+  # 主 mod 构建完之后：
+  cd 1.21.11/addon/fabric   && GRADLE_USER_HOME=<干净目录> ./gradlew build
+  cd 1.21.11/addon/neoforge && GRADLE_USER_HOME=<干净目录> ./gradlew build
+  # 产物：1.21.11/addon/<loader>/build/libs/compressedblockspot-<loader>-1.21.11-<version>.jar
+  ```
+
 - 环境：Loom 1.17.21 / ModDevGradle 2.0.147 / Gradle 9.5.1 / JDK 21（版本坐标在各子项目 gradle.properties）
 - **GRADLE_USER_HOME 必须指向无 init.gradle 的干净目录**（全局阿里云镜像会破坏 NeoForge 解析）
 - 贴图与全部 JSON 由脚本生成：`python scripts/gen_assets.py && python scripts/gen_resources.py`（原版 sprite 缓存于 `_asset-src/vanilla/`，树特征模板在 `_asset-src/vanilla-data/`，均不入库）
