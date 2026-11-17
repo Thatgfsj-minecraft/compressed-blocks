@@ -170,13 +170,26 @@ final class CompressedSelfTest {
         // 可燃物：压缩木制物品必须被 FuelValues 收录且燃烧时间符合 CompressedFuels 规则；
         // 盆栽不可燃。Fabric 走 FuelRegistryEvents、NeoForge 走 furnace_fuels 数据图，两边都要过。
         net.minecraft.world.level.block.entity.FuelValues fuels = level.fuelValues();
+        int[] fuelSeen = {0};
         CompressedFuels.forEach((item, ticks) -> {
+            fuelSeen[0]++;
             int actual = fuels.burnDuration(new ItemStack(item));
             if (actual != ticks) {
                 errors.add("fuel " + BuiltInRegistries.ITEM.getKey(item).getPath()
                     + " burn " + actual + " != " + ticks);
             }
         });
+        // 条目数对拍：防止规则被改小/命名失配后 forEach 静默少注册（NeoForge data map 漂移也会在这里暴露）
+        if (fuelSeen[0] != CompressedFuels.EXPECTED_ITEM_COUNT) {
+            errors.add("fuel entries " + fuelSeen[0] + " != " + CompressedFuels.EXPECTED_ITEM_COUNT);
+        }
+        // 反向断言：FuelValues 里属于本模组的燃料项，必须在规则表里（防止 data map/注册残留过时条目）
+        for (Item fuelItem : fuels.fuelItems()) {
+            var fuelId = BuiltInRegistries.ITEM.getKey(fuelItem);
+            if (fuelId.getNamespace().equals(MOD_ID) && CompressedFuels.burnTimeFor(fuelId.getPath()) <= 0) {
+                errors.add("unexpected fuel: " + fuelId.getPath());
+            }
+        }
         for (String notFuel : new String[] {"pot", "hopper_pot"}) {
             Item notFuelItem = itemByName(notFuel);
             if (notFuelItem != null && fuels.isFuel(new ItemStack(notFuelItem))) {

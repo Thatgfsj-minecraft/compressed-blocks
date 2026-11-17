@@ -14,6 +14,7 @@ import net.minecraft.world.item.Item;
  *   <li>压缩木质储存方块（压缩原木 1~9 重）：原版原木 300 tick，每重 ×5，不封顶</li>
  *   <li>木线工具 / 木制盔甲：原版木质工具 200 tick，每重 ×5</li>
  *   <li>压缩木棍：原版木棍 100 tick，每重 ×5</li>
+ *   <li>压缩树苗：原版树苗 100 tick，每重 ×5（2026-11-18 用户确认加入）</li>
  *   <li>木质漏斗（基础 + 1~3 重压缩）：按箱子 300 tick 基准，每重 ×5</li>
  *   <li>压缩箱子：5 × 箱子 = 1500 tick</li>
  *   <li>盆栽（pot / hopper_pot）**不可燃**</li>
@@ -28,12 +29,19 @@ public final class CompressedFuels {
     public static final int TOOL_BASE = 200;
     /** 原版木棍燃烧时间。 */
     public static final int STICK_BASE = 100;
+    /** 原版树苗燃烧时间（与木棍同为 100 tick）。 */
+    public static final int SAPLING_BASE = 100;
     /** 木制盔甲按木质工具时间（与 TOOL_BASE 同值，单列以便日后单独调整）。 */
     public static final int ARMOR_BASE = 200;
     /** 木质漏斗按箱子时间。 */
     public static final int HOPPER_BASE = 300;
     /** 压缩箱子 = 5 × 箱子。 */
     public static final int COMPRESSED_CHEST = LOG_BASE * TIER_FACTOR;
+    /**
+     * 规则命中的物品总数（9 木材 × (9 原木 + 9 树苗 + 9 木棍 + 9 工具 + 4 盔甲) + 4 木漏斗 + 1 压缩箱 = 257）。
+     * 改动燃料规则时必须同步；SELF-TEST 用它对拍「注册进 FuelValues 的条目数」，防止静默漏注册。
+     */
+    public static final int EXPECTED_ITEM_COUNT = 257;
 
     private static final int[] TIER_MULT = new int[CompressedBlocks.LEVELS + 1];
 
@@ -82,6 +90,9 @@ public final class CompressedFuels {
         }
         if (path.endsWith("_stick")) {
             return level >= 1 ? STICK_BASE * mult : -1;
+        }
+        if (path.endsWith("_sapling")) {
+            return level >= 1 ? SAPLING_BASE * mult : -1;
         }
         int wood = path.indexOf("_wood_");
         if (wood >= 0) {
