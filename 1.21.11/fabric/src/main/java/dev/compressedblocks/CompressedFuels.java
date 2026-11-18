@@ -16,6 +16,8 @@ import net.minecraft.world.item.Item;
  *   <li>木线工具 / 木制盔甲：原版木质工具 200 tick，每重 ×5</li>
  *   <li>压缩木棍：原版木棍 100 tick，每重 ×5</li>
  *   <li>压缩树苗：原版树苗 100 tick，每重 ×5（2026-11-18 用户确认加入）</li>
+ *   <li>压缩树叶：按树苗同档 100 tick，每重 ×5（2026-11-18 用户确认加入；方块本体不可燃
+ *   ——高密度不点燃、不传播火焰，仅作熔炉燃料，与原版树叶本就非燃料不同，属模组定位的增强）</li>
  *   <li>木质漏斗（基础 + 1~3 重压缩）：按箱子 300 tick 基准，每重 ×5</li>
  *   <li>压缩箱子：5 × 箱子 = 1500 tick</li>
  *   <li>盆栽（pot / hopper_pot）**不可燃**</li>
@@ -32,6 +34,8 @@ public final class CompressedFuels {
     public static final int STICK_BASE = 100;
     /** 原版树苗燃烧时间（与木棍同为 100 tick）。 */
     public static final int SAPLING_BASE = 100;
+    /** 压缩树叶燃烧时间：按树苗同档 100 tick（原版树叶本就非燃料，此处为模组定位的增强）。 */
+    public static final int LEAVES_BASE = 100;
     /** 木制盔甲按木质工具时间（与 TOOL_BASE 同值，单列以便日后单独调整）。 */
     public static final int ARMOR_BASE = 200;
     /** 木质漏斗按箱子时间。 */
@@ -39,10 +43,11 @@ public final class CompressedFuels {
     /** 压缩箱子 = 5 × 箱子。 */
     public static final int COMPRESSED_CHEST = LOG_BASE * TIER_FACTOR;
     /**
-     * 规则命中的物品总数（9 树种 × (9 原木 + 9 树苗) + 9 压缩木棍 + 45 木线工具 + 36 木甲 + 4 木漏斗 + 1 压缩箱 = 257）。
+     * 规则命中的物品总数（9 树种 × (9 原木 + 9 树苗 + 9 树叶) + 9 压缩木棍 + 45 木线工具
+     * + 36 木甲 + 4 木漏斗 + 1 压缩箱 = 338）。
      * 改动燃料规则时必须同步；SELF-TEST 用它对拍「注册进 FuelValues 的条目数」，防止静默漏注册。
      */
-    public static final int EXPECTED_ITEM_COUNT = 257;
+    public static final int EXPECTED_ITEM_COUNT = 338;
 
     private static final int[] TIER_MULT = new int[CompressedBlocks.LEVELS + 1];
 
@@ -88,6 +93,9 @@ public final class CompressedFuels {
         }
         if (path.endsWith("_log")) {
             return level >= 1 ? LOG_BASE * mult : -1;
+        }
+        if (path.endsWith("_leaves")) {
+            return level >= 1 ? LEAVES_BASE * mult : -1;
         }
         if (path.endsWith("_stick")) {
             return level >= 1 ? STICK_BASE * mult : -1;
