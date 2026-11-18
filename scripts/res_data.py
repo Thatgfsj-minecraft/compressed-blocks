@@ -376,6 +376,25 @@ def gen_data(data):
         target = {"stone": stone_tool, "iron": iron_tool, "diamond": diamond_tool}[m[3]]
         target += [f"{NS}:{n}" for n in compat_names() if n.endswith(f"_{m[0]}_block")]
     logs = [f"{NS}:{p}_{w[0]}_log" for w in WOODS for p in LV]
+    # 标签补齐（refs #88）：锹/锄按材料采掘类别登记 —— 原版锹/锄对压缩泥土/沙/黏土/雪/泥巴/
+    # 耕地/干草/苔藓恢复本类工具速度（此前所有储存方块只进 #mineable/pickaxe）
+    shovel_mats = {"clay", "dirt", "sand", "gravel", "mud", "snow", "gunpowder"}
+    hoe_mats = {"hay_block", "moss_block"}
+    shovel = [f"{NS}:{n}" for n in storage_names()
+              if n.split("_", 1)[1] in shovel_mats] + [f"{NS}:{n}" for n in farmland_names()]
+    hoe = [f"{NS}:{n}" for n in storage_names() if n.split("_", 1)[1] in hoe_mats]
+    # 原版植物可种在压缩土壤上：#dirt/#sand 驱动原版甘蔗/仙人掌/竹子/树苗/花的 canPlaceOn 判定
+    dirt_like = [f"{NS}:{n}" for n in storage_names()
+                 if n.split("_", 1)[1] in {"dirt", "mud", "moss_block"}]
+    sand_like = [f"{NS}:{n}" for n in storage_names() if n.split("_", 1)[1] == "sand"]
+    # 信标底座 = 铁/金/钻石/绿宝石块；末影龙免疫 = 黑曜石/末地石（对齐原版成员）
+    beacon = [f"{NS}:{n}" for n in storage_names()
+              if n.split("_", 1)[1] in {"iron_block", "gold_block", "diamond_block", "emerald_block"}]
+    dragon_immune = [f"{NS}:{n}" for n in storage_names()
+                     if n.split("_", 1)[1] in {"obsidian", "end_stone"}]
+    # 蜜蜂可为压缩樱花树叶授粉（原版 cherry_leaves ∈ #flowers）；#ice 供原版冰面判定
+    flowers = [f"{NS}:{n}" for n in leaves_names() if n.endswith("_cherry_leaves")]
+    ice = [f"{NS}:{n}" for n in storage_names() if n.split("_", 1)[1] == "blue_ice"]
     # 漏斗的采掘标签值也在这里写（漏斗生成器会重写同样内容），保证单独跑本脚本不丢条目
     iron_hoppers = [f"{NS}:{name}" for _t, name, _e, _z in hopper_tiers.IRON_HOPPERS]
     wooden_hoppers = [f"{NS}:{name}" for _t, name, _e, _z in hopper_tiers.WOODEN_HOPPERS]
@@ -388,6 +407,10 @@ def gen_data(data):
                         ("leaves", [f"{NS}:{n}" for n in leaves_names()]),
                         ("saplings", [f"{NS}:{n}" for n in sapling_names()]),
                         ("crops", [f"{NS}:{n}" for n in crop_block_names()]),
+                        ("mineable/shovel", shovel), ("mineable/hoe", hoe),
+                        ("dirt", dirt_like), ("sand", sand_like),
+                        ("beacon_base_blocks", beacon), ("dragon_immune", dragon_immune),
+                        ("flowers", flowers), ("ice", ice),
                         ("shulker_boxes", [f"{NS}:compressed_shulker_box"])]:
         tag_obj = {"replace": False, "values": sorted(values)}
         if tag in ("mineable/pickaxe", "mineable/axe", "needs_iron_tool"):
@@ -414,6 +437,20 @@ def gen_data(data):
     armor = [f"{NS}:{n}" for n in armor_names()]
     for tag in ("enchantable/armor", "enchantable/durability"):
         dump(f"{data}/minecraft/tags/item/{tag}.json", {"replace": False, "values": sorted(armor)})
+    # 护甲槽位标签（refs #88）：原版 #enchantable/head_armor 等直接引用四槽位标签，缺槽位导致
+    # 水下呼吸/水下速掘/摔落保护/深海探索者/冰霜行者/灵魂疾行/迅捷潜行/绑定诅咒无法附上；
+    # #trimmable_armor 同样引用四槽位，盔甲纹饰随之自动生效
+    for slot, kind in [("head_armor", "helmet"), ("chest_armor", "chestplate"),
+                       ("leg_armor", "leggings"), ("foot_armor", "boots")]:
+        dump(f"{data}/minecraft/tags/item/{slot}.json",
+             {"replace": False, "values": sorted(n for n in armor if n.endswith(f"_{kind}"))})
+    # 木质盔甲 = 皮甲对应物：全套免疫细雪（原版 #freeze_immune_wearables 含皮甲四件）
+    dump(f"{data}/minecraft/tags/item/freeze_immune_wearables.json",
+         {"replace": False, "values": sorted(n for n in armor if "_wood_" in n)})
+    # 压缩镐进 #cluster_max_harvestables：紫水晶簇按 4 个掉落（原版为具体物品清单，
+    # 不经 #pickaxes 传递，战利品表 match_tool 直接查它）
+    dump(f"{data}/minecraft/tags/item/cluster_max_harvestables.json",
+         {"replace": False, "values": sorted(f"{NS}:{n}" for n in tool_names() if n.endswith("_pickaxe"))})
     # 工具修复材料标签：同重数的混用组；护甲=同重数压缩石头
     for mat, _, _ in TOOL_LINES:
         for p in LV:

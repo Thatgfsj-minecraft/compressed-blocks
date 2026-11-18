@@ -174,6 +174,61 @@ final class CompressedSelfTest {
         if (oakLeaves == null || !oakLeaves.defaultBlockState().is(BlockTags.LEAVES)) {
             errors.add("compressed leaves not in #minecraft:leaves");
         }
+        // 标签族补齐（refs #88）：锹/锄采掘类别、护甲槽位附魔、紫水晶簇、信标底座、
+        // 末影龙免疫、蜜蜂授粉、细雪免疫、原版植物种植 —— 防生成器回退
+        Block dirtBlock = blockByName("1x_dirt");
+        if (dirtBlock == null || !dirtBlock.defaultBlockState().is(BlockTags.MINEABLE_WITH_SHOVEL)) {
+            errors.add("1x_dirt not in #mineable/shovel");
+        }
+        Block farmlandBlock = blockByName("1x_farmland");
+        if (farmlandBlock == null || !farmlandBlock.defaultBlockState().is(BlockTags.MINEABLE_WITH_SHOVEL)) {
+            errors.add("1x_farmland not in #mineable/shovel");
+        }
+        Block hayBlock = blockByName("1x_hay_block");
+        if (hayBlock == null || !hayBlock.defaultBlockState().is(BlockTags.MINEABLE_WITH_HOE)) {
+            errors.add("1x_hay_block not in #mineable/hoe");
+        }
+        Block sandBlock = blockByName("1x_sand");
+        if (dirtBlock != null && !dirtBlock.defaultBlockState().is(BlockTags.DIRT)) {
+            errors.add("1x_dirt not in #dirt");
+        }
+        if (sandBlock == null || !sandBlock.defaultBlockState().is(BlockTags.SAND)) {
+            errors.add("1x_sand not in #sand");
+        }
+        Block ironBlock = blockByName("1x_iron_block");
+        if (ironBlock == null || !ironBlock.defaultBlockState().is(BlockTags.BEACON_BASE_BLOCKS)) {
+            errors.add("1x_iron_block not in #beacon_base_blocks");
+        }
+        Block obsidianBlock = blockByName("1x_obsidian");
+        if (obsidianBlock == null || !obsidianBlock.defaultBlockState().is(BlockTags.DRAGON_IMMUNE)) {
+            errors.add("1x_obsidian not in #dragon_immune");
+        }
+        Block cherryLeaves = blockByName("1x_cherry_leaves");
+        if (cherryLeaves == null || !cherryLeaves.defaultBlockState().is(BlockTags.FLOWERS)) {
+            errors.add("1x_cherry_leaves not in #flowers");
+        }
+        Block blueIce = blockByName("1x_blue_ice");
+        if (blueIce == null || !blueIce.defaultBlockState().is(BlockTags.ICE)) {
+            errors.add("1x_blue_ice not in #ice");
+        }
+        // 护甲槽位（原版 #enchantable/head_armor 等直接引用四槽位）+ 细雪免疫 + 紫水晶簇
+        TagKey<Item> headArmor = vanillaItemTag("head_armor");
+        TagKey<Item> footArmor = vanillaItemTag("foot_armor");
+        TagKey<Item> freezeImmune = vanillaItemTag("freeze_immune_wearables");
+        TagKey<Item> clusterMax = vanillaItemTag("cluster_max_harvestables");
+        Item stoneHelmet = itemByName("1x_stone_helmet");
+        if (stoneHelmet == null || !new ItemStack(stoneHelmet).is(headArmor)) {
+            errors.add("1x_stone_helmet not in #head_armor");
+        }
+        Item woodBoots = itemByName("1x_wood_boots");
+        if (woodBoots == null || !new ItemStack(woodBoots).is(footArmor)
+            || !new ItemStack(woodBoots).is(freezeImmune)) {
+            errors.add("wood boots not in #foot_armor/#freeze_immune_wearables");
+        }
+        Item woodPick = itemByName("1x_wood_pickaxe");
+        if (woodPick == null || !new ItemStack(woodPick).is(clusterMax)) {
+            errors.add("1x_wood_pickaxe not in #cluster_max_harvestables");
+        }
 
         // 可燃物：压缩木制物品必须被 FuelValues 收录且燃烧时间符合 CompressedFuels 规则；
         // 盆栽不可燃。Fabric 走 FuelRegistryEvents、NeoForge 走 furnace_fuels 数据图，两边都要过。
